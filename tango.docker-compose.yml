@@ -1,0 +1,243 @@
+version: '2.4'
+
+networks:
+  default:
+    name: ${TANGO_APP_NETWORK_NAME}
+
+volumes:
+  artefact:
+    name: ${TANGO_APP_NAME}_artefact
+  data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH}
+    name: ${TANGO_APP_NAME}_data
+  internal_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${TANGO_DATA_PATH}
+    name: ${TANGO_INSTANCE_NAME}_internal_data
+  letsencrypt:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${TANGO_DATA_PATH}/letsencrypt
+    name: ${TANGO_INSTANCE_NAME}_letsencrypt
+  traefikconfig:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${TANGO_DATA_PATH}/traefikconfig
+    name: ${TANGO_INSTANCE_NAME}_traefikconfig
+    
+
+services:
+
+  # Launch all services
+  tango:
+    image: bash:4.4.23
+    container_name: ${TANGO_APP_NAME}
+    user: ${TANGO_USER_ID:-0}:${TANGO_GROUP_ID:-0}
+    depends_on:
+      - service_info
+    networks:
+      - default
+    command: >
+      bash -c "echo Hello ${TANGO_APP_NAME}."
+
+  # do some init on internal volume
+  # populate artefact named volume with a foo file because when mounting an empty named volume on {$TANGO_ARTEFACT_MOUNT_POINT}, it might get existing content (i.e : cdrom, floppy, usb... for /media)
+  volume_init:
+    image: bash:4.4.23
+    container_name: ${TANGO_INSTANCE_NAME}_volume_init
+    user: root
+    volumes:
+      - artefact:/foo
+    networks:
+      - default
+    command: >
+      bash -c "touch /foo/.tango"  
+      
+  # init service
+  service_init:
+    image: bash:4.4.23
+    container_name: ${TANGO_INSTANCE_NAME}_service_init
+    user: ${TANGO_USER_ID:-0}:${TANGO_GROUP_ID:-0}
+    depends_on:
+      - volume_init
+    volumes:
+      - data:/data
+      - internal_data:/internal_data
+      - artefact:${TANGO_ARTEFACT_MOUNT_POINT:-/artefact}
+      - ${TANGO_ROOT}/pool:/pool/tango
+    env_file:
+      - ${GENERATED_ENV_FILE_FOR_COMPOSE}
+    networks:
+      - default
+    command: >
+      bash -c "for f in /pool/tango/scripts/*; do [ -f \"$${f}\" ] && $${f} init; done &&
+      for f in /pool/${TANGO_APP_NAME}/scripts/*; do [ -f \"$${f}\" ] && $${f} init; done
+      "
+
+  # info on services
+  service_info:
+    image: bash:4.4.23
+    container_name: ${TANGO_INSTANCE_NAME}_service_info
+    user: ${TANGO_USER_ID:-0}:${TANGO_GROUP_ID:-0}
+    volumes:
+      - ${TANGO_ROOT}/pool:/pool/tango
+    env_file:
+      - ${GENERATED_ENV_FILE_FOR_COMPOSE}
+    networks:
+      - default
+    command: >
+      bash -c "for f in /pool/tango/scripts/*; do [ -f \"$${f}\" ] && $${f} info; done &&
+      for f in /pool/${TANGO_APP_NAME}/scripts/*; do [ -f \"$${f}\" ] && $${f} info; done
+      "
+  
+
+  # init addons
+  addons:
+    image: bash:4.4.23
+    container_name: ${TANGO_INSTANCE_NAME}_addons
+    user: ${TANGO_USER_ID:-0}:${TANGO_GROUP_ID:-0}
+    depends_on:
+     - volume_init
+    volumes:
+      - data:/data
+      - ${TANGO_ROOT}/pool:/pool/tango
+    env_file:
+      - ${GENERATED_ENV_FILE_FOR_COMPOSE}
+    networks:
+      - default
+    command: >
+        bash -c "echo ---------==---- MAMBO ADDONS ----==---------
+        && echo \"* Addons : $TANGO_ADDONS\"
+        && for addon in $${TANGO_ADDONS}; do
+        echo \"L-- install $${addon%#*} $${addon#*#}\"
+        \"/pool/tango/addons/install_$${addon%#*}.sh\" \"$${addon#*#}\"
+        done"
+
+  # Router
+  # traefik launch order do not matter. It can be launched before or after all other services
+  # ENTRYPOINT web_admin
+  #     http://traefik.domain:${NETWORK_PORT_ADMIN}          => go to dashboard
+  #     http://traefik.domain:${NETWORK_PORT_ADMIN}/api
+  #     http://traefik.domain:${NETWORK_PORT_ADMIN}/dashboard
+  traefik:
+    image: traefik:${TRAEFIK_VERSION:-latest}
+    container_name: ${TANGO_INSTANCE_NAME}_traefik
+    depends_on: 
+      - service_init
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      #- ./traefik-conf.yml:/etc/traefik/traefik.yml
+      - letsencrypt:/letsencrypt
+      - traefikconfig:/traefikconfig
+    env_file:
+      - ${GENERATED_ENV_FILE_FOR_COMPOSE}
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      # http://traefik.domain:${NETWORK_PORT_ADMIN} http://traefik.domain:${NETWORK_PORT_ADMIN}/api http://traefik.domain:${NETWORK_PORT_ADMIN}/dashboard
+      - "traefik.http.routers.traefik_api.entrypoints=${TRAEFIK_ENTRYPOINTS:-web_admin}"
+      # With traefik dashboard enabled, the router rule must catch requests for both /api and /dashboard
+      - "traefik.http.routers.traefik_api.rule=HostRegexp(`{subdomain:${TRAEFIK_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`) || PathPrefix(`/`))"
+      - "traefik.http.routers.traefik_api.service=api@internal"
+      - "traefik.http.routers.traefik_api.priority=${TRAEFIK_REDIRECT_HTTPS_PRIORITY:-200}"
+      - "traefik.http.routers.traefik_api.middlewares=traefik_api-redirect,traefik_api-redirect2"
+      - "traefik.http.routers.traefik_api-secure.entrypoints=${TRAEFIK_ENTRYPOINTS_SECURE:-web_admin_secure}"
+      - "traefik.http.routers.traefik_api-secure.rule=HostRegexp(`{subdomain:${TRAEFIK_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`) || PathPrefix(`/`))"
+      - "traefik.http.routers.traefik_api-secure.service=api@internal"
+      - "traefik.http.routers.traefik_api-secure.middlewares=traefik_api-redirect,traefik_api-redirect2"
+      - "traefik.http.routers.traefik_api-secure.tls=true"
+      - "traefik.http.routers.traefik_api-secure.tls.domains[0].main=traefik.${TANGO_DOMAIN:-.*}"
+      # redirect /dashboard to /dashboard/
+      - "traefik.http.middlewares.traefik_api-redirect.redirectregex.regex=^(http[s]?://[^:/]+(:[0-9]+)?)/dashboard$$"
+      - "traefik.http.middlewares.traefik_api-redirect.redirectregex.replacement=$${1}/dashboard/"
+      # redirect / to /dashboard/
+      - "traefik.http.middlewares.traefik_api-redirect2.redirectregex.regex=^(http[s]?://[^:/]+(:[0-9]+)?)(/)+$$"
+      - "traefik.http.middlewares.traefik_api-redirect2.redirectregex.replacement=$${1}/dashboard/"
+      # HTTP to HTTPS redirect routers - catch all HTTP request on each entrypoint
+      # NOTE : we cannot use the method of set redirect middleware on each routers service because each service routers
+      #        may have two entrypoints and middlewares dont know from which entrypoint the request come.
+      #        So we use a global catch all rule, using priority for exclude some services
+      - "traefik.http.routers.http-catchall-web_admin.entrypoints=web_admin"
+      - "traefik.http.routers.http-catchall-web_admin.rule=HostRegexp(`{host:.+}`)"
+      - "traefik.http.routers.http-catchall-web_admin.priority=100"
+      - "traefik.http.routers.http-catchall-web_admin.middlewares=redirect-secure-web_admin@docker"
+      - "traefik.http.routers.http-catchall-web_secondary.entrypoints=web_secondary"
+      - "traefik.http.routers.http-catchall-web_secondary.rule=HostRegexp(`{host:.+}`)"
+      - "traefik.http.routers.http-catchall-web_secondary.priority=100"
+      - "traefik.http.routers.http-catchall-web_secondary.middlewares=redirect-secure-web_secondary@docker"
+      - "traefik.http.routers.http-catchall-web_main.entrypoints=web_main"
+      - "traefik.http.routers.http-catchall-web_main.rule=HostRegexp(`{host:.+}`)"
+      - "traefik.http.routers.http-catchall-web_main.priority=100"
+      - "traefik.http.routers.http-catchall-web_main.middlewares=redirect-secure-web_main@docker"
+      # HTTP to HTTPS redirect middleware
+      - "traefik.http.middlewares.redirect-secure-web_main.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-secure-web_main.redirectscheme.permanent=true"
+      - "traefik.http.middlewares.redirect-secure-web_main.redirectscheme.port=${NETWORK_PORT_MAIN_SECURE}"
+      - "traefik.http.middlewares.redirect-secure-web_secondary.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-secure-web_secondary.redirectscheme.permanent=true"
+      - "traefik.http.middlewares.redirect-secure-web_secondary.redirectscheme.port=${NETWORK_PORT_SECONDARY_SECURE}"
+      - "traefik.http.middlewares.redirect-secure-web_admin.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-secure-web_admin.redirectscheme.permanent=true"
+      - "traefik.http.middlewares.redirect-secure-web_admin.redirectscheme.port=${NETWORK_PORT_ADMIN_SECURE}"
+    networks:
+      - default
+    expose:
+      # web_admin entrypoints
+      - 9000
+      - 9443
+      # web_secondary entrypoints
+      - 8000
+      - 8443
+      # web_main entrypoints
+      - 80
+      - 443
+    ports:
+      - ${NETWORK_PORT_MAIN}:80
+      - ${NETWORK_PORT_MAIN_SECURE}:443
+      - ${NETWORK_PORT_SECONDARY}:8000
+      - ${NETWORK_PORT_SECONDARY_SECURE}:8443
+      - ${NETWORK_PORT_ADMIN}:9000
+      - ${NETWORK_PORT_ADMIN_SECURE}:9443
+    command:
+      # https://docs.traefik.io/reference/static-configuration/cli/
+      - "--log=true"
+      - "--log.level=DEBUG"
+      - "--api=true"
+      - "--api.dashboard=true"
+      - "--api.debug=false"
+      - "--api.insecure=false"
+      - "--global.sendAnonymousUsage=false"
+      - "--entrypoints.web_main=true"
+      - "--entrypoints.web_main.address=:80" 
+      - "--entrypoints.web_main_secure=true"
+      - "--entrypoints.web_main_secure.address=:443"
+      - "--entrypoints.web_secondary=true"
+      - "--entrypoints.web_secondary.address=:8000"
+      - "--entrypoints.web_secondary_secure=true"
+      - "--entrypoints.web_secondary_secure.address=:8443"
+      - "--entrypoints.web_admin=true"
+      - "--entrypoints.web_admin.address=:9000"
+      - "--entrypoints.web_admin_secure=true"
+      - "--entrypoints.web_admin_secure.address=:9443"
+      - "--providers.docker=true"
+      - "--providers.docker.endpoint=unix:///var/run/docker.sock"
+      - "--providers.docker.constraints=Label(`${TANGO_INSTANCE_NAME}.managed`,`true`)"
+      - "--providers.docker.exposedByDefault=false"
+      - "--providers.file.directory=/traefikconfig"
+      - "--certificatesresolvers.tango=true"
+      - "--certificatesresolvers.tango.acme.email=${LETS_ENCRYPT_MAIL}"
+      - "--certificatesresolvers.tango.acme.storage=/letsencrypt/acme.json"
+
+

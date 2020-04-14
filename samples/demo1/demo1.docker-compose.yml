@@ -1,0 +1,71 @@
+
+volumes:
+  web1_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH}/${WEBROOT}
+    name: ${TANGO_APP_NAME}_web1_data
+
+services:
+  
+  web1:
+    image: httpd:${WEB1_VERSION:-latest}
+    container_name: ${TANGO_APP_NAME}_web1
+    depends_on: 
+      - service_init
+    restart: unless-stopped
+    volumes:
+      - web1_data:/usr/local/apache2/htdocs
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      - "traefik.http.routers.web1.entrypoints=${WEB1_ENTRYPOINTS:-web_main}"
+      - "traefik.http.routers.web1.rule=HostRegexp(`{subdomain:web1}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.web1.priority=${WEB1_REDIRECT_HTTPS_PRIORITY:-200}"
+      - "traefik.http.routers.web1.service=web1"
+
+      - "traefik.http.routers.web1-secure.entrypoints=${WEB1_ENTRYPOINTS_SECURE:-web_main_secure}"
+      - "traefik.http.routers.web1-secure.rule=HostRegexp(`{subdomain:web1}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.web1-secure.service=web1"
+      - "traefik.http.routers.web1-secure.tls=true"
+      - "traefik.http.routers.web1-secure.tls.domains[0].main=web1.${TANGO_DOMAIN:-.*}"
+
+      - "traefik.http.services.web1.loadbalancer.server.port=80"
+      - "traefik.http.services.web1.loadbalancer.server.scheme=http"
+      - "traefik.http.services.web1.loadbalancer.passhostheader=true"
+
+    networks:
+      - default
+    expose:
+      - 80
+
+  whoami:
+    image: containous/whoami:${WHOAMI_VERSION:-latest}
+    container_name: ${TANGO_APP_NAME}_whoami
+    depends_on: 
+      - service_init
+    restart: unless-stopped
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.entrypoints=${WHOAMI_ENTRYPOINTS:-web_main}"
+      - "traefik.http.routers.whoami.rule=HostRegexp(`{subdomain:whoami}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.whoami.priority=${WEBSITE_REDIRECT_HTTPS_PRIORITY:-200}"
+      - "traefik.http.routers.whoami.service=whoami"
+
+      - "traefik.http.routers.whoami-secure.entrypoints=${WWHOAMI_ENTRYPOINTS_SECURE:-web_main_secure}"
+      - "traefik.http.routers.whoami-secure.rule=HostRegexp(`{subdomain:whoami}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.whoami-secure.service=whoami"
+      - "traefik.http.routers.whoami-secure.tls=true"
+      - "traefik.http.routers.whoami-secure.tls.domains[0].main=whoami.${TANGO_DOMAIN:-.*}"
+
+      - "traefik.http.services.whoami.loadbalancer.server.port=80"
+      - "traefik.http.services.whoami.loadbalancer.server.scheme=http"
+      - "traefik.http.services.whoami.loadbalancer.passhostheader=true"
+
+    networks:
+      - default
+    expose:
+      - 80

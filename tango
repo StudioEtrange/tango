@@ -1,0 +1,22 @@
+#!/bin/bash
+_CURRENT_FILE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+_CURRENT_RUNNING_DIR="$( cd "$( dirname "." )" && pwd )"
+
+TANGO_ROOT="${_CURRENT_FILE_DIR}"
+
+STELLA_LOG_STATE="OFF"
+. "${TANGO_ROOT}/stella-link.sh" include
+
+. "${TANGO_ROOT}/modules/tango-init.sh" $@
+
+. "${TANGO_ROOT}/modules/tango-set-arg.sh" $@
+
+. "${TANGO_ROOT}/modules/tango-parse-arg.sh" $@
+
+. "${TANGO_ROOT}/modules/tango-prepare-action.sh" $@
+
+. "${TANGO_ROOT}/modules/tango-before-action.sh" $@
+
+. "${TANGO_ROOT}/modules/tango-action.sh" $@
+
+. "${TANGO_ROOT}/modules/tango-after-action.sh" $@
