@@ -95,7 +95,7 @@ See samples in sample folder
     * Shell environment variables
     * User environment file variables
     * Default configuration file variables
-    * Default values from mambo itself
+    * Default values from tango itself
 
 
 
@@ -104,13 +104,13 @@ See samples in sample folder
 
 |NAME|DESC|DEFAULT VALUE|SAMPLE VALUE|
 |-|-|-|-|
-|TANGO_DOMAIN|domain used to access mambo. It is a regexp. `.*` stands for any domain or host ip.|`.*`|`mydomain.com`|
+|TANGO_DOMAIN|domain used to access tango. It is a regexp. `.*` stands for any domain or host ip.|`.*`|`mydomain.com`|
 |TANGO_USER_ID|unix user which will run services and acces to files.|current user : `id -u`|`1000`|
 |TANGO_GROUP_ID|unix group which will run services and acces to files.|current group : `id -g`|`1000`|
-|TANGO_ARTEFACT_FOLDERS|list of paths on host that artefacts files which can be mount in every service|-|``|
-|DATA_PATH|path on host for services conf and data files. Relative to mambo app path.|`./mambo/workspace/data`|`../data`|
+|TANGO_SERVICES|list of services|-|``|
+|DATA_PATH|path on host for services conf and data files.|defined by `DATA_PATH_DEFAULT`|`../data`|
 
-
+For full list see `tango.env` file
 
 ### PATH variables
 
@@ -128,7 +128,7 @@ See samples in sample folder
 
 * WARN : before changing path variables or instance mode (`shared` or `isolated`) attached to a volume (like `DATA_PATH`) use `tango down` command to delete volume.
 
-### Artefact
+### Artefacts
 
 * `TANGO_ARTEFACT_FOLDERS` is a list of artefact path. All listed artefact folders are attached to services listed in `TANGO_ARTEFACT_SERVICES` to a specified mount point in `TANGO_ARTEFACT_MOUNT_POINT`
 
@@ -145,14 +145,14 @@ See samples in sample folder
 
     ```
     NETWORK_PORT_MAIN=80
-    DATA_PATH=../mambo-data
+    DATA_PATH=../data
     TANGO_ARTEFACT_FOLDERS=/mnt/MEDIA/MOVIES /mnt/MEDIA/TV_SHOWS
     ```
 
 
 ### Using shell environment variables
 
-* Set variables at mambo launch or export them before launch
+* Set variables at tango launch or export them before launch
 
     ```
     TANGO_DOMAIN="mydomain.com" DATA_PATH="/home/$USER/data" ./tango up
@@ -279,7 +279,7 @@ See samples in sample folder
 ### Let's encrypt and non default port for main area
 
 * If you change the network ports of main area to other ports than 80/443, you have to use change the letsencrypt method from `HTTP Challenge` to `DNS Challenge`
-    * By default Mambo uses the `HTTP Challenge` which *requires* port 80/443 to be opened (https://docs.traefik.io/user-guides/docker-compose/acme-http/). 
+    * By default tango uses the `HTTP Challenge` which *requires* port 80/443 to be opened (https://docs.traefik.io/user-guides/docker-compose/acme-http/). 
     * Otherwise you need to configure API to access to your DNS provider to set the `DNS Challenge` (https://docs.traefik.io/user-guides/docker-compose/acme-dns/)
 
 * How-to : in your user conf file

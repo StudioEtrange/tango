@@ -35,7 +35,25 @@ volumes:
       o: bind
       device: ${TANGO_DATA_PATH}/traefikconfig
     name: ${TANGO_INSTANCE_NAME}_traefikconfig
-    
+
+# NOTE : yaml do not support array merge, so we cannot factorize volume declaration here
+# https://forums.docker.com/t/is-there-any-way-to-use-extension-fields-in-docker-compose-with-docker-secrets/68602
+x-vpn: &default-vpn
+  image: studioetrange/openvpn-client:dev
+  user: ${TANGO_USER_ID:-0}:${TANGO_GROUP_ID:-0}
+  depends_on: 
+    - service_init
+  restart: unless-stopped
+  #volumes:
+  environment:
+    - GROUPID=${TANGO_GROUP_ID:-0}
+  labels:
+    - "${TANGO_APP_NAME}.managed=true"
+    - "traefik.enable=true"
+  networks:
+    - default
+  build:
+    context: https://github.com/StudioEtrange/openvpn-client#dev
 
 services:
 
@@ -100,7 +118,7 @@ services:
       bash -c "for f in /pool/tango/scripts/*; do [ -f \"$${f}\" ] && $${f} info; done &&
       for f in /pool/${TANGO_APP_NAME}/scripts/*; do [ -f \"$${f}\" ] && $${f} info; done
       "
-  
+
 
   # init addons
   addons:
@@ -123,6 +141,20 @@ services:
         echo \"L-- install $${addon%#*} $${addon#*#}\"
         \"/pool/tango/addons/install_$${addon%#*}.sh\" \"$${addon#*#}\"
         done"
+  
+
+  # vpn:
+  #   << : *default-vpn
+  #   container_name: ${TANGO_INSTANCE_NAME}_vpn
+  #   volumes:
+  #     - data:/data
+  #     - ${TANGO_ROOT}/pool:/pool/tango
+  #   networks:
+  #     - default
+  #   command: >
+  #     -d -a 'nhnqffgkwpkr;J@B%Sftb1y7#E' -V 'zrh-003.ovpn'
+  #   build:
+  #     context: https://github.com/StudioEtrange/openvpn-client#dev
 
   # Router
   # traefik launch order do not matter. It can be launched before or after all other services

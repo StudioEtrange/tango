@@ -52,7 +52,7 @@ if [ ! "${ACTION}" = "install" ]; then
 	[ "${DAEMON}" = "1" ] && DAEMON="-d"
 	if [ "${DEBUG}" = "1" ]; then
 		VERBOSE="1"
-		DOCKER_COMPOSE_LOG="--verbose"
+		#DOCKER_COMPOSE_LOG="--verbose"
 	fi
 
 	# generate env files
