@@ -2,4 +2,5 @@
 cache/
 workspace/
 generated*
-
+letsencrypt/
+traefikconfig/
