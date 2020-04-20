@@ -1,0 +1,172 @@
+
+volumes:
+  web2_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH}/${WEBROOT}
+    name: ${TANGO_APP_NAME}_web2_data
+
+# NOTE : yaml do not support array merge, so we cannot factorize volume declaration here
+# NOTE : cap_add, security_opt, stdin_open, tty and volume required for the image to function
+x-vpn: &default-vpn
+  image: studioetrange/openvpn-client:add-option-files
+  #user: ${TANGO_USER_ID:-0}:${TANGO_GROUP_ID:-0}
+  depends_on: 
+    - service_init
+  restart: unless-stopped
+  stdin_open: true
+  tty: true
+  # allow host net stack management
+  cap_add:
+    - NET_ADMIN
+  # disable all SELinux policies 
+  security_opt:
+    - label:disable
+  volumes:
+    - /home/nomorgan/testvpn:/vpn
+  devices:
+    - /dev/net/tun
+  environment:
+    - GROUPID=${TANGO_GROUP_ID:-0}
+    - 'VPN_AUTH=nhnqffgkwpkr;J@B%Sftb1y7#E'
+    # '--redirect-gateway def1' is for routing capabilty of this docker vpn client, but we do not use it
+    - 'OTHER_ARGS=--redirect-gateway def1'
+    - DNS=1
+    - 'VPN_FILES=zrh-003.ovpn'
+  labels:
+    - "${TANGO_APP_NAME}.managed=true"
+  networks:
+    - default
+  build:
+    context: https://github.com/StudioEtrange/openvpn-client.git#add-option-files
+
+
+services:
+  
+  web2:
+    image: httpd:${WEB2_VERSION:-latest}
+    container_name: ${TANGO_APP_NAME}_web2
+    depends_on: 
+      - service_init
+    restart: unless-stopped
+    volumes:
+      - web2_data:/usr/local/apache2/htdocs
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      - "traefik.http.routers.web2.entrypoints=${WEB2_ENTRYPOINTS:-web_main}"
+      - "traefik.http.routers.web2.rule=HostRegexp(`{subdomain:web2}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.web2.priority=${WEB2_REDIRECT_HTTPS_PRIORITY:-200}"
+      - "traefik.http.routers.web2.service=web2"
+
+      - "traefik.http.routers.web2-secure.entrypoints=${WEB2_ENTRYPOINTS_SECURE:-web_main_secure}"
+      - "traefik.http.routers.web2-secure.rule=HostRegexp(`{subdomain:web2}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.web2-secure.service=web2"
+      - "traefik.http.routers.web2-secure.tls=true"
+      - "traefik.http.routers.web2-secure.tls.domains[0].main=web2.${TANGO_DOMAIN:-.*}"
+
+      - "traefik.http.services.web2.loadbalancer.server.port=80"
+      - "traefik.http.services.web2.loadbalancer.server.scheme=http"
+      - "traefik.http.services.web2.loadbalancer.passhostheader=true"
+
+    networks:
+      - default
+    expose:
+      - 80
+
+  whoami:
+    image: containous/whoami:${WHOAMI_VERSION:-latest}
+    container_name: ${TANGO_APP_NAME}_whoami
+    depends_on: 
+      - service_init
+    restart: unless-stopped
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.entrypoints=${WHOAMI_ENTRYPOINTS:-web_main}"
+      - "traefik.http.routers.whoami.rule=HostRegexp(`{subdomain:whoami}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.whoami.priority=${WWHOAMI_REDIRECT_HTTPS_PRIORITY:-200}"
+      - "traefik.http.routers.whoami.service=whoami"
+      - "traefik.http.routers.whoami-secure.entrypoints=${WWHOAMI_ENTRYPOINTS_SECURE:-web_main_secure}"
+      - "traefik.http.routers.whoami-secure.rule=HostRegexp(`{subdomain:whoami}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.whoami-secure.service=whoami"
+      - "traefik.http.routers.whoami-secure.tls=true"
+      - "traefik.http.routers.whoami-secure.tls.domains[0].main=whoami.${TANGO_DOMAIN:-.*}"
+      - "traefik.http.services.whoami.loadbalancer.server.port=80"
+      - "traefik.http.services.whoami.loadbalancer.server.scheme=http"
+      - "traefik.http.services.whoami.loadbalancer.passhostheader=true"
+    networks:
+      - default
+    expose:
+      - 80
+
+  vpn:
+    << : *default-vpn
+    container_name: ${TANGO_INSTANCE_NAME}_vpn
+
+  
+  cloud9:
+    image: sapk/cloud9:${CLOUD9_VERSION:-latest}
+    container_name: ${TANGO_APP_NAME}_cloud9
+    depends_on: 
+      - service_init
+    restart: unless-stopped
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      - "traefik.http.routers.cloud9.entrypoints=${CLOUD9_ENTRYPOINTS:-web_main}"
+      - "traefik.http.routers.cloud9.rule=HostRegexp(`{subdomain:cloud9}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.cloud9.priority=${CLOUD9_REDIRECT_HTTPS_PRIORITY:-200}"
+      - "traefik.http.routers.cloud9.service=cloud9"
+      - "traefik.http.routers.cloud9-secure.entrypoints=${CLOUD9_ENTRYPOINTS_SECURE:-web_main_secure}"
+      - "traefik.http.routers.cloud9-secure.rule=HostRegexp(`{subdomain:cloud9}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.cloud9-secure.service=cloud9"
+      - "traefik.http.routers.cloud9-secure.tls=true"
+      - "traefik.http.routers.cloud9-secure.tls.domains[0].main=cloud9.${TANGO_DOMAIN:-.*}"
+      - "traefik.http.services.cloud9.loadbalancer.server.port=8181"
+      - "traefik.http.services.cloud9.loadbalancer.server.scheme=http"
+      - "traefik.http.services.cloud9.loadbalancer.passhostheader=true"
+    network_mode: "service:vpn"
+    # expose:
+    #   - 8181
+    command: >
+      --auth :
+  
+  wetty:
+    image: wetty:${WETTY_VERSION:-latest}
+    container_name: ${TANGO_APP_NAME}_wetty
+    depends_on: 
+      - service_init
+    restart: unless-stopped
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      - "traefik.http.routers.wetty.entrypoints=${WETTY_ENTRYPOINTS:-web_main}"
+      - "traefik.http.routers.wetty.rule=HostRegexp(`{subdomain:wetty}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.wetty.priority=${WETTY_REDIRECT_HTTPS_PRIORITY:-200}"
+      - "traefik.http.routers.wetty.service=wetty"
+      - "traefik.http.routers.wetty.middlewares=wetty-redirect"
+      - "traefik.http.routers.wetty-secure.entrypoints=${WETTY_ENTRYPOINTS_SECURE:-web_main_secure}"
+      - "traefik.http.routers.wetty-secure.rule=HostRegexp(`{subdomain:wetty}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.wetty-secure.service=wetty"
+      - "traefik.http.routers.wetty-secure.tls=true"
+      - "traefik.http.routers.wetty-secure.tls.domains[0].main=wetty.${TANGO_DOMAIN:-.*}"
+      - "traefik.http.routers.wetty-secure.middlewares=wetty-redirect"
+      - "traefik.http.services.wetty.loadbalancer.server.port=3000"
+      - "traefik.http.services.wetty.loadbalancer.server.scheme=http"
+      - "traefik.http.services.wetty.loadbalancer.passhostheader=true"
+      # redirect / to /wetty
+      - "traefik.http.middlewares.wetty-redirect.redirectregex.regex=^(http[s]?://[^:/]+(:[0-9]+)?)(/)+$$"
+      - "traefik.http.middlewares.wetty-redirect.redirectregex.replacement=$${1}/wetty"
+    networks:
+      default:
+        aliases:
+          - wetty-ssh
+    expose:
+      - 3000
+    build:
+      context: https://github.com/butlerx/wetty.git#${WETTY_VERSION:-latest}
+      extra_hosts:
+        - "wetty-ssh:127.0.0.1"
