@@ -75,7 +75,7 @@ __create_docker_compose_file() {
 	[ -f "${TANGO_APP_COMPOSE_FILE}" ] && yq m -i -a -- "${GENERATED_DOCKER_COMPOSE_FILE}" "${TANGO_APP_COMPOSE_FILE}"
 	[ -f "${TANGO_USER_COMPOSE_FILE}" ] && yq m -i -a -- "${GENERATED_DOCKER_COMPOSE_FILE}" "${TANGO_USER_COMPOSE_FILE}"
 	
-	__set_services_all
+	__set_active_services_all
 	__set_time_all
 	__set_entrypoints_service_all
 	__set_redirect_https_service_all
@@ -84,6 +84,10 @@ __create_docker_compose_file() {
 	__add_volume_artefact_all
 	__add_volume_app_pool_all
 	__set_letsencrypt_service_all
+	
+	__create_vpn_all
+	# do this after other compose modification 	# because it remove some network definition
+	__set_vpn_service_all
 }
 
 
@@ -133,13 +137,39 @@ __translate_all_path() {
 
 # MANAGE FEATURES FOR ALL CONTAINTERS -----------------
 
-__set_services_all() {
-	for s in ${TANGO_SERVICES}; do
-		[[ " ${TANGO_DISABLED_SERVICES} " =~ .*\ ${s}\ .* ]] || __add_service_dependency "tango" "${s}"
+__set_active_services_all() {
+	# declare all active service in tango depdenciess
+	for s in ${TANGO_SERVICES_ACTIVE}; do
+		__add_service_dependency "tango" "${s}"
+	done
+}
+
+__set_vpn_service_all() {
+
+	local _tmp=
+	for v in ${VPN_SERVICES_LIST}; do
+		_tmp="${v^^}_SERVICES"
+		for s in ${!_tmp}; do
+			__set_vpn_service "${s}" "${v}"
+		done
+
 	done
 }
 
 
+
+__create_vpn_all() {
+
+	__add_declared_variables "VPN_SERVICES_LIST"
+	# NOTE : +4/-4 is for by bass 'VPN_'nn
+	for _id in $(compgen -A variable | awk 'match($0,/VPN_[0-9]+/) {print substr($0,RSTART+4,RLENGTH-4)}' | sort | uniq); do
+		__create_vpn ${_id}
+		__add_service_dependency "vpn" "vpn_${_id}"
+		export VPN_SERVICES_LIST="${VPN_SERVICES_LIST} vpn_${_id}"
+		export TANGO_TIME_VOLUME_SERVICES="${TANGO_TIME_VOLUME_SERVICES} vpn_${_id}"
+	done
+
+}
 __set_certificates_all() {
 	
 	# empty file
@@ -208,7 +238,7 @@ __add_gpu_all() {
 
 # set timezone to containers which need it
 __set_time_all() {
-	
+
 	for s in $TANGO_TIME_VOLUME_SERVICES; do
 		__add_volume_for_time "$s"
 	done
@@ -304,6 +334,70 @@ __add_service_direct_port_access_all() {
 
 
 # FEATURES MANAGEMENT --------
+
+
+ __set_vpn_service() {
+ 	local __service_name="$1"
+ 	local __vpn_name="$2"
+
+	yq d -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.networks"
+	yq d -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.expose"
+	yq d -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.ports"
+
+	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.network_mode" "service:${__vpn_name}"
+
+	__add_service_dependency "${__service_name}" "${__vpn_name}"
+}
+
+
+# See detail variable here : https://github.com/StudioEtrange/openvpn-client
+__create_vpn() {
+	local __vpn_id="$1"
+	
+	local _tmp=
+	local __service_name="vpn_${__vpn_id}"
+
+
+	_tmp="VPN_${__vpn_id}_FOLDER"
+	local __folder="${!_tmp}"
+	_tmp="VPN_${__vpn_id}_VPN_FILES"
+	local __vpn_files="${!_tmp}"
+	_tmp="VPN_${__vpn_id}_VPN"
+	local __vpn="${!_tmp}"
+	_tmp="VPN_${__vpn_id}_VPN_AUTH"
+	local __vpn_auth="${!_tmp}"
+	_tmp="VPN_${__vpn_id}_DNS"
+	local __dns="${!_tmp}"
+	_tmp="VPN_${__vpn_id}_CERT_AUTH"
+	local __cert_auth="${!_tmp}"
+	_tmp="VPN_${__vpn_id}_CIPHER"
+	local __cipher="${!_tmp}"
+	_tmp="VPN_${__vpn_id}_MSS"
+	local __mss="${!_tmp}"
+	_tmp="VPN_${__vpn_id}_ROUTE"
+	local __route="${!_tmp}"
+	_tmp="VPN_${__vpn_id}_ROUTE6"
+	local __route6="${!_tmp}"
+	
+	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.<<" default-vpn
+	# need tweak '*default-vpn' yaml anchor while this issue exist in yq : https://github.com/mikefarah/yq/issues/377
+	sed -i 's/[^&]default-vpn/ \*default-vpn/' "${GENERATED_DOCKER_COMPOSE_FILE}"
+	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.container_name" '${TANGO_INSTANCE_NAME}_'${__service_name}
+	[ "${__folder}" ] && __add_volume_mapping_service "${__service_name}" "${__folder}:/vpn"
+	[ "${__vpn_files}" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "VPN_FILES=${__vpn_files}"
+	[ "${__vpn}" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "VPN=${__vpn}"
+	[ "${__vpn_auth}" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "VPN_AUTH=${__vpn_auth}"
+	[ "${__dns}" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "DNS=${__dns}"
+	[ "${__cert_auth}" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "CERT_AUTH=${__cert_auth}"
+	[ "${__cipher}" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "CIPHER=${__cipher}"
+	[ "${__mss}" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "MSS=${__mss}"
+	[ "${__route}" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "ROUTE=${__route}"
+	[ "${__route6}" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "ROUTE6=${__route6}"
+
+}
+
+
+
 __add_gpu() {
 	local __service="$1"
 	local __opt="$2"
@@ -333,7 +427,7 @@ __add_tz_var_for_time() {
 
 	if [ -f "/etc/timezone" ]; then
 		TZ="$(cat /etc/timezone)"
-		yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.plex.environment[+]" "TZ=${TZ}"
+		yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.environment[+]" "TZ=${TZ}"
 	fi
 }
 
@@ -429,6 +523,24 @@ __set_network_as_external() {
 
 
 # VARIOUS -----------------
+
+# filter a list with items of another list
+__filter_list() {
+	local __list_src="$1"
+	local __list_filter="$2"
+
+	[ -z "${__list_src}" ] && return
+
+	[ -z "${__list_filter}" ] && echo -n "${__list_src}" && return
+
+	local __result_list=
+	for s in ${__list_src}; do
+		[[ " ${__list_filter} " =~ .*\ ${s}\ .* ]] || __result_list="${__result_list} ${s}"
+	done
+
+	# remove trailing whitespace and return list
+	echo -n "${__result_list%"${__result_list##*[![:space:]]}"}"
+}
 
 docker-compose() {
 	# NOTE we need to specify project directory because when launching from an other directory, docker compose seems to NOT auto load .env file

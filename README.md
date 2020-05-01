@@ -107,7 +107,7 @@ See samples in sample folder
 |TANGO_DOMAIN|domain used to access tango. It is a regexp. `.*` stands for any domain or host ip.|`.*`|`mydomain.com`|
 |TANGO_USER_ID|unix user which will run services and acces to files.|current user : `id -u`|`1000`|
 |TANGO_GROUP_ID|unix group which will run services and acces to files.|current group : `id -g`|`1000`|
-|TANGO_SERVICES|list of services|-|``|
+|TANGO_SERVICES_AVAILABLE|list of available services|-|``|
 |DATA_PATH|path on host for services conf and data files.|defined by `DATA_PATH_DEFAULT`|`../data`|
 
 For full list see `tango.env` file
@@ -192,13 +192,13 @@ For full list see `tango.env` file
 
 ### Enable/disable
 
-* To declare a service use list `TANGO_SERVICES`
-* To enable/disable a service, use variable list `TANGO_DISABLED_SERVICES`
+* To declare a service use list `TANGO_SERVICES_AVAILABLE`
+* To enable/disable a service, use variable list `TANGO_SERVICES_AVAILABLE`
 
 * ie in user env file : 
     ```
-    TANGO_SERVICES=traefik website database
-    TANGO_DISABLED_SERVICES=database
+    TANGO_SERVICES_AVAILABLE=traefik website database
+    TANGO_SERVICES_DISABLED=database
     ```
 
 ### Start/stop a service
@@ -348,7 +348,11 @@ For full list see `tango.env` file
         * https://github.com/dperson/openvpn-client
         * https://hub.docker.com/r/dperson/openvpn-client/
 
+    * test leaks : https://dnsleaktest.com/
+
     * sample with openvpn server https://gist.github.com/darth-veitcher/93acda9617bab3e1de0264cebf4637fc
 
+    * free vpn for test https://pilovali.nl/free-vpn/
+    
     * UI
         * qomui - Qt - openvpn client conf management  https://github.com/corrad1nho/qomui

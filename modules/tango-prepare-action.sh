@@ -49,6 +49,7 @@ if [ ! "${ACTION}" = "install" ]; then
 	# set variables list
 	__get_declared_variable_names
 
+	[ "${BUILD}" = "1" ] && BUILD="--build"
 	[ "${DAEMON}" = "1" ] && DAEMON="-d"
 	if [ "${DEBUG}" = "1" ]; then
 		VERBOSE="1"
@@ -187,6 +188,11 @@ if [ ! "${ACTION}" = "install" ]; then
 	fi
 	__add_declared_variables "TANGO_EXTERNAL_IP"
 
+	# add default services to all available service list
+	TANGO_SERVICES_AVAILABLE="${TANGO_SERVICES_DEFAULT} ${TANGO_SERVICES_AVAILABLE}"
+	# create a list of active services
+	export TANGO_SERVICES_ACTIVE="$(__filter_list "${TANGO_SERVICES_AVAILABLE}" "${TANGO_SERVICES_DISABLED}")"
+	__add_declared_variables "TANGO_SERVICES_ACTIVE"
 
 	case ${ACTION} in
 		info|up|restart )

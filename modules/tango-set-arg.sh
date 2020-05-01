@@ -7,7 +7,7 @@ usage() {
 	echo "o-- commands :"
 	echo "L     install : deploy this app"
 	echo "L     init [addons] : init services & addons. Do it once before launch."
-	echo "L     up [service [-d]] : launch all services or one service"
+	echo "L     up [service [-d]] [-b] : launch all services or one service"
 	echo "L     down [service] [--all]: down all services or one service. Except shared service when in shared mode."
 	echo "L     restart [service [-d]] : restart all services or one service"
 	echo "L     info : give info. Will generate conf files and print configuration used when launching any service."
@@ -37,6 +37,7 @@ DEBUG='' 					'' 				''					b 			0			''		  Debug mode. More verbose and use lets
 ALL='' 						'' 				''					b 			0			''		  Allow to stop all services including shared once like traefik.
 VERBOSE=''				    'v'				''					b			0		''					  Verbose mode for debug purpose.
 DAEMON=''				    'd'				''					b			0		''					  Daemon mode. When launching the whole app, it is in daemon mode by default, but when launching a specific service, launch it in daemon mode.
+BUILD=''				    'b'				''					b			0		''					  Force build image before launch. Only for image which have a build context defined
 PUID='' 					'u' 			'string'			s 			0			''		  user id - set TANGO_USER_ID variable - will own bind mount created folder/files - Default current user group $(id -u).
 PGID='' 					'g' 			'string'			s 			0			''		  group id - set TANGO_GROUP_ID variable - will own bind mount created folder/files - Default current user group $(id -g).
 "

@@ -36,6 +36,44 @@ volumes:
       device: ${TANGO_DATA_PATH}/traefikconfig
     name: ${TANGO_INSTANCE_NAME}_traefikconfig
 
+# See detail variable here : https://github.com/StudioEtrange/openvpn-client
+# NOTE : cap_add, security_opt are required for this image to function
+x-vpn: &default-vpn
+  image: studioetrange/openvpn-client:dev
+  # need root to launch openvpn-client
+  user: 0:0
+  depends_on: 
+    - service_init
+  restart: unless-stopped
+  # allow host net stack management
+  cap_add:
+    - NET_ADMIN
+  # disable all SELinux policies 
+  security_opt:
+    - label:disable
+  # volumes:
+  #   - /home/nomorgan/testvpn:/vpn
+  devices:
+    - /dev/net/tun
+  environment:
+    # von conf files
+    # - 'VPN_FILES=ams-006.ovpn'
+    # # von authentification
+    # - 'VPN_AUTH=nhnqffgkwpkr;J@B%Sftb1y7#E'
+    # # use vpn dns provider
+    # - DNS=1
+    # forbid any output network trafic outside VPN - usefull when VPN do not want to connect
+    - FIREWALL=1
+    # group id that will own openvpn-client process AND that can bypass any firewall rule
+    - GROUPID=33333
+    - 'OTHER_ARGS=--redirect-gateway def1'
+  labels:
+    - "${TANGO_INSTANCE_NAME}.managed=true"
+  networks:
+    - default
+  build:
+    context: https://github.com/StudioEtrange/openvpn-client.git#dev
+
 
 services:
 
@@ -123,6 +161,20 @@ services:
         echo \"L-- install $${addon%#*} $${addon#*#}\"
         \"/pool/tango/addons/install_$${addon%#*}.sh\" \"$${addon#*#}\"
         done"
+
+
+  # Launch all vpn
+  vpn:
+    image: bash:4.4.23
+    container_name: ${TANGO_INSTANCE_NAME}_vpn
+    user: ${TANGO_USER_ID:-0}:${TANGO_GROUP_ID:-0}
+    depends_on:
+      - service_init
+    networks:
+      - default
+    command: >
+      bash -c "echo Launching VPN."
+
   # Router
   # traefik launch order do not matter. It can be launched before or after all other services
   # ENTRYPOINT web_admin

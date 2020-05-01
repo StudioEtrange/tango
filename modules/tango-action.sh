@@ -55,7 +55,7 @@ case ${ACTION} in
 
 	up )
 		# TODO up --no-recreate ?
-		docker-compose up ${DAEMON} ${TARGET:-tango}
+		docker-compose up ${DAEMON} ${BUILD} ${TARGET:-tango}
 		if [ "${DAEMON}" = "" ]; then		
 			[ "${TARGET}" = "" ] && docker-compose logs service_init
 		else
@@ -67,7 +67,7 @@ case ${ACTION} in
 		case "${TARGET}" in
 			"") 
 				if [ "${TANGO_INSTANCE_MODE}" = "shared" ]; then 
-					# test if network already exist to not erase it
+					# test if network already exist and set it as 'external' to not erase it
 					if [ ! -z $(docker network ls --filter name=^${TANGO_APP_NETWORK_NAME}$ --format="{{ .Name }}") ] ; then 
 						__set_network_as_external "default" "${TANGO_APP_NETWORK_NAME}"
 					fi
@@ -81,6 +81,7 @@ case ${ACTION} in
 			;;
 			*) 
 				docker-compose stop ${TARGET}
+				docker-compose rm ${TARGET}
 			;;
 		esac
 	;;
@@ -94,7 +95,7 @@ case ${ACTION} in
 				docker-compose stop ${TARGET}
 			;;
 		esac
-		docker-compose up ${DAEMON} ${TARGET:-tango}
+		docker-compose up ${DAEMON} ${BUILD} ${TARGET:-tango}
 		if [ "${DAEMON}" = "" ]; then
 			[ "${TARGET}" = "" ] && docker-compose logs service_info
 		else

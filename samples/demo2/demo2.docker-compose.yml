@@ -5,42 +5,67 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: ${DATA_PATH}/${WEBROOT}
+      device: ${DATA_PATH}/${WEB2_ROOT_FOLDER}
     name: ${TANGO_APP_NAME}_web2_data
-
-# NOTE : yaml do not support array merge, so we cannot factorize volume declaration here
-# NOTE : cap_add, security_opt, stdin_open, tty and volume required for the image to function
-x-vpn: &default-vpn
-  image: studioetrange/openvpn-client:add-option-files
-  #user: ${TANGO_USER_ID:-0}:${TANGO_GROUP_ID:-0}
-  depends_on: 
-    - service_init
-  restart: unless-stopped
-  stdin_open: true
-  tty: true
-  # allow host net stack management
-  cap_add:
-    - NET_ADMIN
-  # disable all SELinux policies 
-  security_opt:
-    - label:disable
-  volumes:
-    - /home/nomorgan/testvpn:/vpn
-  devices:
-    - /dev/net/tun
-  environment:
-    - GROUPID=${TANGO_GROUP_ID:-0}
-    - 'VPN_AUTH=nhnqffgkwpkr;J@B%Sftb1y7#E'
-    # '--redirect-gateway def1' is for routing capabilty of this docker vpn client, but we do not use it
-    - 'OTHER_ARGS=--redirect-gateway def1'
-    - DNS=1
-    - 'VPN_FILES=zrh-003.ovpn'
-  labels:
-    - "${TANGO_APP_NAME}.managed=true"
-  networks:
-    - default
-  build:
-    context: https://github.com/StudioEtrange/openvpn-client.git#add-option-files
+  transmission_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH}/transmission_data
+    name: ${TANGO_APP_NAME}_transmission_data
+  transmission_download:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH}/transmission_download
+    name: ${TANGO_APP_NAME}_transmission_download
+  transmission_watch:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH}/transmission_watch
+    name: ${TANGO_APP_NAME}_transmission_watch
+    
+# # See detail variable here : https://github.com/StudioEtrange/openvpn-client
+# # NOTE : cap_add, security_opt are required for this image to function
+# x-vpn: &default-vpn
+#   image: studioetrange/openvpn-client:dev
+#   # need root to launch openvpn-client
+#   user: 0:0
+#   depends_on: 
+#     - service_init
+#   restart: unless-stopped
+#   # allow host net stack management
+#   cap_add:
+#     - NET_ADMIN
+#   # disable all SELinux policies 
+#   security_opt:
+#     - label:disable
+#   volumes:
+#     - /home/nomorgan/testvpn:/vpn
+#   devices:
+#     - /dev/net/tun
+#   environment:
+#     # von conf files
+#     - 'VPN_FILES=ams-006.ovpn'
+#     # von authentification
+#     - 'VPN_AUTH=nhnqffgkwpkr;J@B%Sftb1y7#E'
+#     # use vpn dns provider
+#     - DNS=1
+#     # forbid any output network trafic outside VPN - usefull when VPN do not want to connect
+#     - FIREWALL=1
+#     # group id that will own openvpn-client process AND that can bypass any firewall rule
+#     - GROUPID=33333
+#     - 'OTHER_ARGS=--redirect-gateway def1'
+#   labels:
+#     - "${TANGO_INSTANCE_NAME}.managed=true"
+#   networks:
+#     - default
+#   build:
+#     context: https://github.com/StudioEtrange/openvpn-client.git#dev
 
 
 services:
@@ -60,17 +85,14 @@ services:
       - "traefik.http.routers.web2.rule=HostRegexp(`{subdomain:web2}.{domain:${TANGO_DOMAIN:-.*}}`)"
       - "traefik.http.routers.web2.priority=${WEB2_REDIRECT_HTTPS_PRIORITY:-200}"
       - "traefik.http.routers.web2.service=web2"
-
       - "traefik.http.routers.web2-secure.entrypoints=${WEB2_ENTRYPOINTS_SECURE:-web_main_secure}"
       - "traefik.http.routers.web2-secure.rule=HostRegexp(`{subdomain:web2}.{domain:${TANGO_DOMAIN:-.*}}`)"
       - "traefik.http.routers.web2-secure.service=web2"
       - "traefik.http.routers.web2-secure.tls=true"
       - "traefik.http.routers.web2-secure.tls.domains[0].main=web2.${TANGO_DOMAIN:-.*}"
-
       - "traefik.http.services.web2.loadbalancer.server.port=80"
       - "traefik.http.services.web2.loadbalancer.server.scheme=http"
       - "traefik.http.services.web2.loadbalancer.passhostheader=true"
-
     networks:
       - default
     expose:
@@ -102,9 +124,25 @@ services:
     expose:
       - 80
 
-  vpn:
-    << : *default-vpn
-    container_name: ${TANGO_INSTANCE_NAME}_vpn
+  # vpn:
+  #   << : *default-vpn
+  #   container_name: ${TANGO_INSTANCE_NAME}_vpn
+  #   volumes:
+  #     - /home/nomorgan/testvpn:/vpn
+  #   devices:
+  #     - /dev/net/tun
+  #   environment:
+  #     # von conf files
+  #     - 'VPN_FILES=ams-006.ovpn'
+  #     # von authentification
+  #     - 'VPN_AUTH=nhnqffgkwpkr;J@B%Sftb1y7#E'
+  #     # use vpn dns provider
+  #     - DNS=1
+  #     # forbid any output network trafic outside VPN - usefull when VPN do not want to connect
+  #     - FIREWALL=1
+  #     # group id that will own openvpn-client process AND that can bypass any firewall rule
+  #     - GROUPID=33333
+  #     - 'OTHER_ARGS=--redirect-gateway def1'
 
   
   cloud9:
@@ -128,45 +166,91 @@ services:
       - "traefik.http.services.cloud9.loadbalancer.server.port=8181"
       - "traefik.http.services.cloud9.loadbalancer.server.scheme=http"
       - "traefik.http.services.cloud9.loadbalancer.passhostheader=true"
-    network_mode: "service:vpn"
-    # expose:
-    #   - 8181
+    networks:
+      - default
+    #network_mode: "service:vpn"
+    expose:
+      - 8181
     command: >
       --auth :
   
-  wetty:
-    image: wetty:${WETTY_VERSION:-latest}
-    container_name: ${TANGO_APP_NAME}_wetty
+
+
+  # https://github.com/jlesage/docker-firefox
+  firefox:
+    image: jlesage/firefox:${FIREFOX_VERSION:-latest}
+    container_name: ${TANGO_APP_NAME}_firefox
     depends_on: 
       - service_init
     restart: unless-stopped
+    shm_size: 2gb
+    environment:
+      - USER_ID=${TANGO_USER_ID:-0}
+      - GROUP_ID=${TANGO_GROUP_ID:-0}
+      - KEEP_APP_RUNNING=1
+      - DISPLAY_WIDTH=${FIREFOX_WIDTH}
+      - DISPLAY_HEIGHT=${FIREFOX_HEIGHT}
     labels:
       - "${TANGO_INSTANCE_NAME}.managed=true"
       - "traefik.enable=true"
-      - "traefik.http.routers.wetty.entrypoints=${WETTY_ENTRYPOINTS:-web_main}"
-      - "traefik.http.routers.wetty.rule=HostRegexp(`{subdomain:wetty}.{domain:${TANGO_DOMAIN:-.*}}`)"
-      - "traefik.http.routers.wetty.priority=${WETTY_REDIRECT_HTTPS_PRIORITY:-200}"
-      - "traefik.http.routers.wetty.service=wetty"
-      - "traefik.http.routers.wetty.middlewares=wetty-redirect"
-      - "traefik.http.routers.wetty-secure.entrypoints=${WETTY_ENTRYPOINTS_SECURE:-web_main_secure}"
-      - "traefik.http.routers.wetty-secure.rule=HostRegexp(`{subdomain:wetty}.{domain:${TANGO_DOMAIN:-.*}}`)"
-      - "traefik.http.routers.wetty-secure.service=wetty"
-      - "traefik.http.routers.wetty-secure.tls=true"
-      - "traefik.http.routers.wetty-secure.tls.domains[0].main=wetty.${TANGO_DOMAIN:-.*}"
-      - "traefik.http.routers.wetty-secure.middlewares=wetty-redirect"
-      - "traefik.http.services.wetty.loadbalancer.server.port=3000"
-      - "traefik.http.services.wetty.loadbalancer.server.scheme=http"
-      - "traefik.http.services.wetty.loadbalancer.passhostheader=true"
-      # redirect / to /wetty
-      - "traefik.http.middlewares.wetty-redirect.redirectregex.regex=^(http[s]?://[^:/]+(:[0-9]+)?)(/)+$$"
-      - "traefik.http.middlewares.wetty-redirect.redirectregex.replacement=$${1}/wetty"
+      - "traefik.http.routers.firefox.entrypoints=${FIREFOX_ENTRYPOINTS:-web_main}"
+      - "traefik.http.routers.firefox.rule=HostRegexp(`{subdomain:firefox}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.firefox.priority=${FIREFOX_REDIRECT_HTTPS_PRIORITY:-200}"
+      - "traefik.http.routers.firefox.service=firefox"
+      - "traefik.http.routers.firefox-secure.entrypoints=${FIREFOX_ENTRYPOINTS_SECURE:-web_main_secure}"
+      - "traefik.http.routers.firefox-secure.rule=HostRegexp(`{subdomain:firefox}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.firefox-secure.service=firefox"
+      - "traefik.http.routers.firefox-secure.tls=true"
+      - "traefik.http.routers.firefox-secure.tls.domains[0].main=firefox.${TANGO_DOMAIN:-.*}"
+      - "traefik.http.services.firefox.loadbalancer.server.port=5800"
+      - "traefik.http.services.firefox.loadbalancer.server.scheme=http"
+      - "traefik.http.services.firefox.loadbalancer.passhostheader=true"
     networks:
-      default:
-        aliases:
-          - wetty-ssh
+      - default
+    #network_mode: "service:vpn"
     expose:
-      - 3000
-    build:
-      context: https://github.com/butlerx/wetty.git#${WETTY_VERSION:-latest}
-      extra_hosts:
-        - "wetty-ssh:127.0.0.1"
+      - 5000
+    
+  # https://github.com/linuxserver/docker-transmission
+  transmission:
+    image: linuxserver/transmission:${TRANSMISSION_VERSION:-latest}
+    container_name: ${TANGO_APP_NAME}_transmission
+    depends_on: 
+      - service_init
+    restart: unless-stopped
+    volumes:
+      - transmission_download:/config
+      - transmission_data:/downloads
+      - transmission_watch:/watch
+    environment:
+      - PUID=${TANGO_USER_ID:-0}
+      - PGID=${TANGO_GROUP_ID:-0}
+      # Specify an alternative UI options are /combustion-release/, /transmission-web-control/, and /kettu/
+      - TRANSMISSION_WEB_HOME=/transmission-web-control/
+      - USER=${TRANSMISSION_USER}
+      - PASS=${TRANSMISSION_PASSWORD}
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      - "traefik.http.routers.transmission.entrypoints=${TRANSMISSION_ENTRYPOINTS:-web_main}"
+      - "traefik.http.routers.transmission.rule=HostRegexp(`{subdomain:transmission}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.transmission.priority=${TRANSMISSION_REDIRECT_HTTPS_PRIORITY:-200}"
+      - "traefik.http.routers.transmission.service=transmission"
+      - "traefik.http.routers.transmission-secure.entrypoints=${TRANSMISSION_ENTRYPOINTS_SECURE:-web_main_secure}"
+      - "traefik.http.routers.transmission-secure.rule=HostRegexp(`{subdomain:transmission}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.transmission-secure.service=transmission"
+      - "traefik.http.routers.transmission-secure.tls=true"
+      - "traefik.http.routers.transmission-secure.tls.domains[0].main=transmission.${TANGO_DOMAIN:-.*}"
+      - "traefik.http.services.transmission.loadbalancer.server.port=9091"
+      - "traefik.http.services.transmission.loadbalancer.server.scheme=http"
+      - "traefik.http.services.transmission.loadbalancer.passhostheader=true"
+    networks:
+       - default
+    #network_mode: "service:vpn"
+    expose:
+      - 9091/tcp
+      - 51413/tcp
+      - 51413/udp
+    ports:
+      - ${TRANSMISSION_PORT}:51413/tcp
+      - ${TRANSMISSION_PORT}:51413/udp
