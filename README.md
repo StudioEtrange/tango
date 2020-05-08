@@ -235,6 +235,7 @@ For full list see `tango.internal.env` file
 * To activate a module into the current app 
     * use variable list `TANGO_SERVICES_MODULES` or `--add` command line option
     * The list format is `<name>[@<network area>]`
+    * `main` network area is the default
 
     ```
     CLOUD9_USERNAME=mambo CLOUD9_PASSWORD=mambo ./tango --add cloud9 --add firefox@secondary --domain mydomain.org --freeport up
