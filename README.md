@@ -32,10 +32,17 @@ NOTE : tango will auto install other tools like docker-compose
     ./tango install
     ```
 
+### Minimal standalone usage
 
-### Create minimal app
+* Launch an instance with firefox predefined service
 
-See samples in sample folder
+    ```
+    ./tango --add firefox --domain mydomain.org --freeport up
+    ```
+
+### Minimal application
+
+See samples in `samples` folder
 
 * Create a folder for app
     ```
@@ -46,7 +53,6 @@ See samples in sample folder
     ```
     TANGO_DOMAIN=mydomain.com
     ```
-
 
 * Launch
     ```
@@ -68,17 +74,18 @@ See samples in sample folder
 ## Available Commands
 
 ```
+	install : deploy this app
+	init addons : install and init addons only if any addons declared in current app.
+	up [service [-d][-b]] [--add mod-name] [--freeport]: launch all available services or one service
+	down [service] [--mods mod-name] [--all]: down all services or one service. Except shared internal service when in shared mode (-all force stop shared service).
+	restart [service [-d]] [--add mod-name] [--freeport]: restart all services or one service.
+	info [--freeport] : give info. Will generate conf files and print configuration used when launching any service.
+	status [service] : see service status.
+	logs [service] : see service logs.
+	shell <service> : launch a shell into a running service.
+	mods : list available modules for use as a service.
+	cert <path> --domain=<domain> : generate self signed certificate for a domain into a current host folder.
 
-    install : deploy this app"
-    init [addons] : init services & addons. Do it once before launch."
-    up [service [-d]] : launch all services or one service"
-    down [service] [--all]: down all services or one service. Except shared service when in shared mode."
-    restart [service [-d]] : restart all services or one service"
-    info : give info. Will generate conf files and print configuration used when launching any service."
-    status [service] : see status"
-    logs [service] : see logs"
-    shell <service> : launch a shell into a running service"
-    cert <path> --domain=<domain> : generate self signed certificate for a domain into a path"
 ```
 
 
@@ -88,16 +95,13 @@ See samples in sample folder
 
 * You could set every tango variables through a user environment file, shell environment variables and some from command line. 
 
-* All existing variables are listed in `tango.env`
-
 * Resolution priority order :
-    * Shell environment variables
     * Command line variables
+    * Shell environment variables
     * User environment file variables
-    * Default configuration file variables
-    * Default values from tango itself
-
-
+    * Modules environment file variables
+    * Current app environment file variables
+    * Default tango environment file variables
 
 ### Standard variables
 
@@ -110,7 +114,7 @@ See samples in sample folder
 |TANGO_SERVICES_AVAILABLE|list of available services|-|``|
 |DATA_PATH|path on host for services conf and data files.|defined by `DATA_PATH_DEFAULT`|`../data`|
 
-For full list see `tango.env` file
+For full list see `tango.internal.env` file
 
 ### PATH variables
 
@@ -132,7 +136,7 @@ For full list see `tango.env` file
 
 * `TANGO_ARTEFACT_FOLDERS` is a list of artefact path. All listed artefact folders are attached to services listed in `TANGO_ARTEFACT_SERVICES` to a specified mount point in `TANGO_ARTEFACT_MOUNT_POINT`
 
-### Using a user environment file
+### Using an environment file
 
 * You could create a user environment file for your app to set any available variables and put it everywhere. By default it will be looked for from your home directory
 
@@ -140,13 +144,18 @@ For full list see `tango.env` file
     ./tango --app myapp --approot $HOME/myapp --env /foo/bar/myapp.env up
     ```
 
-* A user environment file syntax is liked docker-compose env file syntax. It is **NOT** a shell file. Values are not evaluated.
+* An environment file syntax is liked docker-compose env file syntax. It is **NOT** a shell file. Values are not evaluated.
 
 
     ```
     NETWORK_PORT_MAIN=80
     DATA_PATH=../data
     TANGO_ARTEFACT_FOLDERS=/mnt/MEDIA/MOVIES /mnt/MEDIA/TV_SHOWS
+    ```
+
+* It has a special cumulative assignation sign `+=` which add values to existing variable values
+    ```
+        TANGO_SERVICES_AVAILABLE+=blog
     ```
 
 
@@ -197,7 +206,7 @@ For full list see `tango.env` file
 
 * ie in user env file : 
     ```
-    TANGO_SERVICES_AVAILABLE=traefik website database
+    TANGO_SERVICES_AVAILABLE=website database
     TANGO_SERVICES_DISABLED=database
     ```
 
@@ -247,10 +256,10 @@ For full list see `tango.env` file
 |-|-|-|-|-|
 |main|web_main|HTTP|80|NETWORK_PORT_MAIN|
 |main|web_main_secure|HTTPS|443|NETWORK_PORT_MAIN_SECURE|
-|secondary|web_secondary|HTTP|20000|NETWORK_PORT_SECONDARY|
-|secondary|web_secondary_secure|HTTPS|20443|NETWORK_PORT_SECONDARY_SECURE|
-|admin|web_admin|HTTP|30000|NETWORK_PORT_ADMIN|
-|admin|web_admin_secure|HTTPS|30443|NETWORK_PORT_ADMIN_SECURE|
+|secondary|web_secondary|HTTP|8000|NETWORK_PORT_SECONDARY|
+|secondary|web_secondary_secure|HTTPS|8443|NETWORK_PORT_SECONDARY_SECURE|
+|admin|web_admin|HTTP|9000|NETWORK_PORT_ADMIN|
+|admin|web_admin_secure|HTTPS|9443|NETWORK_PORT_ADMIN_SECURE|
 
 ### Sample usage
 
@@ -262,10 +271,30 @@ For full list see `tango.env` file
     TANGO_SERVICES_ENTRYPOINT_SECONDARY=ombi medusa sabnzbd
     ```
 
-### Direct access port for debuging purpose
+### Ports
+
+#### Random free port
+
+* With `--freeport` option the port associated with each entrypoints will be randomly choosen among free TCP ports. This option override any other entrypoint ports defined with variables from shell or env files.
+
+* Any variables values ending with `_PORT` will be excluded from the free TCP ports. (including direct access port, see below)
+
+    ```
+    ./tango --add firefox --domain=mydomain.org --freeport up
+    ```
+    
+
+* `--freeport` will allocate free ports of entrypoint each times a service is started with `up` or `restart` command. These ports are saved in an internal file. When using `info` command `--freeport` will read ports from previously backup ones.
+
+    ```
+    ./tango --add firefox --domain=mydomain.org --freeport info
+    ```
+    
+
+#### Direct access port
 
 
-* For debugging, you can declare a direct access HTTP port to the service without using traefik with variables `*_DIRECT_ACCESS_PORT`. The first port declared as exposed in docker-compose file is mapped to its value.
+* For various purpose like debugging, you can declare a direct access HTTP port to the service to bypass traefik ang get directly to the service with variables `*_DIRECT_ACCESS_PORT`. The first port declared as `expose` in docker-compose file is mapped to its value.
 
     * access directly throuh http://host:7777
     ```

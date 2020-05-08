@@ -46,7 +46,7 @@ if [ ! "${ACTION}" = "install" ]; then
 	GENERATED_DOCKER_COMPOSE_FILE="${TANGO_APP_ROOT}/generated.${TANGO_APP_NAME}.docker-compose.yml"
 	GENERATED_ENV_FILE_FOR_BASH="${TANGO_APP_ROOT}/generated.${TANGO_APP_NAME}.bash.env"
 	GENERATED_ENV_FILE_FOR_COMPOSE="${TANGO_APP_ROOT}/generated.${TANGO_APP_NAME}.compose.env"
-
+	GENERATED_ENV_FILE_FREEPORT="${TANGO_APP_ROOT}/generated.${TANGO_APP_NAME}.freeport.env"
 
 	# load app libs
 	for f in ${TANGO_APP_ROOT}/pool/libs/*; do
@@ -124,22 +124,16 @@ if [ ! "${ACTION}" = "install" ]; then
 	[ "${TANGO_GROUP_ID}" = "" ] && [ ! "${PGID}" = "" ] &&  TANGO_GROUP_ID="${PGID}"
 	[ "${TANGO_DOMAIN}" = "" ] && [ ! "${DOMAIN}" = "" ] && TANGO_DOMAIN="${DOMAIN}"
 
-	case ${ACTION} in
-		up|restart )
-			if [ "${FREEPORT}" = "1" ]; then
-				__free_port_list="$($STELLA_API find_free_port "6" "TCP RANGE_BEGIN 10000 RANGE_END 65000 CONSECUTIVE")"
-				if [ ! "${__free_port_list}" = "" ]; then
-					__free_port_list=( ${__free_port_list} )
-					NETWORK_PORT_MAIN=${__free_port_list[0]}
-					NETWORK_PORT_MAIN_SECURE=${__free_port_list[1]}
-					NETWORK_PORT_SECONDARY=${__free_port_list[2]}
-					NETWORK_PORT_SECONDARY_SECURE=${__free_port_list[3]}
-					NETWORK_PORT_ADMIN=${__free_port_list[4]}
-					NETWORK_PORT_ADMIN_SECURE=${__free_port_list[5]}
-				fi
-			fi
-		;;
-	esac
+	TANGO_FREEPORT_MODE="0"
+	if [ "${FREEPORT}" = "1" ]; then
+		TANGO_FREEPORT_MODE="1"
+		case ${ACTION} in
+			up|restart ) __fix_free_port ;;
+			* ) # read previous reserved freeport from env file
+				[ -f "${GENERATED_ENV_FILE_FREEPORT}" ] && . "${GENERATED_ENV_FILE_FREEPORT}"
+				;;
+		esac
+	fi
 
 	
 	# add variables created at runtime or computed from command line
@@ -163,9 +157,12 @@ if [ ! "${ACTION}" = "install" ]; then
 	__add_declared_variables "TANGO_APP_MODULES_ROOT"
 
 	__add_declared_variables "GENERATED_ENV_FILE_FOR_COMPOSE"
+	__add_declared_variables "GENERATED_ENV_FILE_FREEPORT"
 	__add_declared_variables "TANGO_NOT_IN_APP"
 	__add_declared_variables "TANGO_SERVICES_MODULES"
 	__add_declared_variables "TANGO_SERVICES_MODULES_FULL"
+
+	__add_declared_variables "TANGO_FREEPORT_MODE"
 
 	# update env var 
 	# env var values priority order :

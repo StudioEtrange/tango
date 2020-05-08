@@ -469,6 +469,36 @@ __add_service_direct_port_access_all() {
 
 # FEATURES MANAGEMENT --------
 
+__fix_free_port() {
+	local __free_port_list=
+	local __exclude=
+
+	# exclude direct access port AND any variable ending with _PORT (for service_PORT variable)
+	for p in $(compgen -A variable | grep _PORT); do
+	echo $p
+		p="${!p}"
+		[[ ${p} =~ ^[0-9]+$ ]] && __exclude="${__exclude} ${p}"
+	done
+	[ ! "${__exclude}" = "" ] && __exclude="EXCLUDE_LIST_BEGIN ${__exclude} EXCLUDE_LIST_END"
+
+	__free_port_list="$($STELLA_API find_free_port "6" "TCP RANGE_BEGIN 10000 RANGE_END 65000 CONSECUTIVE ${__exclude}")"
+	if [ ! "${__free_port_list}" = "" ]; then
+		__free_port_list=( ${__free_port_list} )
+		NETWORK_PORT_MAIN=${__free_port_list[0]}
+		NETWORK_PORT_MAIN_SECURE=${__free_port_list[1]}
+		NETWORK_PORT_SECONDARY=${__free_port_list[2]}
+		NETWORK_PORT_SECONDARY_SECURE=${__free_port_list[3]}
+		NETWORK_PORT_ADMIN=${__free_port_list[4]}
+		NETWORK_PORT_ADMIN_SECURE=${__free_port_list[5]}
+
+		echo "NETWORK_PORT_MAIN=${__free_port_list[0]}" > "${GENERATED_ENV_FILE_FREEPORT}"
+		echo "NETWORK_PORT_MAIN_SECURE=${__free_port_list[1]}" >> "${GENERATED_ENV_FILE_FREEPORT}"
+		echo "NETWORK_PORT_SECONDARY=${__free_port_list[2]}" >> "${GENERATED_ENV_FILE_FREEPORT}"
+		echo "NETWORK_PORT_SECONDARY_SECURE=${__free_port_list[3]}" >> "${GENERATED_ENV_FILE_FREEPORT}"
+		echo "NETWORK_PORT_ADMIN=${__free_port_list[4]}" >> "${GENERATED_ENV_FILE_FREEPORT}"
+		echo "NETWORK_PORT_ADMIN_SECURE=${__free_port_list[5]}" >> "${GENERATED_ENV_FILE_FREEPORT}"
+	fi
+}
 
  __set_vpn_service() {
  	local __service_name="$1"
@@ -658,6 +688,7 @@ __set_network_as_external() {
 
 # VARIOUS -----------------
 
+
 # list available modules
 # mode : all (default) | app | tango
 __list_modules() {
@@ -668,7 +699,7 @@ __list_modules() {
 	case ${__mode} in
 		all ) __do_app_modules=1; __do_tango_modules=1;;
 		app ) __do_app_modules=1; __do_tango_modules=0;;
-		tango ) __do_app_modules=1; __do_tango_modules=0;;
+		tango ) __do_app_modules=0; __do_tango_modules=1;;
 	esac
 
 	if [ "${__do_app_modules}" = "1" ]; then

@@ -127,6 +127,7 @@ echo L-- External IP from internet : $TANGO_EXTERNAL_IP
 echo L-- Host name : $TANGO_HOSTNAME
 echo L-- Host default local IP : $TANGO_HOST_DEFAULT_IP
 echo L-- Host local IPs : $TANGO_HOST_IP
+echo L-- Random free ports mode :  $([ "${TANGO_FREEPORT_MODE}" = "1" ] && echo "ON [$GENERATED_ENV_FILE_FREEPORT]" || echo "OFF")
 echo "* MAIN AREA"
 echo L-- services : $NETWORK_SERVICES_AREA_MAIN
 echo L-- HTTP entrypoint [web_main] - port : $NETWORK_PORT_MAIN reachable from internet : $([ "${NETWORK_PORT_MAIN_REACHABLE}" = "1" ] && echo YES || echo dont know)
