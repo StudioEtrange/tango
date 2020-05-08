@@ -91,8 +91,8 @@ See samples in sample folder
 * All existing variables are listed in `tango.env`
 
 * Resolution priority order :
-    * Command line variables
     * Shell environment variables
+    * Command line variables
     * User environment file variables
     * Default configuration file variables
     * Default values from tango itself
@@ -213,6 +213,22 @@ For full list see `tango.env` file
 
     ```
     ./tango down <service>
+    ```
+
+## Modules 
+
+* There is a list of predefined services named `module`.
+    * List modules :
+     ```
+    ./tango mods
+    ```
+
+* To activate a module into the current app 
+    * use variable list `TANGO_SERVICES_MODULES` or `--add` command line option
+    * The list format is `<name>[@<network area>]`
+
+    ```
+    CLOUD9_USERNAME=mambo CLOUD9_PASSWORD=mambo ./tango --add cloud9 --add firefox@secondary --domain mydomain.org --freeport up
     ```
 
 ## Network Configuration

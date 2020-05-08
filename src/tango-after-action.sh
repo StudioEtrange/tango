@@ -4,7 +4,9 @@
 # ------------------- AFTER ACTION ----------------------------
 
 case ${ACTION} in
-	info|init|up|restart|stop|down|status )
+	info|up|down|status|init|restart )
 		docker-compose rm -v -f 1>/dev/null
+		;;
+	cert|shell|install|logs|mods)
 		;;
 esac

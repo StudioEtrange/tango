@@ -11,14 +11,52 @@ __update_env_files() {
 	done
 }
 
-
 __get_declared_variable_names() {
 	VARIABLES_LIST=""
-	[ -f "${TANGO_ENV_FILE}" ] && VARIABLES_LIST="$(sed -e '/^[[:space:]]*$/d' -e '/^[#].*$/d' -e 's/^\(.*\)=\(.*\)$/\1/g' "${TANGO_ENV_FILE}")"
-	[ -f "${TANGO_APP_ENV_FILE}" ] && VARIABLES_LIST="${VARIABLES_LIST} $(sed -e '/^[[:space:]]*$/d' -e '/^[#].*$/d' -e 's/^\(.*\)=\(.*\)$/\1/g' "${TANGO_APP_ENV_FILE}")"
-	[ -f "${TANGO_USER_ENV_FILE}" ] && VARIABLES_LIST="${VARIABLES_LIST} $(sed -e '/^[[:space:]]*$/d' -e '/^[#].*$/d' -e 's/^\(.*\)=\(.*\)$/\1/g' "${TANGO_USER_ENV_FILE}")"
+	[ -f "${TANGO_ENV_FILE}" ] && VARIABLES_LIST="$(sed -e '/^[[:space:]]*$/d' -e '/^[#]\+.*$/d' -e 's/^\([^=+]*\)+\?=\(.*\)$/\1/g' "${TANGO_ENV_FILE}")"
+	[ -f "${TANGO_APP_ENV_FILE}" ] && VARIABLES_LIST="${VARIABLES_LIST} $(sed -e '/^[[:space:]]*$/d' -e '/^[#]\+.*$/d' -e 's/^\([^=+]*\)+\?=\(.*\)$/\1/g' "${TANGO_APP_ENV_FILE}")"
+	[ -f "${TANGO_USER_ENV_FILE}" ] && VARIABLES_LIST="${VARIABLES_LIST} $(sed -e '/^[[:space:]]*$/d' -e '/^[#]\+.*$/d' -e 's/^\([^=+]*\)+\?=\(.*\)$/\1/g' "${TANGO_USER_ENV_FILE}")"
 
 	VARIABLES_LIST="$($STELLA_API list_filter_duplicate "${VARIABLES_LIST}")"
+
+}
+
+# add new variables names from modules env file
+__add_modules_declared_variable_names() {
+				
+	# add modules env file
+	for s in ${TANGO_SERVICES_MODULES}; do
+		if [ -f "${TANGO_APP_MODULES_ROOT}/${s}.env" ]; then
+			VARIABLES_LIST="${VARIABLES_LIST} $(sed -e '/^[[:space:]]*$/d' -e '/^[#]\+.*$/d' -e 's/^\([^=+]*\)+\?=\(.*\)$/\1/g' "${TANGO_APP_MODULES_ROOT}/${s}.env")"
+		else
+			[ -f "${TANGO_MODULES_ROOT}/${s}.env" ] && VARIABLES_LIST="${VARIABLES_LIST} $(sed -e '/^[[:space:]]*$/d' -e '/^[#]\+.*$/d' -e 's/^\([^=+]*\)+\?=\(.*\)$/\1/g' "${TANGO_MODULES_ROOT}/${s}.env")"
+		fi
+	done
+	VARIABLES_LIST="$($STELLA_API list_filter_duplicate "${VARIABLES_LIST}")"
+}
+
+
+# filter existing modules and split module list between full list and name list
+# full modules list format : <name>[@<network area>]
+__parse_modules_list() {
+	local _existing_modules=
+
+	# split module list between full list and name list
+	TANGO_SERVICES_MODULES_FULL="${TANGO_SERVICES_MODULES}"
+	TANGO_SERVICES_MODULES="$(echo "${TANGO_SERVICES_MODULES}" | sed -e 's/@[^ ]* */ /g')"
+
+	# filter existing modules
+	for s in ${TANGO_SERVICES_MODULES}; do
+		# app modules overrides tango modules
+		if [ -f "${TANGO_APP_MODULES_ROOT}/${s}.yml" ]; then
+			_existing_modules="${_existing_modules} ${s}"
+		else
+			[ -f "${TANGO_MODULES_ROOT}/${s}.yml" ] && _existing_modules="${_existing_modules} ${s}" \
+				|| echo "* WARN : module ${s} not found."
+		fi
+	done
+	
+	TANGO_SERVICES_MODULES="${_existing_modules}"
 }
 
 
@@ -27,6 +65,10 @@ __get_declared_variable_names() {
 __add_declared_variables() {
 	VARIABLES_LIST="${VARIABLES_LIST} $1"
 }
+
+
+
+
 
 
 # generate an env file to be uses as env-file in environment section of docker compose file (GENERATED_ENV_FILE_FOR_COMPOSE)
@@ -39,10 +81,20 @@ __create_env_for_docker_compose() {
 	# add app env file
 	[ -f "${TANGO_APP_ENV_FILE}" ] &&  cat <(echo \# --- PART FROM app env file ${TANGO_APP_ENV_FILE}) <(echo) <(echo) "${TANGO_APP_ENV_FILE}" <(echo) >> "${GENERATED_ENV_FILE_FOR_COMPOSE}"
 	
-	# add user app env file
+	# add modules env file
+	for s in ${TANGO_SERVICES_MODULES}; do
+		# app modules overrides tango modules
+		if [ -f "${TANGO_APP_MODULES_ROOT}/${s}.env" ]; then
+			cat <(echo \# --- PART FROM modules env file ${TANGO_APP_MODULES_ROOT}/${s}.env) <(echo) <(echo) "${TANGO_APP_MODULES_ROOT}/${s}.env" <(echo) >> "${GENERATED_ENV_FILE_FOR_COMPOSE}"
+		else
+			[ -f "${TANGO_MODULES_ROOT}/${s}.env" ] && cat <(echo \# --- PART FROM modules env file ${TANGO_MODULES_ROOT}/${s}.env) <(echo) <(echo) "${TANGO_MODULES_ROOT}/${s}.env" <(echo) >> "${GENERATED_ENV_FILE_FOR_COMPOSE}"
+		fi
+	done
+
+	# add user env file
 	[ -f "${TANGO_USER_ENV_FILE}" ] &&  cat <(echo \# --- PART FROM user env file ${TANGO_USER_ENV_FILE}) <(echo) <(echo) "${TANGO_USER_ENV_FILE}" <(echo) >> "${GENERATED_ENV_FILE_FOR_COMPOSE}"
 
-
+	__parse_env_file "${GENERATED_ENV_FILE_FOR_COMPOSE}"
 }
 
 # generate an env file to be sourced (GENERATED_ENV_FILE_FOR_BASH)
@@ -54,9 +106,21 @@ __create_env_for_bash() {
 	
 	# add app env file
 	[ -f "${TANGO_APP_ENV_FILE}" ] &&  cat <(echo \# --- PART FROM app env file ${TANGO_APP_ENV_FILE}) <(echo) <(echo) "${TANGO_APP_ENV_FILE}" <(echo) >> "${GENERATED_ENV_FILE_FOR_BASH}"
-	
-	# add user app env file
+
+	# add modules env file
+	for s in ${TANGO_SERVICES_MODULES}; do
+		# app modules overrides tango modules
+		if [ -f "${TANGO_APP_MODULES_ROOT}/${s}.env" ]; then
+			cat <(echo \# --- PART FROM modules env file ${TANGO_APP_MODULES_ROOT}/${s}.env) <(echo) <(echo) "${TANGO_APP_MODULES_ROOT}/${s}.env" <(echo) >> "${GENERATED_ENV_FILE_FOR_BASH}"
+		else
+			[ -f "${TANGO_MODULES_ROOT}/${s}.env" ] && cat <(echo \# --- PART FROM modules env file ${TANGO_MODULES_ROOT}/${s}.env) <(echo) <(echo) "${TANGO_MODULES_ROOT}/${s}.env" <(echo) >> "${GENERATED_ENV_FILE_FOR_BASH}"
+		fi
+	done
+
+	# add user env file
 	[ -f "${TANGO_USER_ENV_FILE}" ] &&  cat <(echo \# --- PART FROM user env file ${TANGO_USER_ENV_FILE}) <(echo) <(echo) "${TANGO_USER_ENV_FILE}" <(echo) >> "${GENERATED_ENV_FILE_FOR_BASH}"
+
+	__parse_env_file "${GENERATED_ENV_FILE_FOR_BASH}"
 
 	# add quote for variable bash support
 	sed -i 's/^\([a-zA-Z0-9_-]*\)=\(.*\)$/\1=\"\2\"/g' "${GENERATED_ENV_FILE_FOR_BASH}"
@@ -65,15 +129,69 @@ __create_env_for_bash() {
 
 
 
+# remove commentary and manage cumulative assignation with +=
+__parse_env_file() {
+	local _file="$1"
+
+	local _temp=$(mktmp)
+
+	awk -F= '
+	BEGIN {
+	}
+
+	# catch +=
+	/^[^=#]*\+=/ {
+		key=substr($1, 1, length($1)-1);
+		if (arr[key]) arr[key]=arr[key] " " $2;
+		else arr[key]=$2;
+		print key"="arr[key];
+		next;
+	}
+
+	# catch =
+	/^[^=#]*=/ {
+		arr[$1]=$2;
+		print $0;
+		next;
+	}
+
+	/.*/ {
+		print $0;
+		next;
+	}
+	
+	END {
+	}
+	' "${_file}" > "${_temp}"
+	cat "${_temp}" > "${_file}"
+	rm -f "${_temp}"
+	
+}
+
+
 # generate docker compose file
 __create_docker_compose_file() {
 	rm -f "${GENERATED_DOCKER_COMPOSE_FILE}"
 
-	# concatenate compose file
+	# concatenate compose files
 	cp -f "${TANGO_COMPOSE_FILE}" "${GENERATED_DOCKER_COMPOSE_FILE}"
 
+	# app compose file
 	[ -f "${TANGO_APP_COMPOSE_FILE}" ] && yq m -i -a -- "${GENERATED_DOCKER_COMPOSE_FILE}" "${TANGO_APP_COMPOSE_FILE}"
+
+	# modules compose files
+	for s in ${TANGO_SERVICES_MODULES}; do
+		# app modules overrides tango modules
+		if [ -f "${TANGO_APP_MODULES_ROOT}/${s}.yml" ]; then
+			yq m -i -a -- "${GENERATED_DOCKER_COMPOSE_FILE}" "${TANGO_APP_MODULES_ROOT}/${s}.yml"
+		else
+			[ -f "${TANGO_MODULES_ROOT}/${s}.yml" ] && yq m -i -a -- "${GENERATED_DOCKER_COMPOSE_FILE}" "${TANGO_MODULES_ROOT}/${s}.yml"
+		fi
+	done
+
+	# user compose file
 	[ -f "${TANGO_USER_COMPOSE_FILE}" ] && yq m -i -a -- "${GENERATED_DOCKER_COMPOSE_FILE}" "${TANGO_USER_COMPOSE_FILE}"
+	
 	
 	__set_active_services_all
 	__set_time_all
@@ -84,8 +202,8 @@ __create_docker_compose_file() {
 	__add_volume_artefact_all
 	__add_volume_app_pool_all
 	__set_letsencrypt_service_all
-	
 	__create_vpn_all
+
 	# do this after other compose modification 	# because it remove some network definition
 	__set_vpn_service_all
 }
@@ -215,10 +333,12 @@ __add_volume_artefact_all() {
 
 # add volume to service which needs app pool if it exists
 __add_volume_app_pool_all() {
-	if [ -d "${TANGO_APP_ROOT}/pool" ]; then
-		__add_volume_mapping_service "service_info" "${TANGO_APP_ROOT}/pool:/pool/${TANGO_APP_NAME}"
-		__add_volume_mapping_service "service_init" "${TANGO_APP_ROOT}/pool:/pool/${TANGO_APP_NAME}"
-		__add_volume_mapping_service "addons" "${TANGO_APP_ROOT}/pool:/pool/${TANGO_APP_NAME}"
+	if [ ! "${TANGO_NOT_IN_APP}" = "1" ]; then
+		if [ -d "${TANGO_APP_ROOT}/pool" ]; then
+			__add_volume_mapping_service "service_info" "${TANGO_APP_ROOT}/pool:/pool/${TANGO_APP_NAME}"
+			__add_volume_mapping_service "service_init" "${TANGO_APP_ROOT}/pool:/pool/${TANGO_APP_NAME}"
+			__add_volume_mapping_service "addons" "${TANGO_APP_ROOT}/pool:/pool/${TANGO_APP_NAME}"
+		fi
 	fi
 
 }
@@ -286,6 +406,18 @@ __set_letsencrypt_service_all() {
 
 
 __set_entrypoints_service_all() {
+	local __name=
+	local __area=
+	local __var=
+	# add modules entrypoint
+	for m in ${TANGO_SERVICES_MODULES_FULL}; do
+		__name="${m%%@*}"
+		[ -z "${m##*@*}" ] && __area="${m##*@}" || __area="main"
+
+		__var="NETWORK_SERVICES_AREA_${__area^^}"
+		eval "export ${__var}=\"${!__var} ${__name}\""
+	done
+
 	for s in ${NETWORK_SERVICES_AREA_MAIN}; do
 		__set_entrypoint_service "${s}"  "web_main"
 	done
@@ -295,6 +427,8 @@ __set_entrypoints_service_all() {
 	for s in ${NETWORK_SERVICES_AREA_ADMIN}; do
 		__set_entrypoint_service "${s}"  "web_admin"
 	done
+
+
 }
 
 __set_redirect_https_service_all() {
@@ -523,6 +657,41 @@ __set_network_as_external() {
 
 
 # VARIOUS -----------------
+
+# list available modules
+# mode : all (default) | app | tango
+__list_modules() {
+	local __mode="${1:-all}"
+
+
+	local __result=""
+	case ${__mode} in
+		all ) __do_app_modules=1; __do_tango_modules=1;;
+		app ) __do_app_modules=1; __do_tango_modules=0;;
+		tango ) __do_app_modules=1; __do_tango_modules=0;;
+	esac
+
+	if [ "${__do_app_modules}" = "1" ]; then
+		if ! $STELLA_API "is_dir_empty" "${TANGO_APP_MODULES_ROOT}"; then
+			for f in ${TANGO_APP_MODULES_ROOT}/*; do
+				case $f in
+					*.yml )	__result="${__result} $(basename $f | sed s/.yml//)";;
+				esac
+			done
+		fi
+	fi
+	if [ "${__do_tango_modules}" = "1" ]; then
+		if ! $STELLA_API "is_dir_empty" "${TANGO_MODULES_ROOT}"; then
+			for f in ${TANGO_MODULES_ROOT}/*; do
+				case $f in
+					*.yml )	__result="${__result} $(basename $f | sed s/.yml//)";;
+				esac
+			done
+		fi
+	fi
+
+	$STELLA_API list_filter_duplicate "${__result}"
+}
 
 # filter a list with items of another list
 __filter_list() {

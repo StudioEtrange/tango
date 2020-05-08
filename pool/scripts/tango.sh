@@ -6,12 +6,15 @@ MODE="$1"
 
 echo "---------==---- INFO  ----==---------"
 echo "* Tango current app : ${TANGO_APP_NAME}"
+echo "L-- app instance mode : ${TANGO_INSTANCE_MODE}"
+echo "L-- tango root : ${TANGO_ROOT}"
+echo "L-- tango env file : ${TANGO_ENV_FILE}"
+echo "L-- tango compose file : ${TANGO_COMPOSE_FILE}"
 echo "L-- app root : ${TANGO_APP_ROOT}"
 echo "L-- app env file : ${TANGO_APP_ENV_FILE}"
 echo "L-- app compose file : ${TANGO_APP_COMPOSE_FILE}"
 echo "L-- user env file : ${TANGO_USER_ENV_FILE}"
 echo "L-- user compose file : ${TANGO_USER_COMPOSE_FILE}"
-echo "L-- app instance mode : ${TANGO_INSTANCE_MODE}"
 echo "---------==---- INFO SERVICES ----==---------"
 echo "* Available services : ${TANGO_SERVICES_AVAILABLE}"
 for service in ${TANGO_SERVICES_AVAILABLE}; do
@@ -84,10 +87,20 @@ for service in ${TANGO_SERVICES_AVAILABLE}; do
 
 done
 
+echo "---------==---- MODULES ----==---------"
+echo "* Active modules as a service <module>[@<network area>]: ${TANGO_SERVICES_MODULES_FULL}"
+echo "* Available Tango Modules"
+echo "L-- tango modules root : ${TANGO_MODULES_ROOT}"
+echo "L-- tango modules list : ${TANGO_MODULES}"
+echo "* Available App Modules"
+echo "L-- app modules root : ${TANGO_APP_MODULES_ROOT}"
+echo "L-- app modules list : ${TANGO_APP_MODULES}"
 
 
 
-echo "---------==---- CERTIFICATES ----==---------"
+
+
+echo "---------==---- SERVICES CERTIFICATES ----==---------"
 echo "* Let's encrypt"
 echo -n "L-- status : "
 case ${LETS_ENCRYPT} in
@@ -104,11 +117,6 @@ echo "L-- traefik tls conf : ${GENERATED_TLS_FILE}"
 echo "L-- cert files : ${TANGO_CERT_FILES}"
 echo "L-- key files : ${TANGO_KEY_FILES}"
 
-echo "---------==---- VPN ----==---------"
-echo "* VPN Service"
-echo "L-- status : "
-echo "L-- image : "
-echo "L-- vpn list : "
 
 echo "---------==---- NETWORK ----==---------"
 echo "* IP & Domain"
@@ -132,6 +140,9 @@ echo L-- services : $NETWORK_SERVICES_AREA_ADMIN
 echo L-- HTTP entrypoint [web_admin] - port : $NETWORK_PORT_ADMIN reachable from internet : $([ "${NETWORK_PORT_ADMIN_REACHABLE}" = "1" ] && echo YES || echo dont know)
 echo L-- HTTPS entrypoint [web_admin_secure] - port : $NETWORK_PORT_ADMIN_SECURE reachable from internet : $([ "${NETWORK_PORT_ADMIN_SECURE_REACHABLE}" = "1" ] && echo YES || echo dont know)
 
+echo "---------==---- VPN ----==---------"
+echo "* VPN Service"
+echo "L-- vpn list : ${VPN_SERVICES_LIST}"
 
 
 echo "---------==---- ADDONS ----==---------"

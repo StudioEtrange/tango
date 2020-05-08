@@ -28,44 +28,6 @@ volumes:
       o: bind
       device: ${DATA_PATH}/transmission_watch
     name: ${TANGO_APP_NAME}_transmission_watch
-    
-# # See detail variable here : https://github.com/StudioEtrange/openvpn-client
-# # NOTE : cap_add, security_opt are required for this image to function
-# x-vpn: &default-vpn
-#   image: studioetrange/openvpn-client:dev
-#   # need root to launch openvpn-client
-#   user: 0:0
-#   depends_on: 
-#     - service_init
-#   restart: unless-stopped
-#   # allow host net stack management
-#   cap_add:
-#     - NET_ADMIN
-#   # disable all SELinux policies 
-#   security_opt:
-#     - label:disable
-#   volumes:
-#     - /home/nomorgan/testvpn:/vpn
-#   devices:
-#     - /dev/net/tun
-#   environment:
-#     # von conf files
-#     - 'VPN_FILES=ams-006.ovpn'
-#     # von authentification
-#     - 'VPN_AUTH=nhnqffgkwpkr;J@B%Sftb1y7#E'
-#     # use vpn dns provider
-#     - DNS=1
-#     # forbid any output network trafic outside VPN - usefull when VPN do not want to connect
-#     - FIREWALL=1
-#     # group id that will own openvpn-client process AND that can bypass any firewall rule
-#     - GROUPID=33333
-#     - 'OTHER_ARGS=--redirect-gateway def1'
-#   labels:
-#     - "${TANGO_INSTANCE_NAME}.managed=true"
-#   networks:
-#     - default
-#   build:
-#     context: https://github.com/StudioEtrange/openvpn-client.git#dev
 
 
 services:
@@ -124,56 +86,6 @@ services:
     expose:
       - 80
 
-  # vpn:
-  #   << : *default-vpn
-  #   container_name: ${TANGO_INSTANCE_NAME}_vpn
-  #   volumes:
-  #     - /home/nomorgan/testvpn:/vpn
-  #   devices:
-  #     - /dev/net/tun
-  #   environment:
-  #     # von conf files
-  #     - 'VPN_FILES=ams-006.ovpn'
-  #     # von authentification
-  #     - 'VPN_AUTH=nhnqffgkwpkr;J@B%Sftb1y7#E'
-  #     # use vpn dns provider
-  #     - DNS=1
-  #     # forbid any output network trafic outside VPN - usefull when VPN do not want to connect
-  #     - FIREWALL=1
-  #     # group id that will own openvpn-client process AND that can bypass any firewall rule
-  #     - GROUPID=33333
-  #     - 'OTHER_ARGS=--redirect-gateway def1'
-
-  
-  cloud9:
-    image: sapk/cloud9:${CLOUD9_VERSION:-latest}
-    container_name: ${TANGO_APP_NAME}_cloud9
-    depends_on: 
-      - service_init
-    restart: unless-stopped
-    labels:
-      - "${TANGO_INSTANCE_NAME}.managed=true"
-      - "traefik.enable=true"
-      - "traefik.http.routers.cloud9.entrypoints=${CLOUD9_ENTRYPOINTS:-web_main}"
-      - "traefik.http.routers.cloud9.rule=HostRegexp(`{subdomain:cloud9}.{domain:${TANGO_DOMAIN:-.*}}`)"
-      - "traefik.http.routers.cloud9.priority=${CLOUD9_REDIRECT_HTTPS_PRIORITY:-200}"
-      - "traefik.http.routers.cloud9.service=cloud9"
-      - "traefik.http.routers.cloud9-secure.entrypoints=${CLOUD9_ENTRYPOINTS_SECURE:-web_main_secure}"
-      - "traefik.http.routers.cloud9-secure.rule=HostRegexp(`{subdomain:cloud9}.{domain:${TANGO_DOMAIN:-.*}}`)"
-      - "traefik.http.routers.cloud9-secure.service=cloud9"
-      - "traefik.http.routers.cloud9-secure.tls=true"
-      - "traefik.http.routers.cloud9-secure.tls.domains[0].main=cloud9.${TANGO_DOMAIN:-.*}"
-      - "traefik.http.services.cloud9.loadbalancer.server.port=8181"
-      - "traefik.http.services.cloud9.loadbalancer.server.scheme=http"
-      - "traefik.http.services.cloud9.loadbalancer.passhostheader=true"
-    networks:
-      - default
-    #network_mode: "service:vpn"
-    expose:
-      - 8181
-    command: >
-      --auth :
-  
 
 
   # https://github.com/jlesage/docker-firefox

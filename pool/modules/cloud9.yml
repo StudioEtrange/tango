@@ -1,0 +1,28 @@
+services:  
+  cloud9:
+    image: sapk/cloud9:${CLOUD9_VERSION:-latest}
+    container_name: ${TANGO_APP_NAME}_cloud9
+    depends_on: 
+      - service_init
+    restart: unless-stopped
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      - "traefik.http.routers.cloud9.entrypoints=${CLOUD9_ENTRYPOINTS:-web_main}"
+      - "traefik.http.routers.cloud9.rule=HostRegexp(`{subdomain:cloud9}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.cloud9.priority=${CLOUD9_REDIRECT_HTTPS_PRIORITY:-200}"
+      - "traefik.http.routers.cloud9.service=cloud9"
+      - "traefik.http.routers.cloud9-secure.entrypoints=${CLOUD9_ENTRYPOINTS_SECURE:-web_main_secure}"
+      - "traefik.http.routers.cloud9-secure.rule=HostRegexp(`{subdomain:cloud9}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.cloud9-secure.service=cloud9"
+      - "traefik.http.routers.cloud9-secure.tls=true"
+      - "traefik.http.routers.cloud9-secure.tls.domains[0].main=cloud9.${TANGO_DOMAIN:-.*}"
+      - "traefik.http.services.cloud9.loadbalancer.server.port=8181"
+      - "traefik.http.services.cloud9.loadbalancer.server.scheme=http"
+      - "traefik.http.services.cloud9.loadbalancer.passhostheader=true"
+    networks:
+      - default
+    expose:
+      - 8181
+    command: >
+      --auth ${CLOUD9_USERNAME:-}:${CLOUD9_PASSWORD:-}

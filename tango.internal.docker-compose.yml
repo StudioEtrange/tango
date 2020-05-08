@@ -120,7 +120,7 @@ services:
       - default
     command: >
       bash -c "for f in /pool/tango/scripts/*; do [ -f \"$${f}\" ] && $${f} init; done &&
-      for f in /pool/${TANGO_APP_NAME}/scripts/*; do [ -f \"$${f}\" ] && $${f} init; done
+      [ ! ${TANGO_NOT_IN_APP} = "1" ] && for f in /pool/${TANGO_APP_NAME}/scripts/*; do [ -f \"$${f}\" ] && $${f} init; done
       "
 
   # info on services
@@ -135,8 +135,8 @@ services:
     networks:
       - default
     command: >
-      bash -c "for f in /pool/tango/scripts/*; do [ -f \"$${f}\" ] && $${f} info; done &&
-      for f in /pool/${TANGO_APP_NAME}/scripts/*; do [ -f \"$${f}\" ] && $${f} info; done
+      bash -c "for f in /pool/tango/scripts/*; do [ -f \"$${f}\" ] && . $${f} info; done &&
+      [ ! ${TANGO_NOT_IN_APP} = "1" ] && for f in /pool/${TANGO_APP_NAME}/scripts/*; do [ -f \"$${f}\" ] && $${f} info; done
       "
 
 
@@ -155,7 +155,7 @@ services:
     networks:
       - default
     command: >
-        bash -c "echo ---------==---- MAMBO ADDONS ----==---------
+        bash -c "echo ---------==---- TANGO ADDONS ----==---------
         && echo \"* Addons : $TANGO_ADDONS\"
         && for addon in $${TANGO_ADDONS}; do
         echo \"L-- install $${addon%#*} $${addon#*#}\"

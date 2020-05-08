@@ -1,0 +1,34 @@
+services:
+  # https://github.com/jlesage/docker-firefox
+  firefox:
+    image: jlesage/firefox:${FIREFOX_VERSION:-latest}
+    container_name: ${TANGO_APP_NAME}_firefox
+    depends_on: 
+      - service_init
+    restart: unless-stopped
+    shm_size: 2gb
+    environment:
+      - USER_ID=${TANGO_USER_ID:-0}
+      - GROUP_ID=${TANGO_GROUP_ID:-0}
+      - KEEP_APP_RUNNING=1
+      - DISPLAY_WIDTH=${FIREFOX_WIDTH}
+      - DISPLAY_HEIGHT=${FIREFOX_HEIGHT}
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      - "traefik.http.routers.firefox.entrypoints=${FIREFOX_ENTRYPOINTS:-web_main}"
+      - "traefik.http.routers.firefox.rule=HostRegexp(`{subdomain:firefox}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.firefox.priority=${FIREFOX_REDIRECT_HTTPS_PRIORITY:-200}"
+      - "traefik.http.routers.firefox.service=firefox"
+      - "traefik.http.routers.firefox-secure.entrypoints=${FIREFOX_ENTRYPOINTS_SECURE:-web_main_secure}"
+      - "traefik.http.routers.firefox-secure.rule=HostRegexp(`{subdomain:firefox}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.firefox-secure.service=firefox"
+      - "traefik.http.routers.firefox-secure.tls=true"
+      - "traefik.http.routers.firefox-secure.tls.domains[0].main=firefox.${TANGO_DOMAIN:-.*}"
+      - "traefik.http.services.firefox.loadbalancer.server.port=5800"
+      - "traefik.http.services.firefox.loadbalancer.server.scheme=http"
+      - "traefik.http.services.firefox.loadbalancer.passhostheader=true"
+    networks:
+      - default
+    expose:
+      - 5000

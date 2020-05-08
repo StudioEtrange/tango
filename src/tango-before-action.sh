@@ -4,7 +4,7 @@
 # ------------------- BEFORE ACTION ----------------------------
 
 case ${ACTION} in
-	install|cert )
+	install|cert|mods )
 		;;
 	info )
 		__create_default_path "${TANGO_APP_WORK_ROOT}" "${DEFAULT_APP_WORK_PATH_TO_CREATE}"

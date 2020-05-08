@@ -5,6 +5,11 @@
 
 
 case ${ACTION} in
+	mods )
+		echo "** Available modules to use as a service"
+		echo $(__list_modules)
+	;;
+
 	install )
 		echo "** Install requirements"
 		$STELLA_API get_features
@@ -30,16 +35,10 @@ case ${ACTION} in
 	;;
 
 	init )
-		
+		# TODO REVIEW : do we need an init step for addon ?
 		case ${TARGET} in
 			addons )
-				echo "** Init service ${TANGO_APP_NAME} addons"
-				docker-compose up addons
-				;;
-			* )
-				echo "** Init service Plex"
-				__init_service_plex
-				echo "** Init service ${TANGO_APP_NAME} addons"
+				echo "** Init ${TANGO_APP_NAME} addons"
 				docker-compose up addons
 				;;
 		esac
