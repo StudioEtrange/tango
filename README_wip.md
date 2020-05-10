@@ -321,7 +321,7 @@ L     shell <service> : launch a shell into a running service
 * If your Docker host also has a dedicated graphics card, the video encoding acceleration of Intel Quick Sync Video may become unavailable when the GPU is in use. 
 * If your computer has an NVIDIA GPU, please install the latest Latest NVIDIA drivers for Linux to make sure that Plex can use your NVIDIA graphics card for video encoding (only) when Intel Quick Sync Video becomes unavailable.
 
-## MAMBO ADDONS
+## MAMBO PLUGINS SCRIPTS
 
 
 * declare used addons

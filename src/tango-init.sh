@@ -11,6 +11,7 @@ TANGO_COMPOSE_FILE="${TANGO_ROOT}/tango.internal.docker-compose.yml"
 TANGO_ENV_FILE="${TANGO_ROOT}/tango.internal.env"
 
 TANGO_MODULES_ROOT="${TANGO_ROOT}/pool/modules"
+TANGO_PLUGINS_ROOT="${TANGO_ROOT}/pool/plugins"
 
 # load tango libs
 for f in ${TANGO_ROOT}/pool/libs/*; do

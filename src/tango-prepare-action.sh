@@ -21,21 +21,26 @@ if [ ! "${ACTION}" = "install" ]; then
 	TANGO_APP_ENV_FILE="${TANGO_APP_ROOT}/${TANGO_APP_NAME}.env"
 	TANGO_APP_COMPOSE_FILE="${TANGO_APP_ROOT}/${TANGO_APP_NAME}.docker-compose.yml"
 	TANGO_APP_MODULES_ROOT="${TANGO_APP_ROOT}/pool/modules"
+	TANGO_APP_PLUGINS_ROOT="${TANGO_APP_ROOT}/pool/plugins"
 
 	# workspace folder
 	TANGO_WORK_ROOT="${TANGO_ROOT}/workspace"
 	mkdir -p "${TANGO_WORK_ROOT}"
-	TANGO_APP_WORK_ROOT="${TANGO_APP_ROOT}/workspace"
+	TANGO_APP_WORK_ROOT="${TANGO_APP_ROOT}/workspace/${TANGO_APP_NAME}"
 	mkdir -p "${TANGO_APP_WORK_ROOT}"
 
-	TANGO_MODULES="$(__list_modules "tango")"
+	TANGO_PLUGINS="$(__list_items "plugins" "tango")"
+	TANGO_MODULES="$(__list_items "modules" "tango")"
 	if [ "${TANGO_NOT_IN_APP}" = "1" ]; then
 		TANGO_APP_ENV_FILE=
 		TANGO_APP_COMPOSE_FILE=
+		TANGO_APP_PLUGINS_ROOT=
+		TANGO_APP_PLUGINS=
 		TANGO_APP_MODULES_ROOT=
 		TANGO_APP_MODULES=
 	else
-		TANGO_APP_MODULES="$(__list_modules "app")"
+		TANGO_APP_PLUGINS="$(__list_items "plugins" "app")"
+		TANGO_APP_MODULES="$(__list_items "modules" "app")"
 	fi
 
 	# TANGO USER FILES 
@@ -111,7 +116,6 @@ if [ ! "${ACTION}" = "install" ]; then
 	# add to VARIABLES_LIST declared variables from modules env files
 	__add_modules_declared_variable_names
 
-
 	
 	# STEP 2 ------ process command line and shell env variables
 
@@ -128,14 +132,13 @@ if [ ! "${ACTION}" = "install" ]; then
 	if [ "${FREEPORT}" = "1" ]; then
 		TANGO_FREEPORT_MODE="1"
 		case ${ACTION} in
-			up|restart ) __fix_free_port ;;
+			up|restart ) __pick_free_port ;;
 			* ) # read previous reserved freeport from env file
 				[ -f "${GENERATED_ENV_FILE_FREEPORT}" ] && . "${GENERATED_ENV_FILE_FREEPORT}"
 				;;
 		esac
 	fi
 
-	
 	# add variables created at runtime or computed from command line
 	__add_declared_variables "TANGO_APP_NAME"
 	__add_declared_variables "TANGO_APP_NAME_CAPS"
@@ -155,6 +158,11 @@ if [ ! "${ACTION}" = "install" ]; then
 	__add_declared_variables "TANGO_MODULES_ROOT"
 	__add_declared_variables "TANGO_APP_MODULES"
 	__add_declared_variables "TANGO_APP_MODULES_ROOT"
+
+	__add_declared_variables "TANGO_PLUGINS"
+	__add_declared_variables "TANGO_PLUGINS_ROOT"
+	__add_declared_variables "TANGO_APP_PLUGINS"
+	__add_declared_variables "TANGO_APP_PLUGINS_ROOT"
 
 	__add_declared_variables "GENERATED_ENV_FILE_FOR_COMPOSE"
 	__add_declared_variables "GENERATED_ENV_FILE_FREEPORT"
@@ -178,7 +186,6 @@ if [ ! "${ACTION}" = "install" ]; then
 	. "${GENERATED_ENV_FILE_FOR_BASH}"
 
 
-	
 
 	# STEP 3 ------ process hardcoded default values, and computed runtime variable not fixed with command line nor shell env var nor env files
 
@@ -228,14 +235,15 @@ if [ ! "${ACTION}" = "install" ]; then
 	# Tango instance mode
 	case ${TANGO_INSTANCE_MODE} in
 		shared )
-			TANGO_SHARED_DATA_PATH="${TANGO_WORK_ROOT}"
+			TANGO_SHARED_DATA_PATH="${TANGO_WORK_ROOT}/tango_shared"
+			mkdir -p "${TANGO_SHARED_DATA_PATH}"
 			TANGO_INSTANCE_NAME="tango_shared"
 			TANGO_DATA_PATH="${TANGO_SHARED_DATA_PATH}"		
 			;;
 		isolated )
 			TANGO_SHARED_DATA_PATH=
 			TANGO_INSTANCE_NAME="${TANGO_APP_NAME}"
-			TANGO_DATA_PATH="${DATA_PATH}"
+			TANGO_DATA_PATH="${APP_DATA_PATH}"
 			;;
 	esac
 
@@ -243,10 +251,9 @@ if [ ! "${ACTION}" = "install" ]; then
 	TANGO_APP_NETWORK_NAME="${TANGO_INSTANCE_NAME}_default"
 	GENERATED_TLS_FILE_PATH="${TANGO_DATA_PATH}/traefikconfig/generated.${TANGO_APP_NAME}.tls.yml"
 
-	__add_declared_variables "TANGO_INSTANCE_NAME"
-	# data of generic service like tango
+	# path pointing where the tango cross-app data will be stored
 	__add_declared_variables "TANGO_DATA_PATH"
-	# path to shared tango data
+	__add_declared_variables "TANGO_INSTANCE_NAME"
 	__add_declared_variables "TANGO_SHARED_DATA_PATH"
 	__add_declared_variables "GENERATED_TLS_FILE_PATH"
 	__add_declared_variables "TANGO_APP_NETWORK_NAME"
@@ -298,7 +305,6 @@ if [ ! "${ACTION}" = "install" ]; then
 	# 	- default tango env file
 	# 	- default values hardcoded and runtume computed
 	__update_env_files "ingest default hardcoded values and runtime only variables"
-
 
 
 	# STEP 4 ------ create/transform some values and create docker compose file

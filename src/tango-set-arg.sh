@@ -6,7 +6,6 @@ usage() {
 	echo "----------------"
 	echo "o-- commands :"
 	echo "L     install : deploy this app"
-	echo "L     init addons : install and init addons only if any addons declared in current app."
 	echo "L     up [service [-d][-b]] [--add mod-name] [--freeport]: launch all available services or one service"
 	echo "L     down [service] [--mods mod-name] [--all]: down all services or one service. Except shared internal service when in shared mode (-all force stop shared service)."
 	echo "L     restart [service [-d]] [--add mod-name] [--freeport]: restart all services or one service."
@@ -25,7 +24,7 @@ usage() {
 
 # COMMAND LINE
 PARAMETERS="
-ACTION=										'action' 			a				'cert info shell up down status install logs init restart mods' '1'
+ACTION=										'action' 			a				'cert info shell up down status install logs restart mods' '1'
 TARGET=										'target' 			s				''	'0'
 "
 OPTIONS="

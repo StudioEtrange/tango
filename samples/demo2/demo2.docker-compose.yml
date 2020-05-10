@@ -5,28 +5,28 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: ${DATA_PATH}/${WEB2_ROOT_FOLDER}
+      device: ${APP_DATA_PATH}/${WEB2_ROOT_FOLDER}
     name: ${TANGO_APP_NAME}_web2_data
   transmission_data:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: ${DATA_PATH}/transmission_data
+      device: ${APP_DATA_PATH}/transmission_data
     name: ${TANGO_APP_NAME}_transmission_data
   transmission_download:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: ${DATA_PATH}/transmission_download
+      device: ${APP_DATA_PATH}/transmission_download
     name: ${TANGO_APP_NAME}_transmission_download
   transmission_watch:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: ${DATA_PATH}/transmission_watch
+      device: ${APP_DATA_PATH}/transmission_watch
     name: ${TANGO_APP_NAME}_transmission_watch
 
 

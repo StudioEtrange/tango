@@ -112,7 +112,7 @@ See samples in `samples` folder
 |TANGO_USER_ID|unix user which will run services and acces to files.|current user : `id -u`|`1000`|
 |TANGO_GROUP_ID|unix group which will run services and acces to files.|current group : `id -g`|`1000`|
 |TANGO_SERVICES_AVAILABLE|list of available services|-|``|
-|DATA_PATH|path on host for services conf and data files.|defined by `DATA_PATH_DEFAULT`|`../data`|
+|APP_DATA_PATH|path on host for services conf and data files.|defined by `DATA_PATH_DEFAULT`|`../data`|
 
 For full list see `tango.internal.env` file
 
@@ -124,13 +124,13 @@ For full list see `tango.internal.env` file
     * If the value is fixed the path must exists or it will throw an error
     * If the value is empty then the default value defined by `_PATH_DEFAULT` (i.e `VAR_PATH_DEFAULT`) ending variable will be picked and the path created. `_PATH_DEFAULT` are relative to app `workspace` folder
 
-* `DATA_PATH` is a special path variable with a purpose to store and share data of services in one unique location
+* `APP_DATA_PATH` is a special path variable with a purpose to store and share data of services app in one unique location
 
-* Tango specific data like letsencrypt data or traefik conf are stored in a special way depending of the app instance mode (`isolated` or `shared`)
-    * if `isolated` they are stored as subfolder of `DATA_PATH`
-    * if `shared` they are stored as subfolder of tango `workspace` itself (not in the app `DATA_PATH`)
+* Tango generic data like letsencrypt data or traefik conf are stored in a special way depending of the app instance mode (`isolated` or `shared`). `TANGO_DATA_PATH` contains the path of these data
+    * if `isolated` `TANGO_DATA_PATH` is `APP_DATA_PATH` - they are stored as subfolder of `APP_DATA_PATH`
+    * if `shared` `TANGO_DATA_PATH` is a subfolder of tango `workspace` itself
 
-* WARN : before changing path variables or instance mode (`shared` or `isolated`) attached to a volume (like `DATA_PATH`) use `tango down` command to delete volume.
+* WARN : before changing path variables or instance mode (`shared` or `isolated`) attached to a volume (like `APP_DATA_PATH`) use `tango down` command to delete volume.
 
 ### Artefacts
 
@@ -149,7 +149,7 @@ For full list see `tango.internal.env` file
 
     ```
     NETWORK_PORT_MAIN=80
-    DATA_PATH=../data
+    APP_DATA_PATH=../data
     TANGO_ARTEFACT_FOLDERS=/mnt/MEDIA/MOVIES /mnt/MEDIA/TV_SHOWS
     ```
 
@@ -164,7 +164,7 @@ For full list see `tango.internal.env` file
 * Set variables at tango launch or export them before launch
 
     ```
-    TANGO_DOMAIN="mydomain.com" DATA_PATH="/home/$USER/data" ./tango up
+    TANGO_DOMAIN="mydomain.com" APP_DATA_PATH="/home/$USER/data" ./tango up
     ```
 
 
@@ -238,8 +238,12 @@ For full list see `tango.internal.env` file
     * `main` network area is the default
 
     ```
-    CLOUD9_USERNAME=mambo CLOUD9_PASSWORD=mambo ./tango --add cloud9 --add firefox@secondary --domain mydomain.org --freeport up
+    CLOUD9_USERNAME=tango CLOUD9_PASSWORD=tango ./tango --add cloud9 --add firefox@secondary --domain mydomain.org --freeport up
     ```
+
+* Predefined modules and their available variables files are in `pool/modules` folder
+
+* You can define your own modules in your app by putting their matching `.yml` and `.env` files in a `pool/modules` folder of the app
 
 ## Network Configuration
 
@@ -343,6 +347,10 @@ For full list see `tango.internal.env` file
     ```
 
 
+## VPN
+
+### addon scripts vpn https://www.privateinternetaccess.com/helpdesk/kb/articles/can-i-use-port-forwarding-without-using-the-pia-client
+
 ## GPU
 
 
@@ -398,7 +406,7 @@ For full list see `tango.internal.env` file
 
     * sample with openvpn server https://gist.github.com/darth-veitcher/93acda9617bab3e1de0264cebf4637fc
 
-    * free vpn for test https://pilovali.nl/free-vpn/
+    * free vpn provider for test https://pilovali.nl/free-vpn/
     
     * UI
         * qomui - Qt - openvpn client conf management  https://github.com/corrad1nho/qomui

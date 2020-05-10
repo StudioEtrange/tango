@@ -5,7 +5,7 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: ${DATA_PATH}/${WEBROOT}
+      device: ${APP_DATA_PATH}/${WEBROOT}
     name: ${TANGO_APP_NAME}_web1_data
 
 services:

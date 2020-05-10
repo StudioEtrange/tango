@@ -7,7 +7,7 @@ __update_env_files() {
 	echo "# ------ UPDATE : update_env_files : $(date) -- ${__text}" >> "${GENERATED_ENV_FILE_FOR_BASH}"
 	for __variable in ${VARIABLES_LIST}; do
 		[ -z ${!__variable+x} ] || echo "${__variable}=${!__variable}" >> "${GENERATED_ENV_FILE_FOR_COMPOSE}"
-		[ -z ${!__variable+x} ] || echo "${__variable}=\"${!__variable}\"" >> "${GENERATED_ENV_FILE_FOR_BASH}"		
+		[ -z ${!__variable+x} ] || echo "${__variable}=\"$(echo ${!__variable} | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\$/\\$/g')\"" >> "${GENERATED_ENV_FILE_FOR_BASH}"	
 	done
 }
 
@@ -123,6 +123,7 @@ __create_env_for_bash() {
 	__parse_env_file "${GENERATED_ENV_FILE_FOR_BASH}"
 
 	# add quote for variable bash support
+	sed -i -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\$/\\$/g' "${GENERATED_ENV_FILE_FOR_BASH}"
 	sed -i 's/^\([a-zA-Z0-9_-]*\)=\(.*\)$/\1=\"\2\"/g' "${GENERATED_ENV_FILE_FOR_BASH}"
 
 }
@@ -204,7 +205,10 @@ __create_docker_compose_file() {
 	__set_letsencrypt_service_all
 	__create_vpn_all
 
-	# do this after other compose modification 	# because it remove some network definition
+	__create_plugin_all
+
+	# do this after other compose modification 	
+	# because it remove some network definition
 	__set_vpn_service_all
 }
 
@@ -255,10 +259,72 @@ __translate_all_path() {
 
 # MANAGE FEATURES FOR ALL CONTAINTERS -----------------
 
+__create_plugin_all() {
+
+	__add_declared_variables "TANGO_PLUGINS_LIST"
+	# NOTE : +13/-13 is for bybass 'TANGO_PLUGIN_'
+	for _id in $(compgen -A variable | awk 'match($0,/TANGO_PLUGIN_[0-9]+/) {print substr($0,RSTART+13,RLENGTH-13)}' | sort | uniq); do
+		__create_plugin "${_id}"
+		__add_service_dependency "plugins" "plugin_${_id}"
+		export TANGO_PLUGINS_LIST="${TANGO_PLUGINS_LIST} plugin_${_id}"
+		export TANGO_TIME_VOLUME_SERVICES="${TANGO_TIME_VOLUME_SERVICES} plugin_${_id}"
+	done
+
+}
+
+
+__create_plugin() {
+	local __plugin_id="$1"
+	
+	local _tmp=
+	local __plugin_name=
+	local __arg_list=
+	local __dep_list=
+
+	local __service_name="plugin_${__plugin_id}"
+	local __command=
+
+	_tmp="TANGO_PLUGIN_${__plugin_id}"
+	_tmp="${!_tmp}"
+
+	if [ -z "${_tmp##*@*}" ]; then
+		__plugin_name="${_tmp%%@*}"
+	else
+		[ -z "${_tmp##*#*}" ] && __plugin_name="${_tmp%%#*}" || __plugin_name="${_tmp}" 
+	fi
+
+	if [ -z "${_tmp##*#*}" ]; then
+		__arg_list="${_tmp#*#}"
+		__arg_list="${__arg_list//#/ }"
+	fi
+
+	if [ -z "${_tmp##*@*}" ]; then
+		__dep_list="${_tmp#*@}"
+		__dep_list="${__dep_list%%#*}"
+		__dep_list="${__dep_list//@/ }"
+	fi
+	
+	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.<<" default-plugin
+	# need tweak '*default-vpn' yaml anchor while this issue exist in yq : https://github.com/mikefarah/yq/issues/377
+	sed -i 's/[^&]default-plugin/ \*default-plugin/' "${GENERATED_DOCKER_COMPOSE_FILE}"
+	# NOTE : plugin are specific for each tango app : use of TANGO_APP_NAME
+	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.container_name" '${TANGO_APP_NAME}_'${__service_name}
+	
+	for d in ${__dep_list}; do
+		__add_service_dependency "${__service_name}" "${d,,}"
+	done
+	__command='bash -c "echo \"* Plugin : '$__plugin_name'\" && echo L-- dep list : '$__dep_list' && echo L-- arg list : '$__arg_list' && [ -f \"/pool/${TANGO_APP_NAME}/plugins/'$__plugin_name'\" ] && /pool/${TANGO_APP_NAME}/plugins/'$__plugin_name' || ( [ -f \"/pool/tango/plugins/'$__plugin_name'\" ] && /pool/tango/plugins/'$__plugin_name' || echo \"** WARN plugin not found\")"'
+
+	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.command" "${__command}"
+
+}
+
+
+
 __set_active_services_all() {
 	# declare all active service in tango depdenciess
 	for s in ${TANGO_SERVICES_ACTIVE}; do
-		__add_service_dependency "tango" "${s}"
+		__check_service_exist "${s}" && __add_service_dependency "tango" "${s}" || echo "** WARN : unknow ${s} service declared in TANGO_SERVICES_ACTIVE"
 	done
 }
 
@@ -268,7 +334,7 @@ __set_vpn_service_all() {
 	for v in ${VPN_SERVICES_LIST}; do
 		_tmp="${v^^}_SERVICES"
 		for s in ${!_tmp}; do
-			__set_vpn_service "${s}" "${v}"
+			__check_service_exist "${s}" && __set_vpn_service "${s}" "${v}" || echo "** WARN : unknow ${s} service declared in ${_tmp}"
 		done
 
 	done
@@ -279,7 +345,7 @@ __set_vpn_service_all() {
 __create_vpn_all() {
 
 	__add_declared_variables "VPN_SERVICES_LIST"
-	# NOTE : +4/-4 is for by bass 'VPN_'nn
+	# NOTE : +4/-4 is for bybass 'VPN_'
 	for _id in $(compgen -A variable | awk 'match($0,/VPN_[0-9]+/) {print substr($0,RSTART+4,RLENGTH-4)}' | sort | uniq); do
 		__create_vpn ${_id}
 		__add_service_dependency "vpn" "vpn_${_id}"
@@ -288,6 +354,7 @@ __create_vpn_all() {
 	done
 
 }
+
 __set_certificates_all() {
 	
 	# empty file
@@ -323,7 +390,10 @@ __add_volume_artefact_all() {
 			__name="$($STELLA_API md5 "${f}")"
 			__add_volume_local_definition "artefact_${__name}" "${f}"
 			for s in $TANGO_ARTEFACT_SERVICES; do
-				__add_volume_mapping_service "${s}" "artefact_${__name}:${TANGO_ARTEFACT_MOUNT_POINT}/${target}"
+				__check_service_exist "${s}" && __add_volume_mapping_service "${s}" "artefact_${__name}:${TANGO_ARTEFACT_MOUNT_POINT}/${target}"
+				# NOTE : do not print WARN because a warn is printed for each artefact folder for each undefined services
+				#	|| echo "** WARN : unknow ${s} service declared in TANGO_ARTEFACT_SERVICES"
+				
 			done
 			[ "${VERBOSE}" = "1" ] && echo "** [${f}] will be mapped to {${TANGO_ARTEFACT_MOUNT_POINT}/${target}}"			
 		fi
@@ -337,7 +407,8 @@ __add_volume_app_pool_all() {
 		if [ -d "${TANGO_APP_ROOT}/pool" ]; then
 			__add_volume_mapping_service "service_info" "${TANGO_APP_ROOT}/pool:/pool/${TANGO_APP_NAME}"
 			__add_volume_mapping_service "service_init" "${TANGO_APP_ROOT}/pool:/pool/${TANGO_APP_NAME}"
-			__add_volume_mapping_service "addons" "${TANGO_APP_ROOT}/pool:/pool/${TANGO_APP_NAME}"
+			#__add_volume_mapping_service "x-plugin" "${TANGO_APP_ROOT}/pool:/pool/${TANGO_APP_NAME}"
+			yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "x-plugin.volumes[+]" "${TANGO_APP_ROOT}/pool:/pool/${TANGO_APP_NAME}"
 		fi
 	fi
 
@@ -346,12 +417,12 @@ __add_volume_app_pool_all() {
 # add gpu to all container that need its
 # NVIDIA | INTEL_QUICKSYNC
 __add_gpu_all() {
-	for service in $(compgen -A variable | grep _GPU); do
-		gpu="${!service}"
+	for s in $(compgen -A variable | grep _GPU); do
+		gpu="${!s}"
 		if [ ! "${gpu}" = "" ]; then
-			service="${service%_GPU}"
+			service="${s%_GPU}"
 			service="${service,,}"
-			__add_gpu "${service}" "${gpu}"
+			__check_service_exist "${service}" && __add_gpu "${service}" "${gpu}" || echo "** WARN : unknow ${service} service declared in ${s}"
 		fi
 	done
 }
@@ -360,11 +431,11 @@ __add_gpu_all() {
 __set_time_all() {
 
 	for s in $TANGO_TIME_VOLUME_SERVICES; do
-		__add_volume_for_time "$s"
+		__check_service_exist "${s}" && __add_volume_for_time "$s" || echo "** WARN : unknow ${s} service declared in TANGO_TIME_VOLUME_SERVICES"
 	done
 
 	for s in $TANGO_TIME_VAR_TZ_SERVICES; do
-		__add_tz_var_for_time "$s"
+		__check_service_exist "${s}" && __add_tz_var_for_time "$s" || echo "** WARN : unknow ${s} service declared in TANGO_TIME_VAR_TZ_SERVICES"
 	done
 
 }
@@ -377,13 +448,18 @@ __set_letsencrypt_service_all() {
 	case ${LETS_ENCRYPT} in
 		enable|debug )
 			for serv in ${LETS_ENCRYPT_SERVICES}; do
-				__add_letsencrypt_service "${serv}"
-				# add lets encrypt support for subservices
-				for sub in ${TANGO_SUBSERVICES}; do
-					case ${sub} in
-						${serv}* ) __add_letsencrypt_service "${serv}" "${sub}";;
-					esac
-				done
+				if __check_service_exist "${serv}"; then
+					__add_letsencrypt_service "${serv}"
+					
+					# add lets encrypt support for subservices
+					for sub in ${TANGO_SUBSERVICES}; do
+						case ${sub} in
+							${serv}* ) __add_letsencrypt_service "${serv}" "${sub}";;
+						esac
+					done
+				else
+					echo "** WARN : unknow ${serv} service declared in LETS_ENCRYPT_SERVICES"
+				fi
 			done
 
 			case ${LETS_ENCRYPT_CHALLENGE} in
@@ -419,13 +495,13 @@ __set_entrypoints_service_all() {
 	done
 
 	for s in ${NETWORK_SERVICES_AREA_MAIN}; do
-		__set_entrypoint_service "${s}"  "web_main"
+		__check_service_exist "${s}" && __set_entrypoint_service "${s}"  "web_main" || echo "** WARN : unknow ${s} service declared in NETWORK_SERVICES_AREA_MAIN"
 	done
 	for s in ${NETWORK_SERVICES_AREA_SECONDARY}; do
-		__set_entrypoint_service "${s}"  "web_secondary"
+		__check_service_exist "${s}" && __set_entrypoint_service "${s}"  "web_secondary" || echo "** WARN : unknow ${s} service declared in NETWORK_SERVICES_AREA_SECONDARY"
 	done
 	for s in ${NETWORK_SERVICES_AREA_ADMIN}; do
-		__set_entrypoint_service "${s}"  "web_admin"
+		__check_service_exist "${s}" && __set_entrypoint_service "${s}"  "web_admin" || echo "** WARN : unknow ${s} service declared in NETWORK_SERVICES_AREA_ADMIN"
 	done
 
 
@@ -433,32 +509,41 @@ __set_entrypoints_service_all() {
 
 __set_redirect_https_service_all() {
 	for s in ${NETWORK_SERVICES_REDIRECT_HTTPS}; do
-		# look if on any entrypoint, we have to override the service router rule with the http-catchall rule
-		for se in ${NETWORK_SERVICES_AREA_ADMIN}; do
-			[ "${se}" = "${s}" ] && __set_redirect_https_service "${s}"  "web_admin"
-		done
-		for se in ${NETWORK_SERVICES_AREA_SECONDARY}; do
-			[ "${se}" = "${s}" ] && __set_redirect_https_service "${s}"  "web_secondary"
-		done
-		for se in ${NETWORK_SERVICES_AREA_MAIN}; do
-			[ "${se}" = "${s}" ] && __set_redirect_https_service "${s}"  "web_main"
-		done
+		if __check_service_exist "${s}"; then
+			# look if on any entrypoint, we have to override the service router rule with the http-catchall rule
+			for se in ${NETWORK_SERVICES_AREA_ADMIN}; do
+				[ "${se}" = "${s}" ] && __set_redirect_https_service "${s}"  "web_admin"
+			done
+			for se in ${NETWORK_SERVICES_AREA_SECONDARY}; do
+				[ "${se}" = "${s}" ] && __set_redirect_https_service "${s}"  "web_secondary"
+			done
+			for se in ${NETWORK_SERVICES_AREA_MAIN}; do
+				[ "${se}" = "${s}" ] && __set_redirect_https_service "${s}"  "web_main"
+			done
+		else
+			echo "** WARN : unknow ${s} service declared in NETWORK_SERVICES_REDIRECT_HTTPS"
+		fi
 	done
 }
 
 
 __add_service_direct_port_access_all() {
-	for service in $(compgen -A variable | grep _DIRECT_ACCESS_PORT); do
-		port="${!service}"
+	for s in $(compgen -A variable | grep _DIRECT_ACCESS_PORT); do
+		port="${!s}"
 		if [ ! "${port}" = "" ]; then
-			service="${service%_DIRECT_ACCESS_PORT}"
+			service="${s%_DIRECT_ACCESS_PORT}"
 			service="${service,,}"
-			port_inside="$(yq r "${GENERATED_DOCKER_COMPOSE_FILE}" services.$service.expose[0])"
-			if [ ! "${port_inside}" = "" ]; then
-				[ "${VERBOSE}" = "1" ] && echo "* Activate direct access to $service : mapping $port to $port_inside"
-				yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.$service.ports[+]" "$port:$port_inside"
+			
+			if __check_service_exist "${service}"; then
+				port_inside="$(yq r "${GENERATED_DOCKER_COMPOSE_FILE}" services.$service.expose[0])"
+				if [ ! "${port_inside}" = "" ]; then
+					[ "${VERBOSE}" = "1" ] && echo "* Activate direct access to $service : mapping $port to $port_inside"
+					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.$service.ports[+]" "$port:$port_inside"
+				else
+					echo "* WARN : cannot activate direct access to $service through $port : Unknown inside port to map to. Inside port must be declared as first port in expose section."
+				fi
 			else
-				echo "* WARN : cannot activate direct access to $service through $port : Unknown inside port to map to. Inside port must be declared as first port in expose section."
+				echo "** WARN : unknow ${service} service declared in ${s}"
 			fi
 		fi
 	done
@@ -469,13 +554,12 @@ __add_service_direct_port_access_all() {
 
 # FEATURES MANAGEMENT --------
 
-__fix_free_port() {
+__pick_free_port() {
 	local __free_port_list=
 	local __exclude=
 
 	# exclude direct access port AND any variable ending with _PORT (for service_PORT variable)
 	for p in $(compgen -A variable | grep _PORT); do
-	echo $p
 		p="${!p}"
 		[[ ${p} =~ ^[0-9]+$ ]] && __exclude="${__exclude} ${p}"
 	done
@@ -514,7 +598,7 @@ __fix_free_port() {
 }
 
 
-# See detail variable here : https://github.com/StudioEtrange/openvpn-client
+
 __create_vpn() {
 	local __vpn_id="$1"
 	
@@ -522,7 +606,7 @@ __create_vpn() {
 	local __service_name="vpn_${__vpn_id}"
 
 
-	_tmp="VPN_${__vpn_id}_FOLDER"
+	_tmp="VPN_${__vpn_id}_PATH"
 	local __folder="${!_tmp}"
 	_tmp="VPN_${__vpn_id}_VPN_FILES"
 	local __vpn_files="${!_tmp}"
@@ -561,6 +645,13 @@ __create_vpn() {
 }
 
 
+__check_service_exist() {
+	local __service="$1"
+	
+	[ ! -z "$(yq r -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.image")" ]
+	return $?
+}
+
 
 __add_gpu() {
 	local __service="$1"
@@ -597,7 +688,7 @@ __add_tz_var_for_time() {
 
 
 
-__add_service_dependency () {
+__add_service_dependency() {
 	local __service="$1"
 	local __dependency="$2"
 
@@ -689,33 +780,43 @@ __set_network_as_external() {
 # VARIOUS -----------------
 
 
-# list available modules
+# list available modules or plugins
+# item : modules or plugins
 # mode : all (default) | app | tango
-__list_modules() {
-	local __mode="${1:-all}"
+__list_items() {
+	local __item="${1}"
+	local __mode="${2:-all}"
 
+	local __app_folder=
+	local __tango_folder=
+	local __file_ext=
+	case ${__item} in
+		modules ) __app_folder="${TANGO_APP_MODULES_ROOT}"; __tango_folder="${TANGO_MODULES_ROOT}"; __file_ext='*.yml';;
+		plugins ) __app_folder="${TANGO_APP_PLUGINS_ROOT}"; __tango_folder="${TANGO_PLUGINS_ROOT}"; __file_ext='*';;
+	esac
 
 	local __result=""
 	case ${__mode} in
-		all ) __do_app_modules=1; __do_tango_modules=1;;
-		app ) __do_app_modules=1; __do_tango_modules=0;;
-		tango ) __do_app_modules=0; __do_tango_modules=1;;
+		all ) __do_app=1; __do_tango=1;;
+		app ) __do_app=1; __do_tango=0;;
+		tango ) __do_app=0; __do_tango=1;;
 	esac
 
-	if [ "${__do_app_modules}" = "1" ]; then
-		if ! $STELLA_API "is_dir_empty" "${TANGO_APP_MODULES_ROOT}"; then
-			for f in ${TANGO_APP_MODULES_ROOT}/*; do
+	 
+	if [ "${__do_app}" = "1" ]; then
+		if ! $STELLA_API "is_dir_empty" "${__app_folder}"; then
+			for f in ${__app_folder}/*; do
 				case $f in
-					*.yml )	__result="${__result} $(basename $f | sed s/.yml//)";;
+					$__file_ext )	__result="${__result} $(basename $f | sed s/.yml//)";;
 				esac
 			done
 		fi
 	fi
-	if [ "${__do_tango_modules}" = "1" ]; then
-		if ! $STELLA_API "is_dir_empty" "${TANGO_MODULES_ROOT}"; then
-			for f in ${TANGO_MODULES_ROOT}/*; do
+	if [ "${__do_tango}" = "1" ]; then
+		if ! $STELLA_API "is_dir_empty" "${__tango_folder}"; then
+			for f in ${__tango_folder}/*; do
 				case $f in
-					*.yml )	__result="${__result} $(basename $f | sed s/.yml//)";;
+					$__file_ext )	__result="${__result} $(basename $f | sed s/.yml//)";;
 				esac
 			done
 		fi
@@ -723,6 +824,7 @@ __list_modules() {
 
 	$STELLA_API list_filter_duplicate "${__result}"
 }
+
 
 # filter a list with items of another list
 __filter_list() {

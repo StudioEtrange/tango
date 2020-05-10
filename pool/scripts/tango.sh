@@ -5,8 +5,9 @@ MODE="$1"
 
 
 echo "---------==---- INFO  ----==---------"
-echo "* Tango current app : ${TANGO_APP_NAME}"
-echo "L-- app instance mode : ${TANGO_INSTANCE_MODE}"
+echo "* Tango current app name : ${TANGO_APP_NAME}"
+echo "L-- standalone app : $([ "${TANGO_NOT_IN_APP}" = "1" ] && echo NO || echo YES)"
+echo "L-- instance mode : ${TANGO_INSTANCE_MODE}"
 echo "L-- tango root : ${TANGO_ROOT}"
 echo "L-- tango env file : ${TANGO_ENV_FILE}"
 echo "L-- tango compose file : ${TANGO_COMPOSE_FILE}"
@@ -31,7 +32,7 @@ for service in ${TANGO_SERVICES_AVAILABLE}; do
    
     # filter information to show
     case ${service} in
-        VPN ) info_extended=0; info_variables=1;;
+        VPN|PLUGINS ) info_extended=0; info_variables=0;;
         * ) info_extended=1; info_variables=1;;
     esac
 
@@ -39,6 +40,9 @@ for service in ${TANGO_SERVICES_AVAILABLE}; do
         echo "L-- version : ${version}"
         
         __var="${service}_ENTRYPOINTS"; __entrypoints="${!__var}"; __var="${service}_ENTRYPOINTS_SECURE"; __entrypoints="${__entrypoints} ${!__var}";
+        # trim __entrypoints
+        __entrypoints="${__entrypoints#"${__entrypoints%%[![:space:]]*}"}"   # remove leading whitespace characters
+        __entrypoints="${__entrypoints%"${var##*[![:space:]]}"}" # remove trailing whitespace characters
         echo "L-- entrypoints : ${__entrypoints}"
         
         echo -n "L-- use letsencrypt : "
@@ -59,6 +63,9 @@ for service in ${TANGO_SERVICES_AVAILABLE}; do
         echo "L-- direct access port : ${__direct_access}"
         
         __urls=
+        __domain=
+        [ "${service}" = "TRAEFIK" ] && __domain="${TRAEFIK_SUBDOMAIN}${TANGO_DOMAIN/\.\*/\*}" \
+            || __domain="${service,,}.${TANGO_DOMAIN/\.\*/\*}"
         for e in ${__entrypoints}; do
             e="${e/web_/NETWORK_PORT_}"
             e="${e^^}"
@@ -66,14 +73,15 @@ for service in ${TANGO_SERVICES_AVAILABLE}; do
             case $e in
                 *SECURE ) __with_s="s";; 
             esac
-            [ "${service}" = "TRAEFIK" ] && __domain="${TRAEFIK_SUBDOMAIN}${TANGO_DOMAIN/\.\*/\*}" \
-            || __domain="${service,,}.${TANGO_DOMAIN/\.\*/\*}"
             __urls="${__urls} http${__with_s}://${__domain}:${!e}"
         done
-        echo "L-- URLs : ${__urls}"
-        # NOTE crt.sh do not need domain to be reacheable from internet : it is a search engine for certificate
-        echo "L-- certificate status : https://crt.sh/?q=${__domain}"
-        [ "${NETWORK_INTERNET_EXPOSED}" = "1" ] && echo "L-- diagnostic dns, cert, content : https://check-your-website.server-daten.de/?q=${__domain}"
+
+        if [ ! "${__entrypoints}" = "" ]; then
+            echo "L-- URLs : ${__urls}"
+            # NOTE crt.sh do not need domain to be reacheable from internet : it is a search engine for certificate
+            echo "L-- certificate status : https://crt.sh/?q=${__domain}"
+            [ "${NETWORK_INTERNET_EXPOSED}" = "1" ] && echo "L-- diagnostic dns, cert, content : https://check-your-website.server-daten.de/?q=${__domain}"
+        fi
     fi
     if [ "${info_variables}" = "1" ]; then
         echo "L-- variables list :"
@@ -90,13 +98,30 @@ done
 echo "---------==---- MODULES ----==---------"
 echo "* Active modules as a service <module>[@<network area>]: ${TANGO_SERVICES_MODULES_FULL}"
 echo "* Available Tango Modules"
-echo "L-- tango modules root : ${TANGO_MODULES_ROOT}"
+echo "L-- tango modules root : [${TANGO_MODULES_ROOT}]"
 echo "L-- tango modules list : ${TANGO_MODULES}"
 echo "* Available App Modules"
-echo "L-- app modules root : ${TANGO_APP_MODULES_ROOT}"
+echo "L-- app modules root : [${TANGO_APP_MODULES_ROOT}]"
 echo "L-- app modules list : ${TANGO_APP_MODULES}"
 
 
+
+echo "---------==---- PLUGINS ----==---------"
+echo "* Available Tango plugins"
+echo "L-- tango plugins root : [${TANGO_PLUGINS_ROOT}] {/pool/tango/plugins}"
+echo "L-- tango plugins list : ${TANGO_PLUGINS}"
+echo "* Available App plugins"
+echo "L-- app plugins root : [${TANGO_APP_PLUGINS_ROOT}] {/pool/${TANGO_APP_NAME}/plugins}"
+echo "L-- app plugins list : ${TANGO_APP_PLUGINS}"
+echo "* Active plugins infos"
+for v in ${TANGO_PLUGINS_LIST}; do
+    echo "L-- plugin id : ${v}"
+    for var in $(compgen -A variable | grep ^TANGO_${v^^}); do
+        case ${var} in
+            * ) echo "  + ${var}=${!var}";;
+        esac
+    done
+done
 
 
 
@@ -144,16 +169,24 @@ echo L-- HTTPS entrypoint [web_admin_secure] - port : $NETWORK_PORT_ADMIN_SECURE
 echo "---------==---- VPN ----==---------"
 echo "* VPN Service"
 echo "L-- vpn list : ${VPN_SERVICES_LIST}"
+echo "L-- check dns leaks :  https://dnsleaktest.com/"
+echo "* VPN Infos"
+for v in ${VPN_SERVICES_LIST}; do
+    echo "L-- vpn id : ${v}"
+    for var in $(compgen -A variable | grep ^${v^^}_); do
+        case ${var} in
+            *PASSWORD*|*AUTH* ) echo "  + ${var}=*****";;
+            * ) echo "  + ${var}=${!var}";;
+        esac
+    done
+done
 
-
-echo "---------==---- ADDONS ----==---------"
-echo "* Addons : $TANGO_ADDONS"
 
 
 
 echo "---------==---- PATHS ----==---------"
 echo Format : [host path] {inside container path}
-echo App data path : [$DATA_PATH] is mapped to {/data}
+echo App data path : [$APP_DATA_PATH] is mapped to {/data}
 echo Tango internal data path : [$TANGO_DATA_PATH] is mapped to {/internal_data}
 echo Artefact folders : [$TANGO_ARTEFACT_FOLDERS] are mapped to {${TANGO_ARTEFACT_MOUNT_POINT:-/artefact}} subfolders
 echo Lets encrypt store file : [$TANGO_DATA_PATH/letsencrypt/acme.json] {/internal_data/letsencrypt/acme.json}
