@@ -164,4 +164,14 @@ case ${ACTION} in
 			echo "* ERROR ${TARGET} do not exist or is not a folder"
 		fi
 	;;
+
+
+	vendor )
+		if [ "${TARGET}" = "" ]; then
+			echo "* ERROR specify a target path"
+		else
+			echo "* Copy tango into ${TARGET}/tango"
+			$STELLA_API transfer_app "${TARGET}"
+		fi
+	;;
 esac

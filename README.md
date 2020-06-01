@@ -85,7 +85,10 @@ See samples in `samples` folder
 	shell <service> : launch a shell into a running service.
 	modules|plugins list : list available modules or plugins. A module is a predefined service. A plugin is plug onto a service.
 	plugins <exec-service> <service>|<exec> <plugin>: exec all plugin attached to a service OR exec a plugin into all serviced attached.
+
 	cert <path> --domain=<domain> : generate self signed certificate for a domain into a current host folder.
+    vendor <path> : copy tango into another path (inside a tango folder : <path>/tango), mainly to vendorize tango into another app.
+
 
 ```
 

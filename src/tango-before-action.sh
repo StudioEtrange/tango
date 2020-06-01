@@ -4,7 +4,7 @@
 # ------------------- BEFORE ACTION ----------------------------
 
 case ${ACTION} in
-	install|cert|modules )
+	install|cert|modules|vendor )
 		;;
 	info )
 		__create_path_all
