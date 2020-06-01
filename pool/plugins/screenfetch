@@ -1,0 +1,39 @@
+#!/usr/bin/env sh
+
+# load tango libs
+for f in /pool/tango/libs/*; do
+	[ -f "${f}" ] && . ${f}
+done
+# load app libs
+[ ! "${TANGO_NOT_IN_APP}" = "1" ] && for f in /pool/${TANGO_APP_NAME}/libs/*.sh; do [ -f "${f}" ] && . ${f}; done
+
+
+
+PLUGIN="screenfetch"
+[ "$1" = "" ] && VERSION="v3.9.1" || VERSION="$1"
+DATA="/plugins_data/${PLUGIN}/${VERSION}"
+
+echo "* Plugin : ${PLUGIN} ${VERSION}"
+
+echo "L-- STEP : install plugin"
+if [ -d "${DATA}" ]; then
+    echo "  + ${PLUGIN} already installed in ${DATA}"
+else
+    mkdir -p "${DATA}"
+    type curl >/dev/null 2>&1 && {
+        curl -fkSL -o "/tmp/${PLUGIN}-${VERSION}.tar.gz" "https://github.com/KittyKatt/screenFetch/archive/${VERSION}.tar.gz"
+    } || {
+        wget "https://github.com/KittyKatt/screenFetch/archive/${VERSION}.tar.gz" -O "/tmp/${PLUGIN}-${VERSION}.tar.gz" --no-check-certificate
+    }
+
+    cd "${DATA}"
+    tar xzf "/tmp/${PLUGIN}-${VERSION}.tar.gz" --strip-components=1
+fi
+
+echo "L-- STEP : setup plugin"
+echo "  -"
+
+echo "L-- STEP : run plugin"
+${DATA}/screenfetch-dev
+
+echo "L-- STEP : end plugin"

@@ -36,38 +36,12 @@ __add_modules_declared_variable_names() {
 }
 
 
-# filter existing modules and split module list between full list and name list
-# full modules list format : <name>[@<network area>]
-__parse_modules_list() {
-	local _existing_modules=
-
-	# split module list between full list and name list
-	TANGO_SERVICES_MODULES_FULL="${TANGO_SERVICES_MODULES}"
-	TANGO_SERVICES_MODULES="$(echo "${TANGO_SERVICES_MODULES}" | sed -e 's/@[^ ]* */ /g')"
-
-	# filter existing modules
-	for s in ${TANGO_SERVICES_MODULES}; do
-		# app modules overrides tango modules
-		if [ -f "${TANGO_APP_MODULES_ROOT}/${s}.yml" ]; then
-			_existing_modules="${_existing_modules} ${s}"
-		else
-			[ -f "${TANGO_MODULES_ROOT}/${s}.yml" ] && _existing_modules="${_existing_modules} ${s}" \
-				|| echo "* WARN : module ${s} not found."
-		fi
-	done
-	
-	TANGO_SERVICES_MODULES="${_existing_modules}"
-}
-
 
 
 # add variables to variables list
 __add_declared_variables() {
 	VARIABLES_LIST="${VARIABLES_LIST} $1"
 }
-
-
-
 
 
 
@@ -180,20 +154,12 @@ __create_docker_compose_file() {
 	# app compose file
 	[ -f "${TANGO_APP_COMPOSE_FILE}" ] && yq m -i -a -- "${GENERATED_DOCKER_COMPOSE_FILE}" "${TANGO_APP_COMPOSE_FILE}"
 
-	# modules compose files
-	for s in ${TANGO_SERVICES_MODULES}; do
-		# app modules overrides tango modules
-		if [ -f "${TANGO_APP_MODULES_ROOT}/${s}.yml" ]; then
-			yq m -i -a -- "${GENERATED_DOCKER_COMPOSE_FILE}" "${TANGO_APP_MODULES_ROOT}/${s}.yml"
-		else
-			[ -f "${TANGO_MODULES_ROOT}/${s}.yml" ] && yq m -i -a -- "${GENERATED_DOCKER_COMPOSE_FILE}" "${TANGO_MODULES_ROOT}/${s}.yml"
-		fi
-	done
 
 	# user compose file
 	[ -f "${TANGO_USER_COMPOSE_FILE}" ] && yq m -i -a -- "${GENERATED_DOCKER_COMPOSE_FILE}" "${TANGO_USER_COMPOSE_FILE}"
 	
 	
+	__set_module_all
 	__set_active_services_all
 	__set_time_all
 	__set_entrypoints_service_all
@@ -201,14 +167,14 @@ __create_docker_compose_file() {
 	__add_service_direct_port_access_all
 	__add_gpu_all
 	__add_volume_artefact_all
-	__add_volume_app_pool_all
+	__add_volume_pool_and_plugins_data_all
+	__add_generated_env_file_all
 	__set_letsencrypt_service_all
 	__create_vpn_all
 
-	__create_plugin_all
-
 	# do this after other compose modification 	
 	# because it remove some network definition
+	# and because some methods below add service to VPN_x_SERVICES
 	__set_vpn_service_all
 }
 
@@ -259,66 +225,6 @@ __translate_all_path() {
 
 # MANAGE FEATURES FOR ALL CONTAINTERS -----------------
 
-__create_plugin_all() {
-
-	__add_declared_variables "TANGO_PLUGINS_LIST"
-	# NOTE : +13/-13 is for bybass 'TANGO_PLUGIN_'
-	for _id in $(compgen -A variable | awk 'match($0,/TANGO_PLUGIN_[0-9]+/) {print substr($0,RSTART+13,RLENGTH-13)}' | sort | uniq); do
-		__create_plugin "${_id}"
-		__add_service_dependency "plugins" "plugin_${_id}"
-		export TANGO_PLUGINS_LIST="${TANGO_PLUGINS_LIST} plugin_${_id}"
-		export TANGO_TIME_VOLUME_SERVICES="${TANGO_TIME_VOLUME_SERVICES} plugin_${_id}"
-	done
-
-}
-
-
-__create_plugin() {
-	local __plugin_id="$1"
-	
-	local _tmp=
-	local __plugin_name=
-	local __arg_list=
-	local __dep_list=
-
-	local __service_name="plugin_${__plugin_id}"
-	local __command=
-
-	_tmp="TANGO_PLUGIN_${__plugin_id}"
-	_tmp="${!_tmp}"
-
-	if [ -z "${_tmp##*@*}" ]; then
-		__plugin_name="${_tmp%%@*}"
-	else
-		[ -z "${_tmp##*#*}" ] && __plugin_name="${_tmp%%#*}" || __plugin_name="${_tmp}" 
-	fi
-
-	if [ -z "${_tmp##*#*}" ]; then
-		__arg_list="${_tmp#*#}"
-		__arg_list="${__arg_list//#/ }"
-	fi
-
-	if [ -z "${_tmp##*@*}" ]; then
-		__dep_list="${_tmp#*@}"
-		__dep_list="${__dep_list%%#*}"
-		__dep_list="${__dep_list//@/ }"
-	fi
-	
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.<<" default-plugin
-	# need tweak '*default-vpn' yaml anchor while this issue exist in yq : https://github.com/mikefarah/yq/issues/377
-	sed -i 's/[^&]default-plugin/ \*default-plugin/' "${GENERATED_DOCKER_COMPOSE_FILE}"
-	# NOTE : plugin are specific for each tango app : use of TANGO_APP_NAME
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.container_name" '${TANGO_APP_NAME}_'${__service_name}
-	
-	for d in ${__dep_list}; do
-		__add_service_dependency "${__service_name}" "${d,,}"
-	done
-	__command='bash -c "echo \"* Plugin : '$__plugin_name'\" && echo L-- dep list : '$__dep_list' && echo L-- arg list : '$__arg_list' && [ -f \"/pool/${TANGO_APP_NAME}/plugins/'$__plugin_name'\" ] && /pool/${TANGO_APP_NAME}/plugins/'$__plugin_name' || ( [ -f \"/pool/tango/plugins/'$__plugin_name'\" ] && /pool/tango/plugins/'$__plugin_name' || echo \"** WARN plugin not found\")"'
-
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.command" "${__command}"
-
-}
-
 
 
 __set_active_services_all() {
@@ -350,7 +256,6 @@ __create_vpn_all() {
 		__create_vpn ${_id}
 		__add_service_dependency "vpn" "vpn_${_id}"
 		export VPN_SERVICES_LIST="${VPN_SERVICES_LIST} vpn_${_id}"
-		export TANGO_TIME_VOLUME_SERVICES="${TANGO_TIME_VOLUME_SERVICES} vpn_${_id}"
 	done
 
 }
@@ -400,24 +305,45 @@ __add_volume_artefact_all() {
 	done
 }
 
+# attach generated env compose file to services
+__add_generated_env_file_all() {
+	for s in ${TANGO_SERVICES_ACTIVE}; do
+		__add_generated_env_file ${s}
+	done
+}
 
-# add volume to service which needs app pool if it exists
-__add_volume_app_pool_all() {
+# add pool volume and plugins_data to each service
+__add_volume_pool_and_plugins_data_all() {
+
+	# add default pool folder
+	for s in ${TANGO_SERVICES_ACTIVE}; do
+		__add_volume_mapping_service "${s}" "${TANGO_ROOT}/pool:/pool/tango"
+		__add_volume_mapping_service "${s}" "${PLUGINS_DATA_PATH}:/plugins_data"
+	done
+	__add_volume_mapping_service "service_info" "${TANGO_ROOT}/pool:/pool/tango"
+	__add_volume_mapping_service "service_info" "${PLUGINS_DATA_PATH}:/plugins_data"
+	__add_volume_mapping_service "service_init" "${TANGO_ROOT}/pool:/pool/tango"
+	__add_volume_mapping_service "service_init" "${PLUGINS_DATA_PATH}:/plugins_data"
+
+	# add pool app folder if it exists 
 	if [ ! "${TANGO_NOT_IN_APP}" = "1" ]; then
 		if [ -d "${TANGO_APP_ROOT}/pool" ]; then
+			for s in ${TANGO_SERVICES_ACTIVE}; do
+				__add_volume_mapping_service "${s}" "${TANGO_APP_ROOT}/pool:/pool/${TANGO_APP_NAME}"
+			done
 			__add_volume_mapping_service "service_info" "${TANGO_APP_ROOT}/pool:/pool/${TANGO_APP_NAME}"
 			__add_volume_mapping_service "service_init" "${TANGO_APP_ROOT}/pool:/pool/${TANGO_APP_NAME}"
-			#__add_volume_mapping_service "x-plugin" "${TANGO_APP_ROOT}/pool:/pool/${TANGO_APP_NAME}"
-			yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "x-plugin.volumes[+]" "${TANGO_APP_ROOT}/pool:/pool/${TANGO_APP_NAME}"
 		fi
 	fi
+
+
 
 }
 
 # add gpu to all container that need its
 # NVIDIA | INTEL_QUICKSYNC
 __add_gpu_all() {
-	for s in $(compgen -A variable | grep _GPU); do
+	for s in $(compgen -A variable | grep _GPU$); do
 		gpu="${!s}"
 		if [ ! "${gpu}" = "" ]; then
 			service="${s%_GPU}"
@@ -485,14 +411,7 @@ __set_entrypoints_service_all() {
 	local __name=
 	local __area=
 	local __var=
-	# add modules entrypoint
-	for m in ${TANGO_SERVICES_MODULES_FULL}; do
-		__name="${m%%@*}"
-		[ -z "${m##*@*}" ] && __area="${m##*@}" || __area="main"
-
-		__var="NETWORK_SERVICES_AREA_${__area^^}"
-		eval "export ${__var}=\"${!__var} ${__name}\""
-	done
+	
 
 	for s in ${NETWORK_SERVICES_AREA_MAIN}; do
 		__check_service_exist "${s}" && __set_entrypoint_service "${s}"  "web_main" || echo "** WARN : unknow ${s} service declared in NETWORK_SERVICES_AREA_MAIN"
@@ -528,7 +447,7 @@ __set_redirect_https_service_all() {
 
 
 __add_service_direct_port_access_all() {
-	for s in $(compgen -A variable | grep _DIRECT_ACCESS_PORT); do
+	for s in $(compgen -A variable | grep _DIRECT_ACCESS_PORT$); do
 		port="${!s}"
 		if [ ! "${port}" = "" ]; then
 			service="${s%_DIRECT_ACCESS_PORT}"
@@ -549,6 +468,368 @@ __add_service_direct_port_access_all() {
 	done
 }
 
+# ITEMS MANAGEMENT (an item is a module or a plugin) -------------------------
+
+__set_module_all() {
+	local __array_list_names=( ${TANGO_SERVICES_MODULES} )
+	local __array_list_full=( ${TANGO_SERVICES_MODULES_FULL} )
+
+	for index in ${!__array_list_names[*]}; do
+		__set_module "${__array_list_full[$index]}"
+	done
+}
+
+__set_module() {
+	local __module="$1"
+
+	__parse_item "module" "${__module}" "MODULE"
+
+	# add yml to docker compose file
+	case ${MODULE_OWNER} in
+		APP )
+			yq m -i -a -- "${GENERATED_DOCKER_COMPOSE_FILE}" "${TANGO_APP_MODULES_ROOT}/${MODULE_NAME}.yml"
+		;;
+		TANGO )
+			yq m -i -a -- "${GENERATED_DOCKER_COMPOSE_FILE}" "${TANGO_MODULES_ROOT}/${MODULE_NAME}.yml"
+		;;
+	esac
+
+	# entrypoint
+	# default area is 'main'
+	local __area="main"
+	[ ! "${MODULE_NETWORK_AREA}" = "" ] && __area="${MODULE_NETWORK_AREA}"
+	__area="NETWORK_SERVICES_AREA_${__area^^}"
+	eval "export ${__area}=\"${!__area} ${MODULE_NAME}\""
+
+	# dependencies
+	local __dep_disabled="$($STELLA_API filter_list_with_list "${MODULE_LINKS}" "${TANGO_SERVICES_DISABLED}" "FILTER_KEEP")"
+	[ ! -z "${__dep_disabled}" ] && echo " ** WARN : if ${MODULE_NAME} is enabled, these disabled services will be reactivated as dependencies : ${__dep_disabled}"
+	for d in ${MODULE_LINKS}; do
+		__add_service_dependency "${MODULE_NAME}" "${d,,}"
+	done
+
+	local _vpn=
+	if [ ! "${MODULE_VPN_ID}" = "" ]; then 
+		_vpn="${MODULE_VPN_ID^^}_SERVICES" && eval "export ${_vpn}=\"${!_vpn} ${MODULE_NAME}\""
+	fi
+
+}
+
+# exec all plugins programmed to auto exec at launch of all active service __exec_plugin_service_active_at_launch_all
+__exec_auto_plugin_service_active_all() {
+	local __plugin
+	for s in ${TANGO_SERVICES_ACTIVE}; do
+		__exec_auto_plugin_all_by_service ${s}
+	done
+}
+
+# exec all plugins programmed to auto exec at launch of a service
+__exec_auto_plugin_all_by_service() {
+	local __service="$1"
+	local __plugins="${TANGO_PLUGINS_BY_SERVICE_FULL_AUTO_EXEC[$__service]}"
+
+	if [ ! "${__plugins}" = "" ]; then
+		for p in ${__plugins}; do 
+			__exec_plugin "${__service}" "${p}"
+		done
+	fi
+}
+
+# exec all plugins attached to a service
+__exec_plugin_all_by_service() {
+	local __service="$1"
+	local __plugins="${TANGO_PLUGINS_BY_SERVICE_FULL[$__service]}"
+
+	if [ ! "${__plugins}" = "" ]; then
+		for p in ${__plugins}; do 
+			__exec_plugin "${__service}" "${p}"
+		done
+	fi
+}
+
+
+# exec a plugin into all attached service
+__exec_plugin_into_services() {
+	local __plugin="$1"
+	local __services="${TANGO_SERVICES_BY_PLUGIN_FULL[$__plugin]}"
+
+	if [ ! "${__services}" = "" ]; then
+		for s in ${__services}; do 
+			__exec_plugin "${s}" "${__plugin}"
+		done
+	fi
+}
+
+
+
+# execute a plugin into a service context
+__exec_plugin() {
+	local __service="$1"
+	local __plugin="$2"
+
+	__parse_item "plugin" "${__plugin}" "PLUGIN"
+
+	echo "* Plugin execution : ${PLUGIN_NAME}"
+	echo "L-- service : ${__service}"
+	echo "L-- arg list : ${PLUGIN_ARG_LIST}"
+	docker-compose exec --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} ${__service} /bin/sh -c '[ "'${PLUGIN_OWNER}'" = "APP" ] && /pool/'${TANGO_APP_NAME}'/plugins/'${PLUGIN_NAME}' '${PLUGIN_ARG_LIST}' || /pool/tango/plugins/'${PLUGIN_NAME}' '${PLUGIN_ARG_LIST}
+}
+
+# filter existing items
+# split item list between full list and name list
+# build associative array for mapping service and plugin that are atteched to 
+# type : module | plugin
+__filter_items_exists() {
+	local __type="${1}"
+
+	local __list_full=
+	local __list_names=
+	local __app_folder=
+	local __tango_folder=
+	local __file_ext=
+	case ${__type} in
+		module )
+			__list_full="${TANGO_SERVICES_MODULES}"
+			__app_folder="${TANGO_APP_MODULES_ROOT}"
+			__tango_folder="${TANGO_MODULES_ROOT}"
+			__file_ext='.yml'
+		;;
+
+		plugin )
+			__list_full="${TANGO_PLUGINS}"
+			__app_folder="${TANGO_APP_PLUGINS_ROOT}"
+			__tango_folder="${TANGO_PLUGINS_ROOT}"
+			__file_ext=
+		;;
+	esac
+	__list_names="$(echo "${__list_full}" | sed -e 's/[@%\^#][^ ]* */ /g')"
+
+	# filter existing items
+	local __name
+	local __full
+	local __array_list_names=( $__list_names )
+	local __array_list_full=( $__list_full )
+	__list_names=
+	__list_full=
+	for index in ${!__array_list_names[*]}; do
+	
+		__item_exists=""
+		__name="${__array_list_names[$index]}"
+		__full="${__array_list_full[$index]}"
+		# look for item file in current app
+		if [ -f "${__app_folder}/${__name}${__file_ext}" ]; then
+			__item_exists="1"
+		else
+			# look for item file in tango folder
+			if [ -f "${__tango_folder}/${__name}${__file_ext}" ]; then
+				__item_exists="1"
+			fi
+		fi
+
+		if [ "${__item_exists}" = "1" ]; then
+			__list_names="${__list_names} ${__name}"
+			__list_full="${__list_full} ${__full}"
+			if [ "${__type}" = "plugin" ]; then
+				__parse_item "plugin" "${__array_list_full[$index]}" "PLUGIN"
+				for s in ${PLUGIN_LINKS}; do
+					TANGO_PLUGINS_BY_SERVICE_FULL["${s}"]="${TANGO_PLUGINS_BY_SERVICE_FULL[$s]} ${__full}"
+					TANGO_SERVICES_BY_PLUGIN_FULL["${__name}"]="${TANGO_SERVICES_BY_PLUGIN_FULL[${__name}]} ${s}"
+				done
+				for s in ${PLUGIN_LINKS_AUTO_EXEC}; do
+					TANGO_PLUGINS_BY_SERVICE_FULL_AUTO_EXEC["${s}"]="${TANGO_PLUGINS_BY_SERVICE_FULL_AUTO_EXEC[$s]} ${__full}"
+				done
+			fi
+		else
+			echo "* WARN : ${__type} ${__name} not found."
+		fi
+	done
+
+	# FULL list conserve existing items in full format
+	# standard list conserve existing items with only names
+	case ${__type} in
+		module )
+			TANGO_SERVICES_MODULES_FULL="${__list_full}"
+			TANGO_SERVICES_MODULES="${__list_names}"
+		;;
+		plugin )
+			TANGO_PLUGINS_FULL="${__list_full}"
+			TANGO_PLUGINS="${__list_names}"
+		;;
+	esac
+
+}
+
+# type : module | plugin
+# item format :
+#	 	<module>[@<network area>][%<service dependency1>][%<service dependency2>][^<vpn id>]
+#		<plugin>[%<auto exec at launch into service1>][%!<manual exec into service2>][#arg1][#arg2]
+# __result_prefix : variable prefix to store result
+__parse_item() {
+	local __type="$1"
+	local __item="$2"
+	local __result_prefix="$3"
+
+	local __app_folder=
+	local __tango_folder=
+	local __file_ext=
+
+	# name
+	eval ${__result_prefix}_NAME=
+	# item is in APP or TANGO folder
+	eval ${__result_prefix}_OWNER=
+	# arguments list to pass to item
+	eval ${__result_prefix}_ARG_LIST=
+	# network area to bind item to
+	eval ${__result_prefix}_NETWORK_AREA=
+	# links list : services dependencies for module OR attach point for plugin (with auto exec at launch or not)
+	eval ${__result_prefix}_LINKS=
+	# links list : attach point for plugin to services that will be executed at launch
+	eval ${__result_prefix}_LINKS_AUTO_EXEC=
+	# vpn id to bind item to
+	eval ${__result_prefix}_VPN_ID=
+
+
+	# item name
+	local __name=
+	case ${__type} in 
+		plugin )
+			__name="$(echo $__item | sed 's,^\([^#%]*\).*$,\1,')"
+			eval ${__result_prefix}_NAME="${__name}"
+		;;
+
+		module )
+			__name="$(echo $__item | sed 's,^\([^@%\^]*\).*$,\1,')"
+			eval ${__result_prefix}_NAME="${__name}"
+			;;
+	esac
+	
+
+	if [ "${__type}" = "plugin" ]; then
+		# item arg list
+		# symbol : #
+		if [ -z "${__item##*#*}" ]; then
+			local __arg_list="$(echo $__item | sed 's,^[^#]*#\([^%@\^]*\).*$,\1,')"
+			__arg_list="${__arg_list//#/ }"
+			eval ${__result_prefix}_ARG_LIST='"'${__arg_list}'"'
+		fi
+	fi
+
+
+	if [ "${__type}" = "module" ]; then
+		# network area
+		# symbol : @
+		if [ -z "${__item##*@*}" ]; then
+			local __network_area="$(echo $__item | sed 's,^.*@\([^%#\^]*\).*$,\1,')"
+			eval ${__result_prefix}_NETWORK_AREA="${__network_area}"
+		fi
+	fi
+
+	# links list : service dependency or attach point list
+	# symbol : %
+	if [ -z "${__item##*%*}" ]; then
+		local __service_dependency_list="$(echo $__item | sed 's,^[^%]*%\([^@#\^]*\).*$,\1,')"
+		__service_dependency_list="${__service_dependency_list//%/ }"
+		local __tmp_list=
+		local __tmp_list_exec=
+		case ${__type} in 
+			plugin )
+				for d in ${__service_dependency_list}; do
+					if [ "${d:0:1}" = "!" ]; then
+						# do not auto exec at launch
+						__tmp_list="${__tmp_list} ${d//\!/}"
+					else
+						__tmp_list="${__tmp_list} ${d}"
+						__tmp_list_exec="${__tmp_list_exec} ${d}"
+					fi
+				done
+				eval ${__result_prefix}_LINKS='"'${__tmp_list}'"'
+				eval ${__result_prefix}_LINKS_AUTO_EXEC='"'${__tmp_list_exec}'"'
+			;;
+			module )
+				eval ${__result_prefix}_LINKS='"'${__service_dependency_list}'"'
+			;;
+		esac
+		
+	fi
+
+	if [ "${__type}" = "module" ]; then
+		# vpn id
+		# symbol : ^
+		if [ -z "${__item##*^*}" ]; then
+			local __vpn_id="$(echo $__item | sed 's,^.*\^\([^@#%]*\).*$,\1,')"
+			eval ${__result_prefix}_VPN_ID="${__vpn_id}"
+		fi
+	fi
+
+	# determine item owner
+	case ${__type} in 
+		plugin ) 
+			__app_folder="${TANGO_APP_PLUGINS_ROOT}"
+			__tango_folder="${TANGO_PLUGINS_ROOT}"
+			__file_ext=''
+		;;
+		module ) 
+			__app_folder="${TANGO_APP_MODULES_ROOT}"
+			__tango_folder="${TANGO_MODULES_ROOT}"
+			__file_ext='.yml'
+			;;
+	esac
+
+	# we have already test item exists in __filter_items_exists
+	# so item is either in APP folder or TANGO folder
+	if [ -f "${__app_folder}/${__name}${__file_ext}" ]; then
+		eval ${__result_prefix}_OWNER="APP"
+	else
+		eval ${__result_prefix}_OWNER="TANGO"
+	fi
+
+}
+
+# list available modules or plugins
+# type : module | plugin
+# mode : all (default) | app | tango
+__list_items() {
+	local __type="${1}"
+	local __mode="${2:-all}"
+
+	local __app_folder=
+	local __tango_folder=
+	local __file_ext=
+	case ${__type} in
+		module ) __app_folder="${TANGO_APP_MODULES_ROOT}"; __tango_folder="${TANGO_MODULES_ROOT}"; __file_ext='*.yml';;
+		plugin ) __app_folder="${TANGO_APP_PLUGINS_ROOT}"; __tango_folder="${TANGO_PLUGINS_ROOT}"; __file_ext='*';;
+	esac
+
+	local __result=""
+	case ${__mode} in
+		all ) __do_app=1; __do_tango=1;;
+		app ) __do_app=1; __do_tango=0;;
+		tango ) __do_app=0; __do_tango=1;;
+	esac
+
+	 
+	if [ "${__do_app}" = "1" ]; then
+		if ! $STELLA_API "is_dir_empty" "${__app_folder}"; then
+			for f in ${__app_folder}/*; do
+				case $f in
+					$__file_ext )	__result="${__result} $(basename $f | sed s/.yml//)";;
+				esac
+			done
+		fi
+	fi
+	if [ "${__do_tango}" = "1" ]; then
+		if ! $STELLA_API "is_dir_empty" "${__tango_folder}"; then
+			for f in ${__tango_folder}/*; do
+				case $f in
+					$__file_ext )	__result="${__result} $(basename $f | sed s/.yml//)";;
+				esac
+			done
+		fi
+	fi
+
+	$STELLA_API list_filter_duplicate "${__result}"
+}
+
 
 
 
@@ -559,7 +840,7 @@ __pick_free_port() {
 	local __exclude=
 
 	# exclude direct access port AND any variable ending with _PORT (for service_PORT variable)
-	for p in $(compgen -A variable | grep _PORT); do
+	for p in $(compgen -A variable | grep _PORT$); do
 		p="${!p}"
 		[[ ${p} =~ ^[0-9]+$ ]] && __exclude="${__exclude} ${p}"
 	done
@@ -642,6 +923,7 @@ __create_vpn() {
 	[ "${__route}" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "ROUTE=${__route}"
 	[ "${__route6}" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "ROUTE6=${__route6}"
 
+	export TANGO_TIME_VOLUME_SERVICES="${TANGO_TIME_VOLUME_SERVICES} ${__service_name}"
 }
 
 
@@ -686,6 +968,13 @@ __add_tz_var_for_time() {
 	fi
 }
 
+
+# attach generated env compose file to a service
+__add_generated_env_file() {
+	local __service="$1"
+
+	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.env_file[+]" "${GENERATED_ENV_FILE_FOR_COMPOSE}"
+}
 
 
 __add_service_dependency() {
@@ -780,80 +1069,17 @@ __set_network_as_external() {
 # VARIOUS -----------------
 
 
-# list available modules or plugins
-# item : modules or plugins
-# mode : all (default) | app | tango
-__list_items() {
-	local __item="${1}"
-	local __mode="${2:-all}"
-
-	local __app_folder=
-	local __tango_folder=
-	local __file_ext=
-	case ${__item} in
-		modules ) __app_folder="${TANGO_APP_MODULES_ROOT}"; __tango_folder="${TANGO_MODULES_ROOT}"; __file_ext='*.yml';;
-		plugins ) __app_folder="${TANGO_APP_PLUGINS_ROOT}"; __tango_folder="${TANGO_PLUGINS_ROOT}"; __file_ext='*';;
-	esac
-
-	local __result=""
-	case ${__mode} in
-		all ) __do_app=1; __do_tango=1;;
-		app ) __do_app=1; __do_tango=0;;
-		tango ) __do_app=0; __do_tango=1;;
-	esac
-
-	 
-	if [ "${__do_app}" = "1" ]; then
-		if ! $STELLA_API "is_dir_empty" "${__app_folder}"; then
-			for f in ${__app_folder}/*; do
-				case $f in
-					$__file_ext )	__result="${__result} $(basename $f | sed s/.yml//)";;
-				esac
-			done
-		fi
-	fi
-	if [ "${__do_tango}" = "1" ]; then
-		if ! $STELLA_API "is_dir_empty" "${__tango_folder}"; then
-			for f in ${__tango_folder}/*; do
-				case $f in
-					$__file_ext )	__result="${__result} $(basename $f | sed s/.yml//)";;
-				esac
-			done
-		fi
-	fi
-
-	$STELLA_API list_filter_duplicate "${__result}"
-}
-
-
-# filter a list with items of another list
-__filter_list() {
-	local __list_src="$1"
-	local __list_filter="$2"
-
-	[ -z "${__list_src}" ] && return
-
-	[ -z "${__list_filter}" ] && echo -n "${__list_src}" && return
-
-	local __result_list=
-	for s in ${__list_src}; do
-		[[ " ${__list_filter} " =~ .*\ ${s}\ .* ]] || __result_list="${__result_list} ${s}"
-	done
-
-	# remove trailing whitespace and return list
-	echo -n "${__result_list%"${__result_list##*[![:space:]]}"}"
-}
 
 docker-compose() {
 	# NOTE we need to specify project directory because when launching from an other directory, docker compose seems to NOT auto load .env file
 	case ${TANGO_INSTANCE_MODE} in
 		shared ) 
-			[ "${VERBOSE}" = "1" ] && echo COMPOSE_IGNORE_ORPHANS=1 docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_INSTANCE_NAME}" --project-directory "${TANGO_APP_ROOT}" $@
-			COMPOSE_IGNORE_ORPHANS=1 command docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_INSTANCE_NAME}" --project-directory "${TANGO_APP_ROOT}" $@
+			[ "${VERBOSE}" = "1" ] && echo COMPOSE_IGNORE_ORPHANS=1 docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_INSTANCE_NAME}" --project-directory "${TANGO_APP_ROOT}" "$@"
+			COMPOSE_IGNORE_ORPHANS=1 command docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_INSTANCE_NAME}" --project-directory "${TANGO_APP_ROOT}" "$@"
 			;;
 		* ) 
-			[ "${VERBOSE}" = "1" ] && echo COMPOSE_IGNORE_ORPHANS=1 docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_APP_NAME}" --project-directory "${TANGO_APP_ROOT}" $@
-			COMPOSE_IGNORE_ORPHANS=1 command docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_APP_NAME}" --project-directory "${TANGO_APP_ROOT}" $@
+			[ "${VERBOSE}" = "1" ] && echo COMPOSE_IGNORE_ORPHANS=1 docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_APP_NAME}" --project-directory "${TANGO_APP_ROOT}" "$@"
+			COMPOSE_IGNORE_ORPHANS=1 command docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_APP_NAME}" --project-directory "${TANGO_APP_ROOT}" "$@"
 			;;
 	esac
 	
@@ -885,22 +1111,54 @@ __xml_get_attribute_value() {
 }
 
 
-# create various default folder and files if not exist
-__create_default_path() {
+# create all path according to _SUBPATH_CREATE variables content
+# see __create_path
+__create_path_all() {
+	local __create_path_instructions=
+	local __root=
+
+	# first create these root folders before all other that might be subfolders
+	__create_path "${TANGO_APP_WORK_ROOT}" "${TANGO_APP_WORK_ROOT_SUBPATH_CREATE}"
+	__create_path "${TANGO_DATA_PATH}" "${TANGO_DATA_PATH_SUBPATH_CREATE}"
+	
+
+	for p in $(compgen -A variable | grep _SUBPATH_CREATE$); do
+		__create_path_instructions="${!p}"
+		if [ ! "${__create_path_instructions}" = "" ]; then
+			__root="${p%_SUBPATH_CREATE}"
+			[ ! "${!__root}" = "" ] && __create_path "${!__root}" "${__create_path_instructions}"
+		fi
+	done
+
+
+}
+
+# create various sub folder and files if not exist
+# using TANGO_USER_ID
+# root must exist
+# format example : xxx_SUBPATH="FOLDER letsencrypt traefikconfig FILE letsencrypt/acme.json traefikconfig/generated.${TANGO_APP_NAME}.tls.yml"
+__create_path() {
 	local __root="$1"
 	local __list="$2"
 
+	 
 	local __folder=
 	local __file=
+
+	if [ ! -d "${__root}" ]; then
+		echo "* WARN : root path ${__root} do not exist"
+		return
+	fi
+
 	for p in ${__list}; do
 		[ "${p}" = "FOLDER" ] && __folder=1 && __file= && continue
 		[ "${p}" = "FILE" ] && __folder= && __file=1 && continue
 		__path="${__root}/${p}"
 		if [ "${__folder}" = "1" ]; then
-			[ ! -d "${__path}" ] && docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} -v "${__root}":"/foo" bash:4.4.23 bash -c "mkdir -p /foo/${p} && chown ${TANGO_USER_ID}:${TANGO_GROUP_ID} /foo/${p}"
+			[ ! -d "${__path}" ] && docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} -v "${__root}":"/foo" ${TANGO_SHELL_IMAGE} bash -c "mkdir -p /foo/${p} && chown ${TANGO_USER_ID}:${TANGO_GROUP_ID} /foo/${p}"
 		fi
 		if [ "${__file}" = "1" ]; then
-			[ ! -f "${__path}" ] && docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} -v "${__root}":"/foo" bash:4.4.23 bash -c "touch /foo/${p} && chown ${TANGO_USER_ID}:${TANGO_GROUP_ID} /foo/${p}"
+			[ ! -f "${__path}" ] && docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} -v "${__root}":"/foo" ${TANGO_SHELL_IMAGE} bash -c "touch /foo/${p} && chown ${TANGO_USER_ID}:${TANGO_GROUP_ID} /foo/${p}"
 		fi
 	done
 
@@ -911,7 +1169,7 @@ __create_default_path() {
 
 
 
-# test if mandatory  paths exists
+# test if mandatory paths exists
 __check_mandatory_path() {
 
 	for p in ${TANGO_PATH_LIST}; do

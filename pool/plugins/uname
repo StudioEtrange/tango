@@ -1,0 +1,19 @@
+#!/usr/bin/env sh
+
+
+
+PLUGIN="uname"
+
+
+echo "* Plugin : ${PLUGIN}"
+
+echo "L-- STEP : install plugin"
+echo "  -"
+
+echo "L-- STEP : setup plugin"
+echo "  -"
+
+echo "L-- STEP : run plugin"
+uname -a
+
+echo "L-- STEP : end plugin"

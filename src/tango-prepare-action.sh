@@ -29,18 +29,22 @@ if [ ! "${ACTION}" = "install" ]; then
 	TANGO_APP_WORK_ROOT="${TANGO_APP_ROOT}/workspace/${TANGO_APP_NAME}"
 	mkdir -p "${TANGO_APP_WORK_ROOT}"
 
-	TANGO_PLUGINS="$(__list_items "plugins" "tango")"
-	TANGO_MODULES="$(__list_items "modules" "tango")"
+	# available plugins from tango
+	TANGO_PLUGINS_AVAILABLE="$(__list_items "plugin" "tango")"
+	# available modules from tango
+	TANGO_MODULES_AVAILABLE="$(__list_items "module" "tango")"
 	if [ "${TANGO_NOT_IN_APP}" = "1" ]; then
 		TANGO_APP_ENV_FILE=
 		TANGO_APP_COMPOSE_FILE=
 		TANGO_APP_PLUGINS_ROOT=
-		TANGO_APP_PLUGINS=
+		TANGO_APP_PLUGINS_AVAILABLE=
 		TANGO_APP_MODULES_ROOT=
-		TANGO_APP_MODULES=
+		TANGO_APP_MODULES_AVAILABLE=
 	else
-		TANGO_APP_PLUGINS="$(__list_items "plugins" "app")"
-		TANGO_APP_MODULES="$(__list_items "modules" "app")"
+		# available plugins from current app
+		TANGO_APP_PLUGINS_AVAILABLE="$(__list_items "plugin" "app")"
+		# available modules from current app
+		TANGO_APP_MODULES_AVAILABLE="$(__list_items "module" "app")"
 	fi
 
 	# TANGO USER FILES 
@@ -75,20 +79,9 @@ if [ ! "${ACTION}" = "install" ]; then
 	# 	- default values hardcoded and runtume computed
 	
 
-	# STEP 1 ------ init env variables
 
-	extract_modules_list_from_files=
-	# test if TANGO_SERVICES_MODULES is declared as shell env var
-	if [ "${TANGO_SERVICES_MODULES}" = "" ]; then
-	# test if TANGO_SERVICES_MODULES is declared with command line
-		if [ ! "${ADD}" = "" ]; then
-			TANGO_SERVICES_MODULES="${ADD//:/ }"
-			[ "${TANGO_SERVICES_MODULES}" = "" ] && extract_modules_list_from_files=1
-		fi
-	fi
 
-	# split module list defined by shell env or command line
-	[ "${extract_modules_list_from_files}" = "" ] && __parse_modules_list
+	# STEP 1 ------ init modules, plugins and create first env files
 
 	# generate bash env files
 	# bash env files priority :
@@ -96,19 +89,44 @@ if [ ! "${ACTION}" = "install" ]; then
 	# 	- app env file
 	# 	- default env file
 	__create_env_for_bash
-	# retrieve TANGO_SERVICES_MODULES defined in env files
-	if [ "${extract_modules_list_from_files}" = "1" ]; then
+
+	# modules -----
+	# retrieve TANGO_SERVICES_MODULES defined in env files if no shell env var exist
+	if [ "${TANGO_SERVICES_MODULES}" = "" ]; then
 		TANGO_SERVICES_MODULES="$(env -i bash --noprofile --norc -c ". ${GENERATED_ENV_FILE_FOR_BASH}; echo \$TANGO_SERVICES_MODULES")"
-		# modules are defined in env files, so we need to rebuild env files with new env files priority
-		# 			- user env file
-		# 			- modules env file
-		# 			- app env file
-		# 			- default env file
-		if [ ! "${TANGO_SERVICES_MODULES}" = "" ]; then
-			__parse_modules_list
-			__create_env_for_bash
-		fi
+		[ ! "${TANGO_SERVICES_MODULES}" = "" ] && extracted_modules_list_from_files=1
 	fi
+	# some modules have been defined in env files, so we need to rebuild env files by adding modules env files
+	# 			- user env file
+	# 			- modules env file
+	# 			- app env file
+	# 			- default env file
+	[ "${extracted_modules_list_from_files}" = "1" ] && __create_env_for_bash
+	# test if some modules are added by command line and add them
+	if [ ! "${MODULE}" = "" ]; then
+		TANGO_SERVICES_MODULES="${TANGO_SERVICES_MODULES} ${MODULE//:/ }"
+	fi
+	# filter exising modules
+	[ ! "${TANGO_SERVICES_MODULES}" = "" ] && __filter_items_exists "module"
+
+
+	# plugins -----
+	# retrieve TANGO_PLUGINS defined in env files if no shell env var exist
+	if [ "${TANGO_PLUGINS}" = "" ]; then
+		TANGO_PLUGINS="$(env -i bash --noprofile --norc -c ". ${GENERATED_ENV_FILE_FOR_BASH}; echo \$TANGO_PLUGINS")"
+	fi
+	# test if some plugins are added by command line and add them
+	if [ ! "${PLUGIN}" = "" ]; then
+		TANGO_PLUGINS="${TANGO_PLUGINS} ${PLUGIN//:/ }"
+	fi
+	# check plugins exist and build list and map
+	[ ! "${TANGO_PLUGINS}" = "" ] && __filter_items_exists "plugin"
+
+
+
+
+
+	# generate compose env files
 	__create_env_for_docker_compose
 
 	# fill VARIABLES_LIST declared variables from all env files
@@ -117,16 +135,18 @@ if [ ! "${ACTION}" = "install" ]; then
 	__add_modules_declared_variable_names
 
 	
+
 	# STEP 2 ------ process command line and shell env variables
 
+
 	[ "${BUILD}" = "1" ] && BUILD="--build"
-	[ "${DAEMON}" = "1" ] && DAEMON="-d"
 	if [ "${DEBUG}" = "1" ]; then
 		VERBOSE="1"
 	fi
 	[ "${TANGO_USER_ID}" = "" ] && [ ! "${PUID}" = "" ] && TANGO_USER_ID="${PUID}"
 	[ "${TANGO_GROUP_ID}" = "" ] && [ ! "${PGID}" = "" ] &&  TANGO_GROUP_ID="${PGID}"
 	[ "${TANGO_DOMAIN}" = "" ] && [ ! "${DOMAIN}" = "" ] && TANGO_DOMAIN="${DOMAIN}"
+
 
 	TANGO_FREEPORT_MODE="0"
 	if [ "${FREEPORT}" = "1" ]; then
@@ -154,21 +174,24 @@ if [ ! "${ACTION}" = "install" ]; then
 	__add_declared_variables "TANGO_APP_COMPOSE_FILE"
 	__add_declared_variables "TANGO_USER_COMPOSE_FILE"
 
-	__add_declared_variables "TANGO_MODULES"
+	__add_declared_variables "TANGO_MODULES_AVAILABLE"
 	__add_declared_variables "TANGO_MODULES_ROOT"
-	__add_declared_variables "TANGO_APP_MODULES"
+	__add_declared_variables "TANGO_APP_MODULES_AVAILABLE"
 	__add_declared_variables "TANGO_APP_MODULES_ROOT"
 
-	__add_declared_variables "TANGO_PLUGINS"
+	__add_declared_variables "TANGO_PLUGINS_AVAILABLE"
 	__add_declared_variables "TANGO_PLUGINS_ROOT"
-	__add_declared_variables "TANGO_APP_PLUGINS"
+	__add_declared_variables "TANGO_APP_PLUGINS_AVAILABLE"
 	__add_declared_variables "TANGO_APP_PLUGINS_ROOT"
 
 	__add_declared_variables "GENERATED_ENV_FILE_FOR_COMPOSE"
 	__add_declared_variables "GENERATED_ENV_FILE_FREEPORT"
 	__add_declared_variables "TANGO_NOT_IN_APP"
+
 	__add_declared_variables "TANGO_SERVICES_MODULES"
 	__add_declared_variables "TANGO_SERVICES_MODULES_FULL"
+	__add_declared_variables "TANGO_PLUGINS"
+	__add_declared_variables "TANGO_PLUGINS_FULL"
 
 	__add_declared_variables "TANGO_FREEPORT_MODE"
 
@@ -202,8 +225,8 @@ if [ ! "${ACTION}" = "install" ]; then
 	# add default services and active modules services to all available service list
 	TANGO_SERVICES_AVAILABLE="${TANGO_SERVICES_DEFAULT} ${TANGO_SERVICES_AVAILABLE} ${TANGO_SERVICES_MODULES}"
 		
-	# create a list of active services
-	TANGO_SERVICES_ACTIVE="$(__filter_list "${TANGO_SERVICES_AVAILABLE}" "${TANGO_SERVICES_DISABLED}")"
+	# create a list of active services and modules
+	TANGO_SERVICES_ACTIVE="$($STELLA_API filter_list_with_list "${TANGO_SERVICES_AVAILABLE}" "${TANGO_SERVICES_DISABLED}")"
 	__add_declared_variables "TANGO_SERVICES_ACTIVE"
 
 	# default hardcoded user
@@ -215,46 +238,78 @@ if [ ! "${ACTION}" = "install" ]; then
 		[ "${LETS_ENCRYPT}" = "enable" ] && LETS_ENCRYPT="debug"
 	fi
 
-	# determine various path to create
-	# create folder under TANGO_DATA_PATH
-	DEFAULT_TANGO_DATA_PATH_TO_CREATE=
-	# create folder under TANGO_APP_WORK_ROOT
-	DEFAULT_APP_WORK_PATH_TO_CREATE=
+
+	# PATH management -----
 	
-	# set default path if needed
+	# TANGO_PATH_LIST list of generic path variables
+	#   						xxx_PATH =           		provided path
+	#   						xxx_PATH_DEFAULT 	  =   	default path relative to app workspace folder (TANGO_APP_WORK_ROOT)
+	#   						xxx_PATH_SUBPATH_LIST = 	list of subpath variables relative to path
+	# 							xxx_PATH_SUBPATH_CREATE = 	instructions to create subpath relative to path (internal variable)
+	
+	# APP_DATA_PATH			 			path to store data relative to app
+	# APP_DATA_PATH_DEFAULT 			default path relative to app workspace folder (TANGO_APP_WORK_ROOT)
+	# APP_DATA_PATH_SUBPATH_LIST		list of subpath variables relative to app data
+	# APP_DATA_PATH_SUBPATH_CREATE		instructions to create subpath relative to app data (internal variable)
+
+	# TANGO_APP_WORK_ROOT_SUBPATH_CREATE 		instructions to create subpath relative to TANGO_APP_WORK_ROOT (which is an internal variable)
+	TANGO_APP_WORK_ROOT_SUBPATH_CREATE=
+	
+	# TANGO_DATA_PATH 					path to store data relative to internal tango services - hardcoded according to TANGO_INSTANCE_MODE (internal variable)
+	# TANGO_DATA_PATH_DEFAULT			N/A (hardcoced TANGO_DATA_PATH)
+	# TANGO_DATA_PATH_SUBPATH_LIST		N/A (hardcoded TANGO_DATA_PATH_SUBPATH_CREATE)
+	# TANGO_DATA_PATH_SUBPATH_CREATE 	instructions to create subpath relative to tango data (internal variable) 
+	TANGO_DATA_PATH_SUBPATH_CREATE=
+	
+	# manage generic path
 	for p in ${TANGO_PATH_LIST}; do
 		if [ "${!p}" = "" ]; then
-			__default_var_name="${p}_DEFAULT"
-			__subpath="${!__default_var_name}"
+			__default_path="${p}_DEFAULT"
+			__path="${!__default_path}"
 			# export this path will update its value inside env files
-			eval "export ${p}=${TANGO_APP_WORK_ROOT}/${__subpath}"
-			DEFAULT_APP_WORK_PATH_TO_CREATE="${DEFAULT_APP_WORK_PATH_TO_CREATE} FOLDER ${__subpath}"
+			eval "export ${p}=\"${TANGO_APP_WORK_ROOT}/${__path}\""
+			TANGO_APP_WORK_ROOT_SUBPATH_CREATE="${TANGO_APP_WORK_ROOT_SUBPATH} FOLDER ${__path}"
+		fi
+		
+		# manage subpath list
+		__subpath_list="${p}_SUBPATH_LIST"
+		if [ ! "${__subpath_list}" = "" ]; then
+			__create_path_instructions=
+			for s in ${!__subpath_list}; do
+				if [ ! "${!s}" = "" ]; then
+					# create subpath instruction to create subpath later in create_path_all
+					__create_path_instructions="${__create_path_instructions} ${!s}"
+					# export this path will update its value inside env files
+					eval "export ${s}=\"${!p}/${!s}\""
+				fi
+			done
+			# all subpath are FOLDER type
+			eval "${p}_SUBPATH_CREATE=\"FOLDER ${__create_path_instructions}\""
 		fi
 	done
 
 	# Tango instance mode
 	case ${TANGO_INSTANCE_MODE} in
 		shared )
-			TANGO_SHARED_DATA_PATH="${TANGO_WORK_ROOT}/tango_shared"
-			mkdir -p "${TANGO_SHARED_DATA_PATH}"
 			TANGO_INSTANCE_NAME="tango_shared"
-			TANGO_DATA_PATH="${TANGO_SHARED_DATA_PATH}"		
+			mkdir -p "${TANGO_WORK_ROOT}/tango_shared"
+			TANGO_DATA_PATH="${TANGO_WORK_ROOT}/tango_shared"
 			;;
 		isolated )
-			TANGO_SHARED_DATA_PATH=
 			TANGO_INSTANCE_NAME="${TANGO_APP_NAME}"
 			TANGO_DATA_PATH="${APP_DATA_PATH}"
 			;;
 	esac
 
-	DEFAULT_TANGO_DATA_PATH_TO_CREATE="${DEFAULT_TANGO_DATA_PATH_TO_CREATE} FOLDER letsencrypt traefikconfig FILE letsencrypt/acme.json traefikconfig/generated.${TANGO_APP_NAME}.tls.yml"
+	# hardocoded subpath relative to tango data
+	TANGO_DATA_PATH_SUBPATH_CREATE="${TANGO_DATA_PATH_SUBPATH_CREATE} FOLDER letsencrypt traefikconfig FILE letsencrypt/acme.json traefikconfig/generated.${TANGO_APP_NAME}.tls.yml"
 	TANGO_APP_NETWORK_NAME="${TANGO_INSTANCE_NAME}_default"
 	GENERATED_TLS_FILE_PATH="${TANGO_DATA_PATH}/traefikconfig/generated.${TANGO_APP_NAME}.tls.yml"
 
 	# path pointing where the tango cross-app data will be stored
 	__add_declared_variables "TANGO_DATA_PATH"
 	__add_declared_variables "TANGO_INSTANCE_NAME"
-	__add_declared_variables "TANGO_SHARED_DATA_PATH"
+	#__add_declared_variables "TANGO_SHARED_DATA_PATH"
 	__add_declared_variables "GENERATED_TLS_FILE_PATH"
 	__add_declared_variables "TANGO_APP_NETWORK_NAME"
 

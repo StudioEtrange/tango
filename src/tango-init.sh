@@ -13,6 +13,14 @@ TANGO_ENV_FILE="${TANGO_ROOT}/tango.internal.env"
 TANGO_MODULES_ROOT="${TANGO_ROOT}/pool/modules"
 TANGO_PLUGINS_ROOT="${TANGO_ROOT}/pool/plugins"
 
+# associative array for mapping plugins by service that are atteched to
+declare -A TANGO_PLUGINS_BY_SERVICE_FULL
+# associative array for mapping auto exec plugins by service executed at service launch
+declare -A TANGO_PLUGINS_BY_SERVICE_FULL_AUTO_EXEC
+# associative array for mapping services by plugin
+declare -A TANGO_SERVICES_BY_PLUGIN_FULL
+
+
 # load tango libs
 for f in ${TANGO_ROOT}/pool/libs/*; do
 	[ -f "${f}" ] && . ${f}

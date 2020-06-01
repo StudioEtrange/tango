@@ -5,14 +5,56 @@
 
 
 case ${ACTION} in
-	mods )
-		echo "** Available modules to use as a service"
-		echo $(__list_modules)
+	modules )
+		if [ "${TARGET}" = "list" ]; then
+			echo "** Available modules to use as a service"
+			echo $(__list_items "module")
+		fi
+	;;
+
+	plugins )
+		case ${TARGET} in
+			list )
+				echo "** Available plugins"
+				echo $(__list_items "plugin")
+				;;
+
+			exec-service )
+				if $STELLA_API list_contains "${TANGO_SERVICES_ACTIVE}" "${ARGUMENT}"; then
+					echo "** Exec plugins attached to service ${ARGUMENT}"
+					__exec_plugin_all_by_service "${ARGUMENT}"
+				else
+					echo "** ERROR ${ARGUMENT} is not an active service"
+				fi
+				;;
+
+			exec )
+				if $STELLA_API list_contains "${TANGO_PLUGINS}" "${ARGUMENT}"; then
+					echo "** Exec plugin ${ARGUMENT} attached to all its services"
+					__exec_plugin_into_services "${ARGUMENT}"
+				else
+					echo "** ERROR plugin ${ARGUMENT} is not available"
+				fi
+				;;
+		esac 
 	;;
 
 	install )
 		echo "** Install requirements"
 		$STELLA_API get_features
+	;;
+
+	update )
+		if [ "${TARGET}" = "" ]; then
+			echo "** ERROR : specify a service to update its docker image"
+			exit 1
+		else
+
+			echo "** Will get last docker image version of ${TARGET}"
+
+			docker-compose pull ${TARGET}
+			echo "** NOTE : you should restart ${TARGET} service to run the updated version"
+		fi
 	;;
 
 	shell )
@@ -22,26 +64,13 @@ case ${ACTION} in
 		else
 			case ${TARGET} in
 				traefik )
-					docker exec -it "${TANGO_INSTANCE_NAME}_traefik" /bin/sh -c "[ -e /bin/bash ] && /bin/bash || /bin/sh"
+					docker-compose exec --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} ${TARGET} /bin/sh -c '[ -e /bin/bash ] && /bin/bash || /bin/sh'
 				;;
 				* )
-					docker exec -it "${TANGO_APP_NAME}_${TARGET}" /bin/sh -c "[ -e /bin/bash ] && /bin/bash || /bin/sh"
+					docker-compose exec --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} ${TARGET} /bin/sh -c '[ -e /bin/bash ] && /bin/bash || /bin/sh'
 				;;
-
 			esac
-			
-			
 		fi
-	;;
-
-	init )
-		# TODO REVIEW : do we need an init step for addon ?
-		case ${TARGET} in
-			addons )
-				echo "** Init ${TANGO_APP_NAME} addons"
-				docker-compose up addons
-				;;
-		esac
 	;;
 
 	info )
@@ -54,11 +83,13 @@ case ${ACTION} in
 
 	up )
 		# TODO up --no-recreate ?
-		docker-compose up ${DAEMON} ${BUILD} ${TARGET:-tango}
-		if [ "${DAEMON}" = "" ]; then		
-			[ "${TARGET}" = "" ] && docker-compose logs service_init
-		else
+		docker-compose up -d ${BUILD} ${TARGET:-tango}
+		if [ "${TARGET}" = "" ]; then
+			__exec_auto_plugin_service_active_all
 			docker-compose logs service_init
+		else
+			__exec_auto_plugin_all_by_service "${TARGET}"
+			docker-compose logs "${TARGET}"
 		fi
 	;;
 
@@ -73,14 +104,15 @@ case ${ACTION} in
 				fi
 				docker-compose down -v
 				# restart common services like traefik when in shared mode because we do not want to stop them
-                # TODO : do not restart traefik if it was already stopped ! ==> the idea is to conserve previous traefik state
+                # TODO : 
+				#		tango and vpn are shared, we may restart them (or not stop them) if they were already running : all service wich container name are container_name: ${TANGO_INSTANCE_NAME}___service
 				if [ "${TANGO_INSTANCE_MODE}" = "shared" ]; then 
 					[ ! "${ALL}" = "1" ] && docker-compose up -d traefik
 				fi
 			;;
 			*) 
-				docker-compose stop ${TARGET}
-				docker-compose rm ${TARGET}
+				docker-compose stop "${TARGET}"
+				docker-compose rm "${TARGET}"
 			;;
 		esac
 	;;
@@ -91,16 +123,18 @@ case ${ACTION} in
 				docker-compose down -v
 			;;
 			*) 
-				docker-compose stop ${TARGET}
+				docker-compose stop "${TARGET}"
 			;;
 		esac
-		docker-compose up ${DAEMON} ${BUILD} ${TARGET:-tango}
-		if [ "${DAEMON}" = "" ]; then
-			[ "${TARGET}" = "" ] && docker-compose logs service_info
-		else
-			docker-compose logs service_info
-		fi
+		docker-compose up -d ${BUILD} ${TARGET:-tango}
 
+		if [ "${TARGET}" = "" ]; then
+			__exec_auto_plugin_service_active_all
+			docker-compose logs service_init
+		else
+			__exec_auto_plugin_all_by_service "${TARGET}"
+			docker-compose logs "${TARGET}"
+		fi
 	;;
 
 	status )

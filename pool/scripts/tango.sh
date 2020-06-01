@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 MODE="$1"
-[ "${MODE}" = "" ] && MODE = "info"
+[ "${MODE}" = "" ] && MODE="info"
 
 
 echo "---------==---- INFO  ----==---------"
@@ -32,7 +32,7 @@ for service in ${TANGO_SERVICES_AVAILABLE}; do
    
     # filter information to show
     case ${service} in
-        VPN|PLUGINS ) info_extended=0; info_variables=0;;
+        VPN ) info_extended=0; info_variables=0;;
         * ) info_extended=1; info_variables=1;;
     esac
 
@@ -96,33 +96,30 @@ for service in ${TANGO_SERVICES_AVAILABLE}; do
 done
 
 echo "---------==---- MODULES ----==---------"
-echo "* Active modules as a service <module>[@<network area>]: ${TANGO_SERVICES_MODULES_FULL}"
+echo "* Active modules as a service "
+echo "L-- a module is a predefined service"
+echo "L-- format : <module>[@<network area>][%<service dependency1>][%<service dependency2>][^<vpn id>]"
+echo "L-- list : ${TANGO_SERVICES_MODULES_FULL}"
 echo "* Available Tango Modules"
 echo "L-- tango modules root : [${TANGO_MODULES_ROOT}]"
-echo "L-- tango modules list : ${TANGO_MODULES}"
+echo "L-- tango modules list : ${TANGO_MODULES_AVAILABLE}"
 echo "* Available App Modules"
 echo "L-- app modules root : [${TANGO_APP_MODULES_ROOT}]"
-echo "L-- app modules list : ${TANGO_APP_MODULES}"
+echo "L-- app modules list : ${TANGO_APP_MODULES_AVAILABLE}"
 
 
 
 echo "---------==---- PLUGINS ----==---------"
+echo "* Active plugins infos"
+echo "L-- a plugin act on a service"
+echo "L-- format : <plugin>[%<auto exec at launch into service1>][%!<manual exec into service2>][#arg1][#arg2]"
+echo "L-- list : ${TANGO_PLUGINS_FULL}"
 echo "* Available Tango plugins"
 echo "L-- tango plugins root : [${TANGO_PLUGINS_ROOT}] {/pool/tango/plugins}"
-echo "L-- tango plugins list : ${TANGO_PLUGINS}"
+echo "L-- tango plugins list : ${TANGO_PLUGINS_AVAILABLE}"
 echo "* Available App plugins"
 echo "L-- app plugins root : [${TANGO_APP_PLUGINS_ROOT}] {/pool/${TANGO_APP_NAME}/plugins}"
-echo "L-- app plugins list : ${TANGO_APP_PLUGINS}"
-echo "* Active plugins infos"
-for v in ${TANGO_PLUGINS_LIST}; do
-    echo "L-- plugin id : ${v}"
-    for var in $(compgen -A variable | grep ^TANGO_${v^^}); do
-        case ${var} in
-            * ) echo "  + ${var}=${!var}";;
-        esac
-    done
-done
-
+echo "L-- app plugins list : ${TANGO_APP_PLUGINS_AVAILABLE}"
 
 
 echo "---------==---- SERVICES CERTIFICATES ----==---------"
@@ -185,9 +182,10 @@ done
 
 
 echo "---------==---- PATHS ----==---------"
-echo Format : [host path] {inside container path}
+echo Format : [host path] is mapped to {inside container path}
 echo App data path : [$APP_DATA_PATH] is mapped to {/data}
-echo Tango internal data path : [$TANGO_DATA_PATH] is mapped to {/internal_data}
+echo Data path of app plugins : [$PLUGINS_DATA_PATH] is mapped to {/plugins_data}
+echo Data path of internal tango data : [$TANGO_DATA_PATH] is mapped to {/internal_data}
 echo Artefact folders : [$TANGO_ARTEFACT_FOLDERS] are mapped to {${TANGO_ARTEFACT_MOUNT_POINT:-/artefact}} subfolders
 echo Lets encrypt store file : [$TANGO_DATA_PATH/letsencrypt/acme.json] {/internal_data/letsencrypt/acme.json}
 [ "${MODE}" = "init" ] && chmod 600 /internal_data/letsencrypt/acme.json

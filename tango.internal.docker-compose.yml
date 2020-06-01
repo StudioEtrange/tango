@@ -5,6 +5,7 @@ networks:
     name: ${TANGO_APP_NETWORK_NAME}
 
 volumes:
+  # volumes specific for each app
   artefact:
     name: ${TANGO_APP_NAME}_artefact
   data:
@@ -14,6 +15,14 @@ volumes:
       o: bind
       device: ${APP_DATA_PATH}
     name: ${TANGO_APP_NAME}_data
+  plugins_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PLUGINS_DATA_PATH}
+    name: ${TANGO_APP_NAME}_plugins_data
+  # volumes that can be shared between each app
   internal_data:
     driver: local
     driver_opts:
@@ -51,10 +60,10 @@ x-vpn: &default-vpn
   # disable all SELinux policies 
   security_opt:
     - label:disable
-  # volumes:
-  #   - /home/nomorgan/testvpn:/vpn
   devices:
     - /dev/net/tun
+  env_file:
+    - ${GENERATED_ENV_FILE_FOR_COMPOSE}
   environment:
     # forbid any output network trafic outside VPN - usefull when VPN do not want to connect
     - FIREWALL=1
@@ -69,34 +78,15 @@ x-vpn: &default-vpn
     context: https://github.com/StudioEtrange/openvpn-client.git#dev
 
 
-x-plugin: &default-plugin
-  image: bash:4.4.23
-  user: ${TANGO_USER_ID:-0}:${TANGO_GROUP_ID:-0}
-  depends_on:
-    - volume_init
-  volumes:
-    - data:/data
-    - internal_data:/internal_data
-    - ${TANGO_ROOT}/pool:/pool/tango
-    - artefact:${TANGO_ARTEFACT_MOUNT_POINT:-/artefact}
-  env_file:
-    - ${GENERATED_ENV_FILE_FOR_COMPOSE}
-  networks:
-    - default
-  
-#&& for addon in $${TANGO_ADDONS}; do
-#echo \"L-- install $${addon%#*} $${addon#*#}\"
-#\"/pool/tango/addons/install_$${addon%#*}.sh\" \"$${addon#*#}\"
-#done"
-
-
 services:
 
   # Launch all services
   tango:
-    image: bash:4.4.23
+    image: ${TANGO_SHELL_IMAGE}
     container_name: ${TANGO_APP_NAME}
     user: ${TANGO_USER_ID:-0}:${TANGO_GROUP_ID:-0}
+    env_file:
+      - ${GENERATED_ENV_FILE_FOR_COMPOSE}
     depends_on:
       - service_info
     networks:
@@ -107,9 +97,11 @@ services:
   # do some init on internal volume
   # populate artefact named volume with a foo file because when mounting an empty named volume on {$TANGO_ARTEFACT_MOUNT_POINT}, it might get existing content (i.e : cdrom, floppy, usb... for /media)
   volume_init:
-    image: bash:4.4.23
+    image: ${TANGO_SHELL_IMAGE}
     container_name: ${TANGO_INSTANCE_NAME}_volume_init
     user: root
+    env_file:
+      - ${GENERATED_ENV_FILE_FOR_COMPOSE}
     volumes:
       - artefact:/foo
     networks:
@@ -119,7 +111,7 @@ services:
       
   # init service
   service_init:
-    image: bash:4.4.23
+    image: ${TANGO_SHELL_IMAGE}
     container_name: ${TANGO_INSTANCE_NAME}_service_init
     user: ${TANGO_USER_ID:-0}:${TANGO_GROUP_ID:-0}
     depends_on:
@@ -128,7 +120,6 @@ services:
       - data:/data
       - internal_data:/internal_data
       - artefact:${TANGO_ARTEFACT_MOUNT_POINT:-/artefact}
-      - ${TANGO_ROOT}/pool:/pool/tango
     env_file:
       - ${GENERATED_ENV_FILE_FOR_COMPOSE}
     networks:
@@ -140,24 +131,22 @@ services:
 
   # info on services
   service_info:
-    image: bash:4.4.23
+    image: ${TANGO_SHELL_IMAGE}
     container_name: ${TANGO_INSTANCE_NAME}_service_info
     user: ${TANGO_USER_ID:-0}:${TANGO_GROUP_ID:-0}
-    volumes:
-      - ${TANGO_ROOT}/pool:/pool/tango
     env_file:
       - ${GENERATED_ENV_FILE_FOR_COMPOSE}
     networks:
       - default
     command: >
-      bash -c "for f in /pool/tango/scripts/*.sh; do [ -f \"$${f}\" ] && . $${f} info; done &&
+      bash -c "for f in /pool/tango/scripts/*.sh; do [ -f \"$${f}\" ] && $${f} info; done &&
       [ ! \"${TANGO_NOT_IN_APP}\" = "1" ] && for f in /pool/${TANGO_APP_NAME}/scripts/*.sh; do [ -f \"$${f}\" ] && $${f} info; done
       "
 
 
   # Launch all vpn
   vpn:
-    image: bash:4.4.23
+    image: ${TANGO_SHELL_IMAGE}
     container_name: ${TANGO_INSTANCE_NAME}_vpn
     user: ${TANGO_USER_ID:-0}:${TANGO_GROUP_ID:-0}
     depends_on:
@@ -166,18 +155,6 @@ services:
       - default
     command: >
       bash -c "echo Launching VPN."
-
-  # Launch all plugins
-  plugins:
-    image: bash:4.4.23
-    container_name: ${TANGO_APP_NAME}_plugins
-    user: ${TANGO_USER_ID:-0}:${TANGO_GROUP_ID:-0}
-    depends_on:
-      - service_init
-    networks:
-      - default
-    command: >
-      bash -c "echo Launching Plugins."
 
 
   # Router
@@ -197,8 +174,6 @@ services:
       #- ./traefik-conf.yml:/etc/traefik/traefik.yml
       - letsencrypt:/letsencrypt
       - traefikconfig:/traefikconfig
-    env_file:
-      - ${GENERATED_ENV_FILE_FOR_COMPOSE}
     labels:
       - "${TANGO_INSTANCE_NAME}.managed=true"
       - "traefik.enable=true"

@@ -37,7 +37,7 @@ NOTE : tango will auto install other tools like docker-compose
 * Launch an instance with firefox predefined service
 
     ```
-    ./tango --add firefox --domain mydomain.org --freeport up
+    ./tango --module firefox --domain mydomain.org --freeport up
     ```
 
 ### Minimal application
@@ -74,16 +74,17 @@ See samples in `samples` folder
 ## Available Commands
 
 ```
-	install : deploy this app
-	init addons : install and init addons only if any addons declared in current app.
-	up [service [-d][-b]] [--add mod-name] [--freeport]: launch all available services or one service
-	down [service] [--mods mod-name] [--all]: down all services or one service. Except shared internal service when in shared mode (-all force stop shared service).
-	restart [service [-d]] [--add mod-name] [--freeport]: restart all services or one service.
+	install : deploy this app."
+	up [service [-b]] [--module module] [--plugin plugin] [--freeport]: launch all available services or one service
+	down [service] [--mods mod-name] [--all]: down all services or one service. Except shared internal service when in shared mode (--all force stop shared service).
+	restart [service] [--module module] [--plugin plugin] [--freeport]: restart all services or one service.
 	info [--freeport] : give info. Will generate conf files and print configuration used when launching any service.
 	status [service] : see service status.
 	logs [service] : see service logs.
+	update <service> : get last version of docker image service. Will stop service if it was running.
 	shell <service> : launch a shell into a running service.
-	mods : list available modules for use as a service.
+	modules|plugins list : list available modules or plugins. A module is a predefined service. A plugin is plug onto a service.
+	plugins <exec-service> <service>|<exec> <plugin>: exec all plugin attached to a service OR exec a plugin into all serviced attached.
 	cert <path> --domain=<domain> : generate self signed certificate for a domain into a current host folder.
 
 ```
@@ -96,12 +97,13 @@ See samples in `samples` folder
 * You could set every tango variables through a user environment file, shell environment variables and some from command line. 
 
 * Resolution priority order :
-    * Command line variables
     * Shell environment variables
+    * Command line variables
     * User environment file variables
     * Modules environment file variables
     * Current app environment file variables
     * Default tango environment file variables
+
 
 ### Standard variables
 
@@ -115,6 +117,48 @@ See samples in `samples` folder
 |APP_DATA_PATH|path on host for services conf and data files.|defined by `DATA_PATH_DEFAULT`|`../data`|
 
 For full list see `tango.internal.env` file
+
+### Using shell environment variables
+
+* Set variables at tango launch or export them before launch
+
+    ```
+    TANGO_DOMAIN="mydomain.com" APP_DATA_PATH="/home/$USER/data" ./tango up
+    ```
+
+### Using environment files
+
+* You could create a user environment file for your app to set any available variables and put it everywhere. By default it will be looked for from your home directory
+
+    ```
+    ./tango --app myapp --approot $HOME/myapp --env /foo/bar/myapp.env up
+    ```
+
+* An environment file syntax is liked docker-compose env file syntax. It is **NOT** a shell file. Values are not evaluated.
+
+    ```
+    NETWORK_PORT_MAIN=80
+    APP_DATA_PATH=../data
+    TANGO_ARTEFACT_FOLDERS=/mnt/MEDIA/MOVIES /mnt/MEDIA/TV_SHOWS
+    ```
+
+* It has a special cumulative assignation sign `+=` which add values to existing variable values
+    ```
+        TANGO_SERVICES_AVAILABLE+=blog
+    ```
+
+
+### Using command line variables
+
+* A few variable can be setted with command line (like domain, user/group id, plugins, modules). 
+
+* Command line variables are overrided by shell environment variables and they override environment files variables. `plugin` and `module` are not overrided nor override, they are cumulative with both shell environment and environment files variables
+    ```
+    TANGO_PLUGINS="plugin1 plugin2" ./tango info --plugin "plugin3"
+    ```
+
+
+
 
 ### PATH variables
 
@@ -135,37 +179,6 @@ For full list see `tango.internal.env` file
 ### Artefacts
 
 * `TANGO_ARTEFACT_FOLDERS` is a list of artefact path. All listed artefact folders are attached to services listed in `TANGO_ARTEFACT_SERVICES` to a specified mount point in `TANGO_ARTEFACT_MOUNT_POINT`
-
-### Using an environment file
-
-* You could create a user environment file for your app to set any available variables and put it everywhere. By default it will be looked for from your home directory
-
-    ```
-    ./tango --app myapp --approot $HOME/myapp --env /foo/bar/myapp.env up
-    ```
-
-* An environment file syntax is liked docker-compose env file syntax. It is **NOT** a shell file. Values are not evaluated.
-
-
-    ```
-    NETWORK_PORT_MAIN=80
-    APP_DATA_PATH=../data
-    TANGO_ARTEFACT_FOLDERS=/mnt/MEDIA/MOVIES /mnt/MEDIA/TV_SHOWS
-    ```
-
-* It has a special cumulative assignation sign `+=` which add values to existing variable values
-    ```
-        TANGO_SERVICES_AVAILABLE+=blog
-    ```
-
-
-### Using shell environment variables
-
-* Set variables at tango launch or export them before launch
-
-    ```
-    TANGO_DOMAIN="mydomain.com" APP_DATA_PATH="/home/$USER/data" ./tango up
-    ```
 
 
 ### For Your Information about env files - internal mechanisms
@@ -215,7 +228,7 @@ For full list see `tango.internal.env` file
 * Launch a specific service
 
     ```
-    ./tango up <service> [-d]
+    ./tango up <service>
     ```
 
 * Stop a service
@@ -229,21 +242,75 @@ For full list see `tango.internal.env` file
 * There is a list of predefined services named `module`.
     * List modules :
      ```
-    ./tango mods
+    ./tango modules list
     ```
 
-* To activate a module into the current app 
-    * use variable list `TANGO_SERVICES_MODULES` or `--add` command line option
-    * The list format is `<name>[@<network area>]`
+* To declare a module into the current app 
+    * use variable list `TANGO_SERVICES_MODULES` or `--module` command line option
+    * `--module` command line option is cumulative with variable list `TANGO_SERVICES_MODULES`
+    * Item format of the list is `<module>[@<network area>][%<service dependency1>][%<service dependency2>][^<vpn id>]`
     * `main` network area is the default
 
     ```
-    CLOUD9_USERNAME=tango CLOUD9_PASSWORD=tango ./tango --add cloud9 --add firefox@secondary --domain mydomain.org --freeport up
+    CLOUD9_USERNAME=tango CLOUD9_PASSWORD=tango ./tango --module cloud9 --module firefox@secondary --domain mydomain.org --freeport up
     ```
+
+* Module can have other services dependencies and module launch will depends on these dependencies
 
 * Predefined modules and their available variables files are in `pool/modules` folder
 
 * You can define your own modules in your app by putting their matching `.yml` and `.env` files in a `pool/modules` folder of the app
+
+## Plugins 
+
+* A plugin is a code that will exec into a service
+    * List plugins :
+    ```
+    ./tango plugins list
+    ```
+
+* A plugin can be executed at each service launch or manually with plugins commands
+    ```
+    tango plugins <exec-service> <service>|<exec> <plugin>
+    ```
+
+    * Manually execute all plugins attached to a service
+        ```
+        ./tango plugins exec-service <service>
+        ```
+
+    * Manually execute a plugin into all services attached
+        ```
+        ./tango plugins exec <plugin>
+        ```
+
+
+* To declare a plugin into the current app 
+    * use variable list `TANGO_PLUGINS` or `--plugin` command line option
+    * `--plugin` command line option is cumulative with variable list `TANGO_PLUGINS`
+    * Item format of the list is `<plugin>[%<auto exec at launch into service1>][%!<manual exec into service2>][#arg1][#arg2]`
+
+
+
+* Sample that attach `uname` plugin to `firefox` launch and launch `firefox` service
+    ```
+    ./tango --plugin uname%firefox --module firefox --domain mydomain.org --freeport up firefox
+    ```
+
+* Sample that attach `uname` plugin to `firefox`, launch `firefox` service then exec plugins attached to `firefox`
+    ```
+    ./tango --plugin uname%!firefox --module firefox --domain mydomain.org --freeport up firefox
+    ./tango plugins exec-service firefox
+    ```
+
+
+* Plugin code will be executed inside each attached services
+
+* Predefined plugins are in `pool/plugins` folder
+
+* You can define your own modules in your app by putting executable files in a `pool/plugins` folder of the app
+
+
 
 ## Network Configuration
 
@@ -285,14 +352,14 @@ For full list see `tango.internal.env` file
 * Any variables values ending with `_PORT` will be excluded from the free TCP ports. (including direct access port, see below)
 
     ```
-    ./tango --add firefox --domain=mydomain.org --freeport up
+    ./tango --module firefox --domain=mydomain.org --freeport up
     ```
     
 
 * `--freeport` will allocate free ports of entrypoint each times a service is started with `up` or `restart` command. These ports are saved in an internal file. When using `info` command `--freeport` will read ports from previously backup ones.
 
     ```
-    ./tango --add firefox --domain=mydomain.org --freeport info
+    ./tango --module firefox --domain=mydomain.org --freeport info
     ```
     
 
@@ -325,7 +392,7 @@ For full list see `tango.internal.env` file
     * `LETS_ENCRYPT=disable` (default value) will disable auto generation
     * `LETS_ENCRYPT=enable` will auto generate a certificate for each services declared in `LETS_ENCRYPT_SERVICES`. (All services by default)
     * `LETS_ENCRYPT=debug` will use the test server of letsencrypt to not reach rate limit (https://letsencrypt.org/fr/docs/rate-limits/)
-    
+
 ### Let's encrypt and non default port for main area
 
 * If you change the network ports of main area to other ports than 80/443, you have to use change the letsencrypt method from `HTTP Challenge` to `DNS Challenge`
@@ -360,20 +427,9 @@ For full list see `tango.internal.env` file
 * If your Docker host also has a dedicated graphics card, the video encoding acceleration of Intel Quick Sync Video may become unavailable when the GPU is in use. 
 * If your computer has an NVIDIA GPU, please install the latest Latest NVIDIA drivers for Linux to make sure that Plex can use your NVIDIA graphics card for video encoding (only) when Intel Quick Sync Video becomes unavailable.
 
-## Tango addons
+## Tango plugins
 
 
-* declare used addons
-
-    * ie in user env file : 
-        ```
-        TANGO_ADDONS=addon_name#version
-        ```
-
-* install addons
-    ```
-    ./tango init addons
-    ```
 
 
 ## Side notes
