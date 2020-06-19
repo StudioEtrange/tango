@@ -163,6 +163,7 @@ __create_docker_compose_file() {
 	__set_active_services_all
 	__set_time_all
 	__set_entrypoints_service_all
+	__set_uri_info_service_all
 	__set_redirect_https_service_all
 	__add_service_direct_port_access_all
 	__add_gpu_all
@@ -224,7 +225,6 @@ __translate_all_path() {
 
 
 # MANAGE FEATURES FOR ALL CONTAINTERS -----------------
-
 
 
 __set_active_services_all() {
@@ -407,20 +407,121 @@ __set_letsencrypt_service_all() {
 }
 
 
-__set_entrypoints_service_all() {
-	local __name=
-	local __area=
-	local __var=
-	
 
-	for s in ${NETWORK_SERVICES_AREA_MAIN}; do
-		__check_service_exist "${s}" && __set_entrypoint_service "${s}"  "web_main" || echo "** WARN : unknow ${s} service declared in NETWORK_SERVICES_AREA_MAIN"
+__set_uri_info_service_all() {
+
+	local __var=
+	local __entrypoints=
+	local __entrypoint_default=
+
+	local __subdomain=
+	local __hostname=
+	local __address=
+	local __port=
+	local __http=
+	for __service in ${TANGO_SERVICES_AVAILABLE}; do
+		
+
+		__var="${__service^^}_ENTRYPOINTS"; __entrypoints="${!__var}"
+		__var="${__service^^}_ENTRYPOINTS_SECURE"; __entrypoints="${__entrypoints} ${!__var}";
+		# trim __entrypoints
+        __entrypoints="${__entrypoints#"${__entrypoints%%[![:space:]]*}"}"   # remove leading whitespace characters
+        __entrypoints="${__entrypoints%"${var##*[![:space:]]}"}" # remove trailing whitespace characters
+
+		if [ ! "${__entrypoints}" = "" ]; then
+			__var="${__service^^}_SUBDOMAIN"
+			if [ -z ${!__var+x} ]; then
+				__add_declared_variables "${__service^^}_SUBDOMAIN"
+				__subdomain="${__service}."
+				eval "export ${__service^^}_SUBDOMAIN=${__subdomain}"
+			else
+				__subdomain="${!__var}"
+			fi
+			__add_declared_variables "${__service^^}_HOSTNAME"
+			[ "${TANGO_DOMAIN}" = ".*" ] && __hostname="${__subdomain}" || __hostname="${__subdomain}${TANGO_DOMAIN}"
+			eval "export ${__service^^}_HOSTNAME=${__hostname}"
+
+		fi
+
+		__service="${__service^^}"
+
+		__var="${__service}_ENTRYPOINTS_DEFAULT"
+		__entrypoint_default="${!__var}"
+		__entrypoint_default="${__entrypoint_default^^}"
+		
+        for e in ${__entrypoints}; do
+			e="${e^^}"
+            __var="${e/WEB_/NETWORK_PORT_}"
+            __var="${__var^^}"
+			__port="${!__var}"
+			[ "${__port}" = "" ] && __address="${__hostname}" || __address="${__hostname}:${__port}"
+			__http=
+            case $e in
+                *SECURE )
+					__add_declared_variables "${__service}_HTTP_PORT_${e}"
+					__add_declared_variables "${__service}_HTTP_ADDRESS_${e}"
+					__add_declared_variables "${__service}_HTTP_URL_${e}"
+					__http="https://${__address}"
+					eval "export ${__service}_HTTP_PORT_${e}=${__port}"
+					eval "export ${__service}_HTTP_ADDRESS_${e}=${__address}"
+					eval "export ${__service}_HTTP_URL_${e}=${__http}"
+					if [ "${__entrypoint_default}_SECURE" = "$e" ]; then
+						__add_declared_variables "${__service}_HTTP_URL_DEFAULT_SECURE"
+						eval "export ${__service}_HTTP_URL_DEFAULT_SECURE=${__http}"
+					fi
+					;;
+				* )
+					__add_declared_variables "${__service}_HTTP_PORT_${e}"
+					__add_declared_variables "${__service}_HTTP_ADDRESS_${e}"
+					__add_declared_variables "${__service}_HTTP_URL_${e}"
+					__http="http://${__address}"
+					eval "export ${__service}_HTTP_PORT_${e}=${__port}"
+					eval "export ${__service}_HTTP_ADDRESS_${e}=${__address}"
+					eval "export ${__service}_HTTP_URL_${e}=${__http}"
+					if [ "${__entrypoint_default}" = "$e" ]; then
+						__add_declared_variables "${__service}_HTTP_URL_DEFAULT"
+						eval "export ${__service}_HTTP_URL_DEFAULT=${__http}"
+					fi
+				 	;;
+            esac
+			
+        done
+
+		
+		
+
+	done
+}
+
+
+__set_entrypoints_service_all() {
+
+	for s in ${NETWORK_SERVICES_AREA_ADMIN}; do
+		if __check_service_exist "${s}"; then
+			__set_entrypoint_service "${s}"  "web_admin"
+			__add_declared_variables "${s^^}_ENTRYPOINTS_DEFAULT"
+			eval "export ${s^^}_ENTRYPOINTS_DEFAULT=web_admin"
+		else
+			echo "** WARN : unknow ${s} service declared in NETWORK_SERVICES_AREA_ADMIN"
+		fi
 	done
 	for s in ${NETWORK_SERVICES_AREA_SECONDARY}; do
-		__check_service_exist "${s}" && __set_entrypoint_service "${s}"  "web_secondary" || echo "** WARN : unknow ${s} service declared in NETWORK_SERVICES_AREA_SECONDARY"
+		if __check_service_exist "${s}"; then
+			__set_entrypoint_service "${s}"  "web_secondary"
+			__add_declared_variables "${s^^}_ENTRYPOINTS_DEFAULT"
+			eval "export ${s^^}_ENTRYPOINTS_DEFAULT=web_secondary"
+		else
+			echo "** WARN : unknow ${s} service declared in NETWORK_SERVICES_AREA_SECONDARY"
+		fi
 	done
-	for s in ${NETWORK_SERVICES_AREA_ADMIN}; do
-		__check_service_exist "${s}" && __set_entrypoint_service "${s}"  "web_admin" || echo "** WARN : unknow ${s} service declared in NETWORK_SERVICES_AREA_ADMIN"
+	for s in ${NETWORK_SERVICES_AREA_MAIN}; do
+		if __check_service_exist "${s}"; then
+			__set_entrypoint_service "${s}"  "web_main"
+			__add_declared_variables "${s^^}_ENTRYPOINTS_DEFAULT"
+			eval "export ${s^^}_ENTRYPOINTS_DEFAULT=web_main"
+		else
+			echo "** WARN : unknow ${s} service declared in NETWORK_SERVICES_AREA_MAIN"
+		fi
 	done
 
 
@@ -1018,9 +1119,10 @@ __set_entrypoint_service() {
 	[ ! "${!__var_secure}" = "" ] && __previous=",${!__var_secure}"
 	eval "export ${__var_secure}=${__entrypoint}_secure${__previous}"
 	__add_declared_variables "${__var_secure}"
+
 }
 
-# change rule priority of a service to be overriden by the http-catchall rule
+# change rule priority of a service to be overriden by the http-catchall rule wich have a prority of 100
 __set_redirect_https_service() {
 	local __service="$1"
 	
@@ -1029,6 +1131,12 @@ __set_redirect_https_service() {
 
 	eval "export ${__var}=50"
 	__add_declared_variables "${__var}"
+
+	# NOTE special case for subservices traefik_api_rest, which mush have an higher priority than TRAEFIK_REDIRECT_HTTPS_PRIORITY
+	if [ "${__service}" = "TRAEFIK" ]; then
+		eval "export TRAEFIK_API_REST_REDIRECT_HTTPS_PRIORITY=51"
+		__add_declared_variables "TRAEFIK_API_REST_REDIRECT_HTTPS_PRIORITY"
+	fi
 
 	# DEPRECATED : technique was to add a middleware redirect rule for each service
 	# add only once ',' separator to compose file only if there is other middlewars declarated 

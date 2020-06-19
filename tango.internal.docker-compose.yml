@@ -180,23 +180,40 @@ services:
       # http://traefik.domain:${NETWORK_PORT_ADMIN} http://traefik.domain:${NETWORK_PORT_ADMIN}/api http://traefik.domain:${NETWORK_PORT_ADMIN}/dashboard
       - "traefik.http.routers.traefik_api.entrypoints=${TRAEFIK_ENTRYPOINTS:-web_admin}"
       # With traefik dashboard enabled, the router rule must catch requests for both /api and /dashboard
-      - "traefik.http.routers.traefik_api.rule=HostRegexp(`{subdomain:${TRAEFIK_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`) || PathPrefix(`/`))"
+      - "traefik.http.routers.traefik_api.rule=HostRegexp(`{subdomain:${TRAEFIK_SUBDOMAIN}}{domain:${TANGO_DOMAIN:-.*}}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`) || PathPrefix(`/`))"
       - "traefik.http.routers.traefik_api.service=api@internal"
       - "traefik.http.routers.traefik_api.priority=${TRAEFIK_REDIRECT_HTTPS_PRIORITY:-200}"
       - "traefik.http.routers.traefik_api.middlewares=traefik_api-redirect,traefik_api-redirect2"
+
       - "traefik.http.routers.traefik_api-secure.entrypoints=${TRAEFIK_ENTRYPOINTS_SECURE:-web_admin_secure}"
-      - "traefik.http.routers.traefik_api-secure.rule=HostRegexp(`{subdomain:${TRAEFIK_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`) || PathPrefix(`/`))"
+      - "traefik.http.routers.traefik_api-secure.rule=HostRegexp(`{subdomain:${TRAEFIK_SUBDOMAIN}}{domain:${TANGO_DOMAIN:-.*}}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`) || PathPrefix(`/`))"
       - "traefik.http.routers.traefik_api-secure.service=api@internal"
+      - "traefik.http.routers.traefik_api-secure.priority=100"
       - "traefik.http.routers.traefik_api-secure.middlewares=traefik_api-redirect,traefik_api-redirect2"
       - "traefik.http.routers.traefik_api-secure.tls=true"
-      - "traefik.http.routers.traefik_api-secure.tls.domains[0].main=traefik.${TANGO_DOMAIN:-.*}"
+      - "traefik.http.routers.traefik_api-secure.tls.domains[0].main=${TRAEFIK_SUBDOMAIN}}${TANGO_DOMAIN:-.*}"
+
+      - "traefik.http.routers.traefik_api_rest.entrypoints=${TRAEFIK_ENTRYPOINTS:-web_admin}"      
+      - "traefik.http.routers.traefik_api_rest.rule=HostRegexp(`{subdomain:${TRAEFIK_SUBDOMAIN}}{domain:${TANGO_DOMAIN:-.*}}`) && PathPrefix(`/api/providers/rest`)"
+      - "traefik.http.routers.traefik_api_rest.service=rest@internal"
+      - "traefik.http.routers.traefik_api_rest.priority=${TRAEFIK_API_REST_REDIRECT_HTTPS_PRIORITY:-201}"
+      - "traefik.http.routers.traefik_api_rest.middlewares=traefik_api_rest-auth"
+      
+      - "traefik.http.routers.traefik_api_rest-secure.entrypoints=${TRAEFIK_ENTRYPOINTS_SECURE:-web_admin_secure}"
+      - "traefik.http.routers.traefik_api_rest-secure.rule=HostRegexp(`{subdomain:${TRAEFIK_SUBDOMAIN}}{domain:${TANGO_DOMAIN:-.*}}`) && PathPrefix(`/api/providers/rest`)"
+      - "traefik.http.routers.traefik_api_rest-secure.service=rest@internal"
+      - "traefik.http.routers.traefik_api_rest-secure.priority=101"
+      - "traefik.http.routers.traefik_api_rest-secure.middlewares=traefik_api_rest-auth"
+      - "traefik.http.routers.traefik_api_rest-secure.tls=true"
+      - "traefik.http.routers.traefik_api_rest-secure.tls.domains[0].main=${TRAEFIK_SUBDOMAIN}}${TANGO_DOMAIN:-.*}"
+
       # redirect /dashboard to /dashboard/
       - "traefik.http.middlewares.traefik_api-redirect.redirectregex.regex=^(http[s]?://[^:/]+(:[0-9]+)?)/dashboard$$"
       - "traefik.http.middlewares.traefik_api-redirect.redirectregex.replacement=$${1}/dashboard/"
       # redirect / to /dashboard/
       - "traefik.http.middlewares.traefik_api-redirect2.redirectregex.regex=^(http[s]?://[^:/]+(:[0-9]+)?)(/)+$$"
       - "traefik.http.middlewares.traefik_api-redirect2.redirectregex.replacement=$${1}/dashboard/"
-      # HTTP to HTTPS redirect routers - catch all HTTP request on each entrypoint
+      # HTTP to HTTPS redirect routers - catch all HTTP request
       # NOTE : we cannot use the method of set redirect middleware on each routers service because each service routers
       #        may have two entrypoints and middlewares dont know from which entrypoint the request come.
       #        So we use a global catch all rule, using priority for exclude some services
@@ -222,6 +239,8 @@ services:
       - "traefik.http.middlewares.redirect-secure-web_admin.redirectscheme.scheme=https"
       - "traefik.http.middlewares.redirect-secure-web_admin.redirectscheme.permanent=true"
       - "traefik.http.middlewares.redirect-secure-web_admin.redirectscheme.port=${NETWORK_PORT_ADMIN_SECURE}"
+      # Auth middleware
+      - "traefik.http.middlewares.traefik_api_rest-auth.basicauth.users=${TRAEFIK_API_USER}:${TRAEFIK_API_HASH_PASSWORD}"
     networks:
       - default
     expose:
@@ -262,6 +281,8 @@ services:
       - "--entrypoints.web_admin.address=:9000"
       - "--entrypoints.web_admin_secure=true"
       - "--entrypoints.web_admin_secure.address=:9443"
+      - "--providers.rest=true"
+      - "--providers.rest.insecure=false"
       - "--providers.docker=true"
       - "--providers.docker.endpoint=unix:///var/run/docker.sock"
       - "--providers.docker.constraints=Label(`${TANGO_INSTANCE_NAME}.managed`,`true`)"
@@ -270,5 +291,3 @@ services:
       - "--certificatesresolvers.tango=true"
       - "--certificatesresolvers.tango.acme.email=${LETS_ENCRYPT_MAIL}"
       - "--certificatesresolvers.tango.acme.storage=/letsencrypt/acme.json"
-
-

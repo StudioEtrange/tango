@@ -233,6 +233,12 @@ if [ ! "${ACTION}" = "install" ]; then
 	[ "${TANGO_USER_ID}" = "" ] && TANGO_USER_ID="$(id -u)"
 	[ "${TANGO_GROUP_ID}" = "" ] && TANGO_GROUP_ID="$(id -g)"
 	
+	# traefik rest api password
+	[ "${TRAEFIK_API_USER}" = "" ] && TRAEFIK_API_USER="tango"
+	[ "${TRAEFIK_API_PASSWORD}" = "" ] && TRAEFIK_API_PASSWORD="tango"
+	TRAEFIK_API_HASH_PASSWORD="$($STELLA_API htpasswd_md5 ${TRAEFIK_API_PASSWORD})"
+	__add_declared_variables "TRAEFIK_API_HASH_PASSWORD"
+
 	# change lets encrypt behaviour
 	if [ "${DEBUG}" = "1" ]; then
 		[ "${LETS_ENCRYPT}" = "enable" ] && LETS_ENCRYPT="debug"

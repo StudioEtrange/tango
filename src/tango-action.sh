@@ -51,7 +51,6 @@ case ${ACTION} in
 		else
 
 			echo "** Will get last docker image version of ${TARGET}"
-
 			docker-compose pull ${TARGET}
 			echo "** NOTE : you should restart ${TARGET} service to run the updated version"
 		fi

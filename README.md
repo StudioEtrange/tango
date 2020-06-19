@@ -445,7 +445,11 @@ For full list see `tango.internal.env` file
     * Traefik1 forward auth and keycloak https://geek-cookbook.funkypenguin.co.nz/ha-docker-swarm/traefik-forward-auth/keycloak/
     * Traefik2 reverse proxy + reverse an external url : https://blog.eleven-labs.com/fr/utiliser-traefik-comme-reverse-proxy/
     * Traefik1 and oauth2 proxy https://geek-cookbook.funkypenguin.co.nz/reference/oauth_proxy/
-
+    * Traefik1 and OpenIDConnect provider with keycloak 
+            * https://geek-cookbook.funkypenguin.co.nz/ha-docker-swarm/traefik-forward-auth/keycloak/
+            * https://geek-cookbook.funkypenguin.co.nz/recipes/keycloak/setup-oidc-provider/
+    * Traefik2 REST API : https://community.containo.us/t/rest-provider-put-giving-404-when-api-auth-is-enabled/2832/6
+    
 * Let's encrypt
     * challenge types : https://letsencrypt.org/fr/docs/challenge-types/
 

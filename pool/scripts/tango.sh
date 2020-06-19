@@ -61,25 +61,29 @@ for service in ${TANGO_SERVICES_AVAILABLE}; do
         
         __direct_access="${service}_DIRECT_ACCESS_PORT"; __direct_access="${!__direct_access}";
         echo "L-- direct access port : ${__direct_access}"
-        
+
         __urls=
-        __domain=
-        [ "${service}" = "TRAEFIK" ] && __domain="${TRAEFIK_SUBDOMAIN}${TANGO_DOMAIN/\.\*/\*}" \
-            || __domain="${service,,}.${TANGO_DOMAIN/\.\*/\*}"
-        for e in ${__entrypoints}; do
-            e="${e/web_/NETWORK_PORT_}"
-            e="${e^^}"
-            __with_s=
-            case $e in
-                *SECURE ) __with_s="s";; 
-            esac
-            __urls="${__urls} http${__with_s}://${__domain}:${!e}"
+        __urls_api_get
+        __urls_api_data=
+        __urls_api_rest=
+        for u in $(compgen -A variable | grep -Ev DEFAULT | grep ^${service}_HTTP_URL_); do
+            __urls="${__urls} ${!u}"
+            __urls_api_get="${__urls_api_get} ${!u}/api"
+            __urls_api_data="${__urls_api_data} ${!u}/api/rawdata"
+            __urls_api_rest="${__urls_api_rest} ${!u}/api/providers/rest"
         done
 
+        __var="${service^^}_HOSTNAME"
+        __hostname="${!__var}"
         if [ ! "${__entrypoints}" = "" ]; then
             echo "L-- URLs : ${__urls}"
+            if [ "${service^^}" = "TRAEFIK" ]; then
+                echo "L -- API GET endpoint : ${__urls_api_get}"
+                echo "L -- API GET all data : ${__urls_api_data}"
+                echo "L -- API PUT (REST API) : ${__urls_api_rest}"
+            fi
             # NOTE crt.sh do not need domain to be reacheable from internet : it is a search engine for certificate
-            echo "L-- certificate status : https://crt.sh/?q=${__domain}"
+            echo "L-- certificate status : https://crt.sh/?q=${__hostname}"
             [ "${NETWORK_INTERNET_EXPOSED}" = "1" ] && echo "L-- diagnostic dns, cert, content : https://check-your-website.server-daten.de/?q=${__domain}"
         fi
     fi
@@ -87,7 +91,7 @@ for service in ${TANGO_SERVICES_AVAILABLE}; do
         echo "L-- variables list :"
         for variables in $(compgen -A variable | grep ^${service}_); do
             case ${variables} in
-                *PASSWORD*|*AUTH* ) echo "  + ${variables}=*****";;
+                *PASSWORD|*AUTH ) echo "  + ${variables}=*****";;
                 * ) echo "  + ${variables}=${!variables}";;
             esac
         done
