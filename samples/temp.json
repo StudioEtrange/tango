@@ -625,7 +625,21 @@ body='
 }
 '
 
-
+body='
+{
+    "http": { 
+        "routers": {
+            "test" : {
+                "entryPoints": [
+                    "web_secondary"
+                ],
+                "rule": "HostRegexp(`{subdomain:test.}{domain:chimere-harpie.org}`)",
+                "service": "sabnzbd"
+            }
+        }
+    }
+}
+'
 body='
 {
     "routers": {
