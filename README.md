@@ -448,6 +448,8 @@ For full list see `tango.internal.env` file
     * Traefik1 and OpenIDConnect provider with keycloak 
             * https://geek-cookbook.funkypenguin.co.nz/ha-docker-swarm/traefik-forward-auth/keycloak/
             * https://geek-cookbook.funkypenguin.co.nz/recipes/keycloak/setup-oidc-provider/
+    * Traefik2 minimal forward authentication service that provides OAuth/SSO login and authentication for the traefik reverse proxy/load balancer (have several fork)
+            * https://github.com/thomseddon/traefik-forward-auth
     * Traefik2 REST API : https://community.containo.us/t/rest-provider-put-giving-404-when-api-auth-is-enabled/2832/6
     
 * Let's encrypt
