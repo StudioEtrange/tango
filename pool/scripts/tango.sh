@@ -63,7 +63,7 @@ for service in ${TANGO_SERVICES_AVAILABLE}; do
         echo "L-- direct access port : ${__direct_access}"
 
         __urls=
-        __urls_api_get
+        __urls_api_get=
         __urls_api_data=
         __urls_api_rest=
         for u in $(compgen -A variable | grep -Ev DEFAULT | grep ^${service}_HTTP_URL_); do

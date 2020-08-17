@@ -144,6 +144,13 @@ case ${ACTION} in
 		docker-compose logs -t ${TARGET}
 	;;
 
+	letsencrypt )
+		if [ "${TARGET}" = "rm" ]; then
+			rm -f "${TANGO_DATA_PATH/letsencrypt/acme.json}"
+		fi
+		;;
+
+
 	cert )
 		TARGET="$($STELLA_API rel_to_abs_path "${TARGET}" "${TANGO_CURRENT_RUNNING_DIR}")"
 		if [ -d "${TARGET}" ]; then

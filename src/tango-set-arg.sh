@@ -18,6 +18,7 @@ usage() {
 	echo "L     plugins <exec-service> <service>|<exec> <plugin>: exec all plugin attached to a service OR exec a plugin into all serviced attached."
 	echo "o-- various commands :"
 	echo "L		cert <path> --domain=<domain> : generate self signed certificate for a domain into a current host folder."
+	echo "L		letsencrypt rm : delete generated letsencrypt cert"
 	echo "L		vendor <path> : copy tango into another path (inside a tango folder : <path>/tango), mainly to vendorize tango into another app."
 }
 
@@ -28,7 +29,7 @@ usage() {
 
 # COMMAND LINE
 PARAMETERS="
-ACTION=										'action' 			a				'update info shell up down status install logs restart modules plugins cert vendor' '1'
+ACTION=										'action' 			a				'update info shell up down status install logs restart modules plugins cert vendor letsencrypt' '1'
 TARGET=										'target' 			s				''	'0'
 ARGUMENT=									'argument' 			s				''	'0'
 "

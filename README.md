@@ -87,6 +87,7 @@ See samples in `samples` folder
 	plugins <exec-service> <service>|<exec> <plugin>: exec all plugin attached to a service OR exec a plugin into all serviced attached.
 
 	cert <path> --domain=<domain> : generate self signed certificate for a domain into a current host folder.
+    letsencrypt rm : delete generated letsencrypt cert
     vendor <path> : copy tango into another path (inside a tango folder : <path>/tango), mainly to vendorize tango into another app.
 
 
@@ -395,6 +396,8 @@ For full list see `tango.internal.env` file
     * `LETS_ENCRYPT=disable` (default value) will disable auto generation
     * `LETS_ENCRYPT=enable` will auto generate a certificate for each services declared in `LETS_ENCRYPT_SERVICES`. (All services by default)
     * `LETS_ENCRYPT=debug` will use the test server of letsencrypt to not reach rate limit (https://letsencrypt.org/fr/docs/rate-limits/)
+
+* NOTE : when you need to fully reset generated certificate, you have to delete the `acme.json` file Use `tango letsencrypt rm` command for that.
 
 ### Let's encrypt and non default port for main area
 
