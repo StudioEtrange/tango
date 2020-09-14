@@ -382,8 +382,8 @@ For full list see `tango.internal.env` file
 
 ### HTTPS redirection
 
+* To enable/disable HTTP to HTTPS redirection engine, set `NETWORK_REDIRECT_HTTPS` variable
 * To enable/disable HTTPS only access to each service, declare them in `NETWORK_SERVICES_REDIRECT_HTTPS` variable. An autosigned certificate will be autogenerate
-    * NOTE : some old plex client do not support HTTPS (like playstation 3) so plex might be exclude from this variable
 
 * ie in user env file : 
     ```

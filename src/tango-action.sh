@@ -5,6 +5,14 @@
 
 
 case ${ACTION} in
+
+	services )
+		if [ "${TARGET}" = "list" ]; then
+			echo "Available services : ${TANGO_SERVICES_AVAILABLE}"
+		fi
+		docker-compose ps
+	;;
+
 	modules )
 		if [ "${TARGET}" = "list" ]; then
 			echo "** Available modules to use as a service"

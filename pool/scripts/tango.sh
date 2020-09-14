@@ -18,6 +18,7 @@ echo "L-- user env file : ${TANGO_USER_ENV_FILE}"
 echo "L-- user compose file : ${TANGO_USER_COMPOSE_FILE}"
 echo "---------==---- INFO SERVICES ----==---------"
 echo "* Available services : ${TANGO_SERVICES_AVAILABLE}"
+echo "* Available subservices : ${TANGO_SUBSERVICES_ROUTER}"
 for service in ${TANGO_SERVICES_AVAILABLE}; do
     service="${service^^}"
     version="${service}_VERSION"
@@ -33,7 +34,12 @@ for service in ${TANGO_SERVICES_AVAILABLE}; do
     # filter information to show
     case ${service} in
         VPN ) info_extended=0; info_variables=0;;
-        * ) info_extended=1; info_variables=1;;
+        ERROR ) info_extended=0; info_variables=1;;
+        * ) info_extended=1; info_variables=0;
+            if [ "$VERBOSE" = "1" ]; then
+                info_variables=1
+            fi
+            ;;
     esac
 
     if [ "${info_extended}" = "1" ]; then
@@ -84,7 +90,10 @@ for service in ${TANGO_SERVICES_AVAILABLE}; do
             fi
             # NOTE crt.sh do not need domain to be reacheable from internet : it is a search engine for certificate
             echo "L-- certificate status : https://crt.sh/?q=${__hostname}"
-            [ "${NETWORK_INTERNET_EXPOSED}" = "1" ] && echo "L-- diagnostic dns, cert, content : https://check-your-website.server-daten.de/?q=${__domain}"
+            if [ "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
+                echo "L-- diagnostic dns, cert, content : https://check-your-website.server-daten.de/?q=${__hostname}"
+                echo "L-- ssl analysis : https://www.ssllabs.com/ssltest/analyze.html?d=${__hostname}"
+            fi
         fi
     fi
     if [ "${info_variables}" = "1" ]; then
@@ -126,7 +135,14 @@ echo "L-- app plugins root : [${TANGO_APP_PLUGINS_ROOT}] {/pool/${TANGO_APP_NAME
 echo "L-- app plugins list : ${TANGO_APP_PLUGINS_AVAILABLE}"
 
 
-echo "---------==---- SERVICES CERTIFICATES ----==---------"
+echo "---------==---- HTTPS REDIRECTION and SSL CERTIFICATES ----==---------"
+echo "* global HTTP to HTTPS redirection engine"
+echo -n "L-- status : "
+case ${NETWORK_REDIRECT_HTTPS} in
+    enable ) t="ENABLED"; echo $t;;
+    * ) t="DISABLED"; echo $t;;
+esac
+echo "L-- HTTP to HTTPS $t on : ${NETWORK_SERVICES_REDIRECT_HTTPS}"
 echo "* Let's encrypt"
 echo -n "L-- status : "
 case ${LETS_ENCRYPT} in

@@ -131,6 +131,9 @@ if [ ! "${ACTION}" = "install" ]; then
 
 	# fill VARIABLES_LIST declared variables from all env files
 	__get_declared_variable_names
+	# add variables and array list itself
+	__add_declared_variables "VARIABLES_LIST"
+	__add_declared_variables "ASSOCIATIVE_ARRAY_LIST"
 	# add to VARIABLES_LIST declared variables from modules env files
 	__add_modules_declared_variable_names
 
@@ -142,9 +145,11 @@ if [ ! "${ACTION}" = "install" ]; then
 	[ "${BUILD}" = "1" ] && BUILD="--build"
 	if [ "${DEBUG}" = "1" ]; then
 		VERBOSE="1"
+		TANGO_LOG_STATE="ON"
+		TANGO_LOG_LEVEL="DEBUG"
 	fi
 	[ "${TANGO_USER_ID}" = "" ] && [ ! "${PUID}" = "" ] && TANGO_USER_ID="${PUID}"
-	[ "${TANGO_GROUP_ID}" = "" ] && [ ! "${PGID}" = "" ] &&  TANGO_GROUP_ID="${PGID}"
+	[ "${TANGO_GROUP_ID}" = "" ] && [ ! "${PGID}" = "" ] && TANGO_GROUP_ID="${PGID}"
 	[ "${TANGO_DOMAIN}" = "" ] && [ ! "${DOMAIN}" = "" ] && TANGO_DOMAIN="${DOMAIN}"
 
 
@@ -160,6 +165,8 @@ if [ ! "${ACTION}" = "install" ]; then
 	fi
 
 	# add variables created at runtime or computed from command line
+	__add_declared_variables "DEBUG"
+	__add_declared_variables "VERBOSE"
 	__add_declared_variables "TANGO_APP_NAME"
 	__add_declared_variables "TANGO_APP_NAME_CAPS"
 
@@ -206,7 +213,7 @@ if [ ! "${ACTION}" = "install" ]; then
 	# 	- default tango env file
 	__update_env_files "ingest with env variables from shell and command line"
 	# load env var
-	. "${GENERATED_ENV_FILE_FOR_BASH}"
+	__load_env_vars
 
 
 
@@ -236,7 +243,9 @@ if [ ! "${ACTION}" = "install" ]; then
 	# traefik rest api password
 	[ "${TRAEFIK_API_USER}" = "" ] && TRAEFIK_API_USER="tango"
 	[ "${TRAEFIK_API_PASSWORD}" = "" ] && TRAEFIK_API_PASSWORD="tango"
-	TRAEFIK_API_HASH_PASSWORD="$($STELLA_API htpasswd_md5 ${TRAEFIK_API_PASSWORD})"
+	#TRAEFIK_API_HASH_PASSWORD=$($STELLA_API htpasswd_md5 "${TRAEFIK_API_PASSWORD}" | tr -dc  "_A-Z-a-z-0-9" | fold -w8 | head -n1)
+	TRAEFIK_API_HASH_PASSWORD="$($STELLA_API htpasswd_md5 "${TRAEFIK_API_PASSWORD}")"
+	#TRAEFIK_API_HASH_PASSWORD="$($STELLA_API md5 "${TRAEFIK_API_PASSWORD}")"
 	__add_declared_variables "TRAEFIK_API_HASH_PASSWORD"
 
 	# change lets encrypt behaviour
@@ -387,6 +396,6 @@ if [ ! "${ACTION}" = "install" ]; then
 	# 	- default values hardcoded and runtume computed
 	__update_env_files "ingest created/modified/translated variables"
 	# load env var
-	. "${GENERATED_ENV_FILE_FOR_BASH}"
+	__load_env_vars
 
 fi

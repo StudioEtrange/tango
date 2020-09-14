@@ -8,6 +8,9 @@ case ${ACTION} in
 		# remove all anonymous volumes
 		docker-compose rm -v -f 1>/dev/null
 		;;
-	cert|letsencrypt|install|logs|modules|vendor)
+	cert|letsencrypt|install|logs|modules|services|vendor)
 		;;
 esac
+
+# exec cached traefik api rest put request
+__traefik_api_rest_update_launch

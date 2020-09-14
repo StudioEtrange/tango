@@ -160,9 +160,9 @@ services:
   # Router
   # traefik launch order do not matter. It can be launched before or after all other services
   # ENTRYPOINT web_admin
-  #     http://traefik.domain:${NETWORK_PORT_ADMIN}          => go to dashboard
+  #     http://traefik.domain:${NETWORK_PORT_ADMIN}           => go to dashboard 
   #     http://traefik.domain:${NETWORK_PORT_ADMIN}/api
-  #     http://traefik.domain:${NETWORK_PORT_ADMIN}/dashboard
+  #     http://traefik.domain:${NETWORK_PORT_ADMIN}/dashboard => go to dashboard
   traefik:
     image: traefik:${TRAEFIK_VERSION:-latest}
     container_name: ${TANGO_INSTANCE_NAME}_traefik
@@ -182,30 +182,30 @@ services:
       # With traefik dashboard enabled, the router rule must catch requests for both /api and /dashboard
       - "traefik.http.routers.traefik_api.rule=HostRegexp(`{subdomain:${TRAEFIK_SUBDOMAIN}}{domain:${TANGO_DOMAIN:-.*}}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`) || PathPrefix(`/`))"
       - "traefik.http.routers.traefik_api.service=api@internal"
-      - "traefik.http.routers.traefik_api.priority=${TRAEFIK_REDIRECT_HTTPS_PRIORITY:-200}"
-      - "traefik.http.routers.traefik_api.middlewares=traefik_api-redirect,traefik_api-redirect2"
+      - "traefik.http.routers.traefik_api.priority=${TRAEFIK_API_PRIORITY}"
+      - "traefik.http.routers.traefik_api.middlewares=traefik_api-redirect,traefik_api-redirect2,error-middleware"
 
       - "traefik.http.routers.traefik_api-secure.entrypoints=${TRAEFIK_ENTRYPOINTS_SECURE:-web_admin_secure}"
       - "traefik.http.routers.traefik_api-secure.rule=HostRegexp(`{subdomain:${TRAEFIK_SUBDOMAIN}}{domain:${TANGO_DOMAIN:-.*}}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`) || PathPrefix(`/`))"
       - "traefik.http.routers.traefik_api-secure.service=api@internal"
-      - "traefik.http.routers.traefik_api-secure.priority=100"
-      - "traefik.http.routers.traefik_api-secure.middlewares=traefik_api-redirect,traefik_api-redirect2"
+      - "traefik.http.routers.traefik_api-secure.priority=${TRAEFIK_API_PRIORITY}"
+      - "traefik.http.routers.traefik_api-secure.middlewares=traefik_api-redirect,traefik_api-redirect2,error-middleware"
       - "traefik.http.routers.traefik_api-secure.tls=true"
-      - "traefik.http.routers.traefik_api-secure.tls.domains[0].main=${TRAEFIK_SUBDOMAIN}}${TANGO_DOMAIN:-.*}"
+      - "traefik.http.routers.traefik_api-secure.tls.domains[0].main=${TRAEFIK_SUBDOMAIN}${TANGO_DOMAIN:-.*}"
 
       - "traefik.http.routers.traefik_api_rest.entrypoints=${TRAEFIK_ENTRYPOINTS:-web_admin}"      
       - "traefik.http.routers.traefik_api_rest.rule=HostRegexp(`{subdomain:${TRAEFIK_SUBDOMAIN}}{domain:${TANGO_DOMAIN:-.*}}`) && PathPrefix(`/api/providers/rest`)"
       - "traefik.http.routers.traefik_api_rest.service=rest@internal"
-      - "traefik.http.routers.traefik_api_rest.priority=${TRAEFIK_API_REST_REDIRECT_HTTPS_PRIORITY:-201}"
-      - "traefik.http.routers.traefik_api_rest.middlewares=traefik_api_rest-auth"
+      - "traefik.http.routers.traefik_api_rest.priority=${TRAEFIK_API_REST_PRIORITY}"
+      - "traefik.http.routers.traefik_api_rest.middlewares=traefik_api_rest-auth,error-middleware"
       
       - "traefik.http.routers.traefik_api_rest-secure.entrypoints=${TRAEFIK_ENTRYPOINTS_SECURE:-web_admin_secure}"
       - "traefik.http.routers.traefik_api_rest-secure.rule=HostRegexp(`{subdomain:${TRAEFIK_SUBDOMAIN}}{domain:${TANGO_DOMAIN:-.*}}`) && PathPrefix(`/api/providers/rest`)"
       - "traefik.http.routers.traefik_api_rest-secure.service=rest@internal"
-      - "traefik.http.routers.traefik_api_rest-secure.priority=101"
-      - "traefik.http.routers.traefik_api_rest-secure.middlewares=traefik_api_rest-auth"
+      - "traefik.http.routers.traefik_api_rest-secure.priority=${TRAEFIK_API_REST_PRIORITY}"
+      - "traefik.http.routers.traefik_api_rest-secure.middlewares=traefik_api_rest-auth,error-middleware"
       - "traefik.http.routers.traefik_api_rest-secure.tls=true"
-      - "traefik.http.routers.traefik_api_rest-secure.tls.domains[0].main=${TRAEFIK_SUBDOMAIN}}${TANGO_DOMAIN:-.*}"
+      - "traefik.http.routers.traefik_api_rest-secure.tls.domains[0].main=${TRAEFIK_SUBDOMAIN}${TANGO_DOMAIN:-.*}"
 
       # redirect /dashboard to /dashboard/
       - "traefik.http.middlewares.traefik_api-redirect.redirectregex.regex=^(http[s]?://[^:/]+(:[0-9]+)?)/dashboard$$"
@@ -213,34 +213,67 @@ services:
       # redirect / to /dashboard/
       - "traefik.http.middlewares.traefik_api-redirect2.redirectregex.regex=^(http[s]?://[^:/]+(:[0-9]+)?)(/)+$$"
       - "traefik.http.middlewares.traefik_api-redirect2.redirectregex.replacement=$${1}/dashboard/"
-      # HTTP to HTTPS redirect routers - catch all HTTP request
+      # HTTP to HTTPS redirect routers - catch all request and redirect to secure entrypoint with HTTPS scheme if it is not the case
       # NOTE : we cannot use the method of set redirect middleware on each routers service because each service routers
       #        may have two entrypoints and middlewares dont know from which entrypoint the request come.
-      #        So we use a global catch all rule, using priority for exclude some services
-      - "traefik.http.routers.http-catchall-web_admin.entrypoints=web_admin"
+      #        So we use a global catch all router rule, using priority for exclude some services
+      # NOTE : a redirect middleware will be dynamicly attached on each of these http-catchall-web_* routers
+      # catch HTTP request on web_admin and web_admin_secure entrypoint
+      - "traefik.http.routers.http-catchall-web_admin.entrypoints=web_admin,web_admin_secure"
       - "traefik.http.routers.http-catchall-web_admin.rule=HostRegexp(`{host:.+}`)"
       - "traefik.http.routers.http-catchall-web_admin.priority=100"
-      - "traefik.http.routers.http-catchall-web_admin.middlewares=redirect-secure-web_admin@docker"
-      - "traefik.http.routers.http-catchall-web_secondary.entrypoints=web_secondary"
+      # catch HTTPS request on web_admin only entrypoint (no need to catch HTTPS on web_admin_secure)
+      - "traefik.http.routers.http-catchall-web_admin_secure.entrypoints=web_admin"
+      - "traefik.http.routers.http-catchall-web_admin_secure.rule=HostRegexp(`{host:.+}`)"
+      - "traefik.http.routers.http-catchall-web_admin_secure.priority=100"
+      - "traefik.http.routers.http-catchall-web_admin_secure.tls=true"
+      
+      # catch HTTP request on web_secondary and web_secondary_secure entrypoint
+      - "traefik.http.routers.http-catchall-web_secondary.entrypoints=web_secondary,web_secondary_secure"
       - "traefik.http.routers.http-catchall-web_secondary.rule=HostRegexp(`{host:.+}`)"
       - "traefik.http.routers.http-catchall-web_secondary.priority=100"
-      - "traefik.http.routers.http-catchall-web_secondary.middlewares=redirect-secure-web_secondary@docker"
-      - "traefik.http.routers.http-catchall-web_main.entrypoints=web_main"
+      # catch HTTPS request on web_secondary only entrypoint (no need to catch HTTPS on web_secondary_secure)
+      - "traefik.http.routers.http-catchall-web_secondary_secure.entrypoints=web_secondary"
+      - "traefik.http.routers.http-catchall-web_secondary_secure.rule=HostRegexp(`{host:.+}`)"
+      - "traefik.http.routers.http-catchall-web_secondary_secure.priority=100"
+      - "traefik.http.routers.http-catchall-web_secondary_secure.tls=true"
+
+      # catch HTTP request on web_main and web_main_secure entrypoint
+      - "traefik.http.routers.http-catchall-web_main.entrypoints=web_main,web_main_secure"
       - "traefik.http.routers.http-catchall-web_main.rule=HostRegexp(`{host:.+}`)"
       - "traefik.http.routers.http-catchall-web_main.priority=100"
-      - "traefik.http.routers.http-catchall-web_main.middlewares=redirect-secure-web_main@docker"
+      # catch HTTPS request on web_main only entrypoint (no need to catch HTTPS on web_main_secure)
+      - "traefik.http.routers.http-catchall-web_main_secure.entrypoints=web_main"
+      - "traefik.http.routers.http-catchall-web_main_secure.rule=HostRegexp(`{host:.+}`)"
+      - "traefik.http.routers.http-catchall-web_main_secure.priority=100"
+      - "traefik.http.routers.http-catchall-web_main_secure.tls=true"
+      
       # HTTP to HTTPS redirect middleware
-      - "traefik.http.middlewares.redirect-secure-web_main.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.redirect-secure-web_main.redirectscheme.permanent=true"
-      - "traefik.http.middlewares.redirect-secure-web_main.redirectscheme.port=${NETWORK_PORT_MAIN_SECURE}"
-      - "traefik.http.middlewares.redirect-secure-web_secondary.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.redirect-secure-web_secondary.redirectscheme.permanent=true"
-      - "traefik.http.middlewares.redirect-secure-web_secondary.redirectscheme.port=${NETWORK_PORT_SECONDARY_SECURE}"
-      - "traefik.http.middlewares.redirect-secure-web_admin.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.redirect-secure-web_admin.redirectscheme.permanent=true"
-      - "traefik.http.middlewares.redirect-secure-web_admin.redirectscheme.port=${NETWORK_PORT_ADMIN_SECURE}"
+      - "traefik.http.middlewares.redirect-web_main_secure.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-web_main_secure.redirectscheme.permanent=true"
+      - "traefik.http.middlewares.redirect-web_main_secure.redirectscheme.port=${NETWORK_PORT_MAIN_SECURE}"
+      - "traefik.http.middlewares.redirect-web_secondary_secure.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-web_secondary_secure.redirectscheme.permanent=true"
+      - "traefik.http.middlewares.redirect-web_secondary_secure.redirectscheme.port=${NETWORK_PORT_SECONDARY_SECURE}"
+      - "traefik.http.middlewares.redirect-web_admin_secure.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-web_admin_secure.redirectscheme.permanent=true"
+      - "traefik.http.middlewares.redirect-web_admin_secure.redirectscheme.port=${NETWORK_PORT_ADMIN_SECURE}"
       # Auth middleware
-      - "traefik.http.middlewares.traefik_api_rest-auth.basicauth.users=${TRAEFIK_API_USER}:${TRAEFIK_API_HASH_PASSWORD}"
+      - 'traefik.http.middlewares.traefik_api_rest-auth.basicauth.users=${TRAEFIK_API_USER}:${TRAEFIK_API_HASH_PASSWORD}'
+      # Security middleware
+      # - "traefik.http.middlewares.security.headers.accesscontrolallowmethods=GET,OPTIONS,PUT"
+      # - "traefik.http.middlewares.security.headers.accesscontrolalloworiginlist=origin-list-or-null"
+      # - "traefik.http.middlewares.security.headers.accesscontrolmaxage=100"
+      # - "traefik.http.middlewares.security.headers.addvaryheader=true"
+      # - "traefik.http.middlewares.security.headers.browserXssFilter=true"
+      # - "traefik.http.middlewares.security.headers.contentTypeNosniff=true"
+      # - "traefik.http.middlewares.security.headers.frameDeny=true"
+      # - "traefik.http.middlewares.security.headers.customFrameOptionsValue=SAMEORIGIN"
+      # - "traefik.http.middlewares.security.headers.referrerPolicy=same-origin"
+      # - 'traefik.http.middlewares.security.headers.featurePolicy=vibrate "self"'
+      # - "traefik.http.middlewares.security.headers.stsIncludeSubdomains=true"
+      # - "traefik.http.middlewares.security.headers.stsPreload=true"
+      # - "traefik.http.middlewares.security.headers.stsSeconds=315360000"
     networks:
       - default
     expose:
@@ -270,17 +303,23 @@ services:
       - "--api.insecure=false"
       - "--global.sendAnonymousUsage=false"
       - "--entrypoints.web_main=true"
-      - "--entrypoints.web_main.address=:80" 
+      - "--entrypoints.web_main.address=:80"
+      #- "--entrypoints.web_main.http.middlewares=security@docker"
       - "--entrypoints.web_main_secure=true"
       - "--entrypoints.web_main_secure.address=:443"
+      #- "--entrypoints.web_main_secure.http.middlewares=security@docker"
       - "--entrypoints.web_secondary=true"
       - "--entrypoints.web_secondary.address=:8000"
+      #- "--entrypoints.web_secondary.http.middlewares=security@docker"
       - "--entrypoints.web_secondary_secure=true"
       - "--entrypoints.web_secondary_secure.address=:8443"
+      #- "--entrypoints.web_secondary_secure.http.middlewares=security@docker"
       - "--entrypoints.web_admin=true"
       - "--entrypoints.web_admin.address=:9000"
+      #- "--entrypoints.web_admin.http.middlewares=security@docker"
       - "--entrypoints.web_admin_secure=true"
       - "--entrypoints.web_admin_secure.address=:9443"
+      #- "--entrypoints.web_admin_secure.http.middlewares=security@docker"
       - "--providers.rest=true"
       - "--providers.rest.insecure=false"
       - "--providers.docker=true"
@@ -291,3 +330,43 @@ services:
       - "--certificatesresolvers.tango=true"
       - "--certificatesresolvers.tango.acme.email=${LETS_ENCRYPT_MAIL}"
       - "--certificatesresolvers.tango.acme.storage=/letsencrypt/acme.json"
+
+
+  # Traefik custom error pages : https://imandrea.me/blog/traefik-custom-404/
+  # Custom error pages : https://github.com/tarampampam/error-pages
+  error:
+    image: tarampampam/error-pages:1.3.1
+    container_name: ${TANGO_INSTANCE_NAME}_error
+    restart: unless-stopped
+    depends_on: 
+      - service_init
+    environment:
+      # https://github.com/tarampampam/error-pages/tree/gh-pages
+      TEMPLATE_NAME: ghost
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      - "traefik.http.services.error.loadbalancer.server.port=8080"
+
+      - "traefik.http.middlewares.error-middleware.errors.status=400-599"
+      - "traefik.http.middlewares.error-middleware.errors.service=error"
+      - 'traefik.http.middlewares.error-middleware.errors.query=/{status}.html'
+
+      # use as "fallback" for any request non matching any router (with priority below normal)
+      # catch unresolved "unknown.domain.com" HTTP request on all entrypoints
+      - "traefik.http.routers.error.rule=HostRegexp(`{host:.+}`)"
+      - "traefik.http.routers.error.priority=${ERROR_PRIORITY}"
+      - "traefik.http.routers.error.entrypoints=web_main,web_main_secure,web_admin,web_admin_secure,web_secondary,web_secondary_secure"
+      - "traefik.http.routers.error.middlewares=error-middleware"
+      # catch unresolved "unknown.domain.com" HTTPS request on all entrypoints
+      - "traefik.http.routers.error-secure.rule=HostRegexp(`{host:.+}`)"
+      - "traefik.http.routers.error-secure.priority=${ERROR_PRIORITY}"
+      - "traefik.http.routers.error-secure.entrypoints=web_main,web_main_secure,web_admin,web_admin_secure,web_secondary,web_secondary_secure"
+      - "traefik.http.routers.error-secure.middlewares=error-middleware"
+      - "traefik.http.routers.error-secure.tls=true"
+      - "traefik.http.routers.error-secure.tls.domains[0].main=*.${TANGO_DOMAIN:-.*}"
+      
+    networks:
+      - default
+    expose:
+      - 8080

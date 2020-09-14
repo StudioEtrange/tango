@@ -1,5 +1,21 @@
 # MANAGE ENV VARIABLES AND FILES GENERATION -----------------
 
+# load all declared variables (including associative arrays)
+__load_env_vars() {
+	. "${GENERATED_ENV_FILE_FOR_BASH}"
+	__load_env_associative_arrays
+}
+
+
+# load all associative arrays
+# https://stackoverflow.com/a/59157715
+__load_env_associative_arrays() {
+	for __array in ${ASSOCIATIVE_ARRAY_LIST}; do
+		__str="declare -A $__array=\"\$__array\""
+		eval $__str
+	done 
+}
+
 # update env files with current declared variables in VARIABLES_LIST
 __update_env_files() {
 	local __text="$1"
@@ -9,8 +25,24 @@ __update_env_files() {
 		[ -z ${!__variable+x} ] || echo "${__variable}=${!__variable}" >> "${GENERATED_ENV_FILE_FOR_COMPOSE}"
 		[ -z ${!__variable+x} ] || echo "${__variable}=\"$(echo ${!__variable} | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\$/\\$/g')\"" >> "${GENERATED_ENV_FILE_FOR_BASH}"	
 	done
+
+	# store associative arrays
+	# to load stored associative arrays from compose env file see __load_env_associative_arrays
+	# https://stackoverflow.com/a/59157715
+	for __array in ${ASSOCIATIVE_ARRAY_LIST}; do
+		# note : use this to store array name and get its length
+		declare -n array_name="$__array"
+		if [ ${#array_name[@]} -gt 0 ]; then
+			__content="$(printf "%q" "$(declare -p $__array | cut -d= -f2-)")"
+			echo "${__array}=${__content}" >> "${GENERATED_ENV_FILE_FOR_COMPOSE}"
+			declare -p $__array >> "${GENERATED_ENV_FILE_FOR_BASH}"
+		fi
+	done
+
+	
 }
 
+# extract declared variable names from various env files (tango, app and user env files)
 __get_declared_variable_names() {
 	VARIABLES_LIST=""
 	[ -f "${TANGO_ENV_FILE}" ] && VARIABLES_LIST="$(sed -e '/^[[:space:]]*$/d' -e '/^[#]\+.*$/d' -e 's/^\([^=+]*\)+\?=\(.*\)$/\1/g' "${TANGO_ENV_FILE}")"
@@ -38,14 +70,19 @@ __add_modules_declared_variable_names() {
 
 
 
-# add variables to variables list
+# add variables to variables list to be stored in env files
 __add_declared_variables() {
 	VARIABLES_LIST="${VARIABLES_LIST} $1"
 }
 
+# add associative array to arrays list to be stored in env files
+__add_declared_associative_array() {
+	ASSOCIATIVE_ARRAY_LIST="${ASSOCIATIVE_ARRAY_LIST} ${1}"
+}
 
 
-# generate an env file to be uses as env-file in environment section of docker compose file (GENERATED_ENV_FILE_FOR_COMPOSE)
+
+# generate an env file from various env files (tango, app, modules and user env files) to be used as env-file in environment section of docker compose file (GENERATED_ENV_FILE_FOR_COMPOSE)
 __create_env_for_docker_compose() {
 	echo "# ------ CREATE : create_env_for_docker_compose : $(date)" > "${GENERATED_ENV_FILE_FOR_COMPOSE}"
 
@@ -71,7 +108,7 @@ __create_env_for_docker_compose() {
 	__parse_env_file "${GENERATED_ENV_FILE_FOR_COMPOSE}"
 }
 
-# generate an env file to be sourced (GENERATED_ENV_FILE_FOR_BASH)
+# generate an env file from various env files (tango, app, modules and user env files) to be sourced (GENERATED_ENV_FILE_FOR_BASH)
 __create_env_for_bash() {
 	echo "# ------ CREATE : create_env_for_bash : $(date)" > "${GENERATED_ENV_FILE_FOR_BASH}"
 
@@ -157,14 +194,16 @@ __create_docker_compose_file() {
 
 	# user compose file
 	[ -f "${TANGO_USER_COMPOSE_FILE}" ] && yq m -i -a -- "${GENERATED_DOCKER_COMPOSE_FILE}" "${TANGO_USER_COMPOSE_FILE}"
-	
-	
+
 	__set_module_all
 	__set_active_services_all
 	__set_time_all
 	__set_entrypoints_service_all
 	__set_uri_info_service_all
+	__set_priority_router_all
 	__set_redirect_https_service_all
+	# set priority for error router after to override default setted values for any service
+	__set_error_engine
 	__add_service_direct_port_access_all
 	__add_gpu_all
 	__add_volume_artefact_all
@@ -230,7 +269,7 @@ __translate_all_path() {
 __set_active_services_all() {
 	# declare all active service in tango depdenciess
 	for s in ${TANGO_SERVICES_ACTIVE}; do
-		__check_service_exist "${s}" && __add_service_dependency "tango" "${s}" || echo "** WARN : unknow ${s} service declared in TANGO_SERVICES_ACTIVE"
+		__check_docker_compose_service_exist "${s}" && __add_service_dependency "tango" "${s}" || echo "** WARN : unknow ${s} service declared in TANGO_SERVICES_ACTIVE"
 	done
 }
 
@@ -240,7 +279,7 @@ __set_vpn_service_all() {
 	for v in ${VPN_SERVICES_LIST}; do
 		_tmp="${v^^}_SERVICES"
 		for s in ${!_tmp}; do
-			__check_service_exist "${s}" && __set_vpn_service "${s}" "${v}" || echo "** WARN : unknow ${s} service declared in ${_tmp}"
+			__check_docker_compose_service_exist "${s}" && __set_vpn_service "${s}" "${v}" || echo "** WARN : unknow ${s} service declared in ${_tmp}"
 		done
 
 	done
@@ -259,6 +298,8 @@ __create_vpn_all() {
 	done
 
 }
+
+
 
 __set_certificates_all() {
 	
@@ -289,18 +330,18 @@ __add_volume_artefact_all() {
 		f="$($STELLA_API rel_to_abs_path "${f}" "${TANGO_APP_ROOT}")"
 		target="$(basename "${f}")"
 		if [ -f "${f}" ]; then 
-			echo "** [${f}] is a file, not mounted inside folder {${TANGO_ARTEFACT_MOUNT_POINT}}"
+			__tango_log "WARN" "[${f}] is a file, not mounted inside folder {${TANGO_ARTEFACT_MOUNT_POINT}}"
 		else
-			[ ! -d "${f}" ] && echo "** [${f}] is not an existing directory and will be auto created."
+			[ ! -d "${f}" ] && __tango_log "INFO" "[${f}] is not an existing directory and will be auto created."
 			__name="$($STELLA_API md5 "${f}")"
 			__add_volume_local_definition "artefact_${__name}" "${f}"
 			for s in $TANGO_ARTEFACT_SERVICES; do
-				__check_service_exist "${s}" && __add_volume_mapping_service "${s}" "artefact_${__name}:${TANGO_ARTEFACT_MOUNT_POINT}/${target}"
+				__check_docker_compose_service_exist "${s}" && __add_volume_mapping_service "${s}" "artefact_${__name}:${TANGO_ARTEFACT_MOUNT_POINT}/${target}"
 				# NOTE : do not print WARN because a warn is printed for each artefact folder for each undefined services
 				#	|| echo "** WARN : unknow ${s} service declared in TANGO_ARTEFACT_SERVICES"
 				
 			done
-			[ "${VERBOSE}" = "1" ] && echo "** [${f}] will be mapped to {${TANGO_ARTEFACT_MOUNT_POINT}/${target}}"			
+			[ "${VERBOSE}" = "1" ] && __tango_log "DEBUG" "[${f}] will be mapped to {${TANGO_ARTEFACT_MOUNT_POINT}/${target}}"			
 		fi
 	done
 }
@@ -348,7 +389,7 @@ __add_gpu_all() {
 		if [ ! "${gpu}" = "" ]; then
 			service="${s%_GPU}"
 			service="${service,,}"
-			__check_service_exist "${service}" && __add_gpu "${service}" "${gpu}" || echo "** WARN : unknow ${service} service declared in ${s}"
+			__check_docker_compose_service_exist "${service}" && __add_gpu "${service}" "${gpu}" || echo "** WARN : unknow ${service} service declared in ${s}"
 		fi
 	done
 }
@@ -357,11 +398,11 @@ __add_gpu_all() {
 __set_time_all() {
 
 	for s in $TANGO_TIME_VOLUME_SERVICES; do
-		__check_service_exist "${s}" && __add_volume_for_time "$s" || echo "** WARN : unknow ${s} service declared in TANGO_TIME_VOLUME_SERVICES"
+		__check_docker_compose_service_exist "${s}" && __add_volume_for_time "$s" || echo "** WARN : unknow ${s} service declared in TANGO_TIME_VOLUME_SERVICES"
 	done
 
 	for s in $TANGO_TIME_VAR_TZ_SERVICES; do
-		__check_service_exist "${s}" && __add_tz_var_for_time "$s" || echo "** WARN : unknow ${s} service declared in TANGO_TIME_VAR_TZ_SERVICES"
+		__check_docker_compose_service_exist "${s}" && __add_tz_var_for_time "$s" || echo "** WARN : unknow ${s} service declared in TANGO_TIME_VAR_TZ_SERVICES"
 	done
 
 }
@@ -374,18 +415,7 @@ __set_letsencrypt_service_all() {
 	case ${LETS_ENCRYPT} in
 		enable|debug )
 			for serv in ${LETS_ENCRYPT_SERVICES}; do
-				if __check_service_exist "${serv}"; then
-					__add_letsencrypt_service "${serv}"
-					
-					# add lets encrypt support for subservices
-					for sub in ${TANGO_SUBSERVICES}; do
-						case ${sub} in
-							${serv}* ) __add_letsencrypt_service "${serv}" "${sub}";;
-						esac
-					done
-				else
-					echo "** WARN : unknow ${serv} service declared in LETS_ENCRYPT_SERVICES"
-				fi
+				__add_letsencrypt_service "${serv}"
 			done
 
 			case ${LETS_ENCRYPT_CHALLENGE} in
@@ -494,10 +524,10 @@ __set_uri_info_service_all() {
 }
 
 
+# NOTE : a subservie as same entrypoint than its parent service
 __set_entrypoints_service_all() {
-
 	for s in ${NETWORK_SERVICES_AREA_ADMIN}; do
-		if __check_service_exist "${s}"; then
+		if __check_docker_compose_service_exist "${s}"; then
 			__set_entrypoint_service "${s}"  "web_admin"
 			__add_declared_variables "${s^^}_ENTRYPOINTS_DEFAULT"
 			eval "export ${s^^}_ENTRYPOINTS_DEFAULT=web_admin"
@@ -506,7 +536,7 @@ __set_entrypoints_service_all() {
 		fi
 	done
 	for s in ${NETWORK_SERVICES_AREA_SECONDARY}; do
-		if __check_service_exist "${s}"; then
+		if __check_docker_compose_service_exist "${s}"; then
 			__set_entrypoint_service "${s}"  "web_secondary"
 			__add_declared_variables "${s^^}_ENTRYPOINTS_DEFAULT"
 			eval "export ${s^^}_ENTRYPOINTS_DEFAULT=web_secondary"
@@ -515,7 +545,7 @@ __set_entrypoints_service_all() {
 		fi
 	done
 	for s in ${NETWORK_SERVICES_AREA_MAIN}; do
-		if __check_service_exist "${s}"; then
+		if __check_docker_compose_service_exist "${s}"; then
 			__set_entrypoint_service "${s}"  "web_main"
 			__add_declared_variables "${s^^}_ENTRYPOINTS_DEFAULT"
 			eval "export ${s^^}_ENTRYPOINTS_DEFAULT=web_main"
@@ -524,26 +554,65 @@ __set_entrypoints_service_all() {
 		fi
 	done
 
+}
 
+
+
+__set_priority_router_all() {
+	
+
+	local __default_priority=200
+	local __priority=
+
+	local __current_parent=
+	local __previous_parent
+	local __current_offset=0
+	
+	local __parent_saved=
+	for s in ${TANGO_SUBSERVICES_ROUTER}; do
+		__priority=${__default_priority}
+
+		__current_parent="$(__get_subservice_parent "${s}")"
+		if [ ! "${__current_parent}" = "" ]; then
+			if [ "${__current_parent}" = "${__previous_parent}" ]; then
+				# same parent service
+				(( __priority++ ))
+				__set_priority_router "${s}" "${__priority}"
+			else
+				__parent_saved="${__current_parent} ${__parent_saved}"
+				__set_priority_router "${s}" "${__priority}"
+			fi
+		fi
+		__previous_parent="${__current_parent}"
+	done
+
+	# we do not affact priority to service which have subservices
+	local __already_setted_services="$($STELLA_API filter_list_with_list "${TANGO_SERVICES_AVAILABLE}" "${__parent_saved}")"
+	
+	for s in ${__already_setted_services}; do
+		__set_priority_router "${s}" "${__default_priority}"
+	done
 }
 
 __set_redirect_https_service_all() {
-	for s in ${NETWORK_SERVICES_REDIRECT_HTTPS}; do
-		if __check_service_exist "${s}"; then
-			# look if on any entrypoint, we have to override the service router rule with the http-catchall rule
-			for se in ${NETWORK_SERVICES_AREA_ADMIN}; do
-				[ "${se}" = "${s}" ] && __set_redirect_https_service "${s}"  "web_admin"
+	case ${NETWORK_REDIRECT_HTTPS} in
+		enable )
+			yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-web_admin.middlewares=redirect-web_admin_secure@docker"
+			yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-web_secondary.middlewares=redirect-web_secondary_secure@docker"
+			yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-web_main.middlewares=redirect-web_main_secure@docker"
+			yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-web_admin_secure.middlewares=redirect-web_admin_secure@docker"
+			yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-web_secondary_secure.middlewares=redirect-web_secondary_secure@docker"
+			yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-web_main_secure.middlewares=redirect-web_main_secure@docker"
+			
+			for s in ${NETWORK_SERVICES_REDIRECT_HTTPS}; do
+				__set_redirect_https_service "${s}"
 			done
-			for se in ${NETWORK_SERVICES_AREA_SECONDARY}; do
-				[ "${se}" = "${s}" ] && __set_redirect_https_service "${s}"  "web_secondary"
-			done
-			for se in ${NETWORK_SERVICES_AREA_MAIN}; do
-				[ "${se}" = "${s}" ] && __set_redirect_https_service "${s}"  "web_main"
-			done
-		else
-			echo "** WARN : unknow ${s} service declared in NETWORK_SERVICES_REDIRECT_HTTPS"
-		fi
-	done
+			;;
+		* )
+			;;
+	esac
+
+	
 }
 
 
@@ -554,16 +623,16 @@ __add_service_direct_port_access_all() {
 			service="${s%_DIRECT_ACCESS_PORT}"
 			service="${service,,}"
 			
-			if __check_service_exist "${service}"; then
+			if __check_docker_compose_service_exist "${service}"; then
 				port_inside="$(yq r "${GENERATED_DOCKER_COMPOSE_FILE}" services.$service.expose[0])"
 				if [ ! "${port_inside}" = "" ]; then
-					[ "${VERBOSE}" = "1" ] && echo "* Activate direct access to $service : mapping $port to $port_inside"
+					[ "${VERBOSE}" = "1" ] && __tango_log "DEBUG" "Activate direct access to $service : mapping $port to $port_inside"
 					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.$service.ports[+]" "$port:$port_inside"
 				else
-					echo "* WARN : cannot activate direct access to $service through $port : Unknown inside port to map to. Inside port must be declared as first port in expose section."
+					__tango_log "WARN" "cannot activate direct access to $service through $port : Unknown inside port to map to. Inside port must be declared as first port in expose section."
 				fi
 			else
-				echo "** WARN : unknow ${service} service declared in ${s}"
+				__tango_log "WARN" "unknow ${service} service declared in ${s}"
 			fi
 		fi
 	done
@@ -616,7 +685,7 @@ __set_module() {
 
 }
 
-# exec all plugins programmed to auto exec at launch of all active service __exec_plugin_service_active_at_launch_all
+# exec all plugins programmed to auto exec at launch of all active service
 __exec_auto_plugin_service_active_all() {
 	local __plugin
 	for s in ${TANGO_SERVICES_ACTIVE}; do
@@ -936,6 +1005,44 @@ __list_items() {
 
 # FEATURES MANAGEMENT --------
 
+__set_error_engine() {
+	# router order
+	# 	global HTTPS redirection engine disabled
+	#   	first : it search for matching any router (priority 200 by default) 
+	#		second : if not found match error router (priory 180)
+	# 	global HTTPS redirection engine enabled
+    #   	first : match router with HTTPS redirection middleware (priority 100)
+	#		second : it search for matching any router (prioriy 50), 
+	#		lastly : match error router (priory 30)
+
+	__set_priority_router "error" "180"
+	case ${NETWORK_REDIRECT_HTTPS} in
+		enable )
+			# lower error router priority by 150
+			__set_redirect_https_service "error"
+			;;
+	esac
+
+	# activate a widlcard registred domain for match "unknow.domain.com" url
+	# wild card "*.domain" certificate generation is attached to error router
+	# if we use HTTP challenge we cannot generate a wild card domain, it must be in DNS challenge
+	case ${LETS_ENCRYPT} in
+		enable|debug )
+			case ${LETS_ENCRYPT_CHALLENGE} in
+				HTTP )
+					__tango_log "DEBUG" "do not generate a *.domain.com certificate because we use HTTP challenge"
+				;;
+				DNS )
+					__tango_log "DEBUG" "generate a *.domain.com certificate because we use DNS challenge"
+					__add_letsencrypt_service "error"
+				;;
+			esac
+		;;
+	esac
+	
+
+}
+
 __pick_free_port() {
 	local __free_port_list=
 	local __exclude=
@@ -965,6 +1072,7 @@ __pick_free_port() {
 		echo "NETWORK_PORT_ADMIN_SECURE=${__free_port_list[5]}" >> "${GENERATED_ENV_FILE_FREEPORT}"
 	fi
 }
+
 
  __set_vpn_service() {
  	local __service_name="$1"
@@ -1028,11 +1136,25 @@ __create_vpn() {
 }
 
 
-__check_service_exist() {
+__check_docker_compose_service_exist() {
 	local __service="$1"
 	
 	[ ! -z "$(yq r -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.image")" ]
 	return $?
+}
+
+
+# if service is a subservice return parent service
+# parent-service_subservice
+__get_subservice_parent() {
+	local __service="$1"
+	if $STELLA_API list_contains "${TANGO_SUBSERVICES_ROUTER}" "${__service}"; then
+		for s in ${TANGO_SERVICES_AVAILABLE}; do
+			case ${__service} in
+				${s}_* ) echo "${s}"; return ;;
+			esac
+		done
+	fi
 }
 
 
@@ -1096,14 +1218,20 @@ __add_volume_for_time() {
 
 __add_letsencrypt_service() {
 	local __service="$1"
-	local __router="$2"
 
-	[ "${__router}" = "" ] && __router="${__service}"
+	# subservice support
+	local __parent="$(__get_subservice_parent "${__service}")"
+	[ "${__parent}" = "" ] && __parent="${__service}"
 
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.labels[+]" "traefik.http.routers.${__router}-secure.tls.certresolver=tango"
+	if __check_docker_compose_service_exist "${__parent}"; then
+		yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__parent}.labels[+]" "traefik.http.routers.${__service}-secure.tls.certresolver=tango"
+	else
+		echo "** WARN : unknow ${__parent} service declared in LETS_ENCRYPT_SERVICES"
+	fi
 }
 
 # declare an entrypoint to a service as well to the secured version of the entrypoint
+# NOTE : a subservie as same entrypoint than its parent service
 __set_entrypoint_service() {
 	local __service="$1"
 	local __entrypoint="$2"
@@ -1122,27 +1250,33 @@ __set_entrypoint_service() {
 
 }
 
+__set_priority_router() {	
+	local __service="$1"
+	local __priority="$2"
+
+	__service="${__service^^}"
+
+	local __var="${__service}_PRIORITY"
+	eval "export ${__var}=${__priority}"
+	__add_declared_variables "${__var}"
+
+	
+}
+
 # change rule priority of a service to be overriden by the http-catchall rule wich have a prority of 100
 __set_redirect_https_service() {
 	local __service="$1"
 	
 	__service="${__service^^}"
-	local __var="${__service}_REDIRECT_HTTPS_PRIORITY"
 
-	eval "export ${__var}=50"
-	__add_declared_variables "${__var}"
-
-	# NOTE special case for subservices traefik_api_rest, which mush have an higher priority than TRAEFIK_REDIRECT_HTTPS_PRIORITY
-	if [ "${__service}" = "TRAEFIK" ]; then
-		eval "export TRAEFIK_API_REST_REDIRECT_HTTPS_PRIORITY=51"
-		__add_declared_variables "TRAEFIK_API_REST_REDIRECT_HTTPS_PRIORITY"
-	fi
-
+	local __var="${__service}_PRIORITY"
+	__var=${!__var}
+	__var="$(($__var - 150))"
+	__set_priority_router "${__service}" "${__var}" 
 	# DEPRECATED : technique was to add a middleware redirect rule for each service
 	# add only once ',' separator to compose file only if there is other middlewars declarated 
 	# ex : "traefik.http.routers.sabnzbd.middlewares=${SABNZBD_REDIRECT_HTTPS}sabnzbd-stripprefix"
 	# sed -i 's/\(.*\)\${'$__service'_REDIRECT_HTTPS}\([^,].\+\)\"$/\1\${'$__service'_REDIRECT_HTTPS},\2\"/g' "${GENERATED_DOCKER_COMPOSE_FILE}"
-
 }
 
 __add_volume_mapping_service() {
@@ -1177,16 +1311,29 @@ __set_network_as_external() {
 # VARIOUS -----------------
 
 
+__container_is_healthy() {
+    local state="$(docker inspect -f '{{ .State.Health.Status }}' $1 2>/dev/null)"
+    local return_code=$?
+	
+    if [ ! ${return_code} -eq 0 ]; then
+        exit ${RETURN_ERROR}
+    fi
+    if [ "${state}" = "healthy" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
 
 docker-compose() {
 	# NOTE we need to specify project directory because when launching from an other directory, docker compose seems to NOT auto load .env file
 	case ${TANGO_INSTANCE_MODE} in
 		shared ) 
-			[ "${VERBOSE}" = "1" ] && echo COMPOSE_IGNORE_ORPHANS=1 docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_INSTANCE_NAME}" --project-directory "${TANGO_APP_ROOT}" "$@"
+			__tango_log "DEBUG" "COMPOSE_IGNORE_ORPHANS=1 docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_INSTANCE_NAME}" --project-directory "${TANGO_APP_ROOT}" "$@""
 			COMPOSE_IGNORE_ORPHANS=1 command docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_INSTANCE_NAME}" --project-directory "${TANGO_APP_ROOT}" "$@"
 			;;
 		* ) 
-			[ "${VERBOSE}" = "1" ] && echo COMPOSE_IGNORE_ORPHANS=1 docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_APP_NAME}" --project-directory "${TANGO_APP_ROOT}" "$@"
+			__tango_log "DEBUG" "COMPOSE_IGNORE_ORPHANS=1 docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_APP_NAME}" --project-directory "${TANGO_APP_ROOT}" "$@""
 			COMPOSE_IGNORE_ORPHANS=1 command docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_APP_NAME}" --project-directory "${TANGO_APP_ROOT}" "$@"
 			;;
 	esac
@@ -1307,4 +1454,110 @@ __check_lets_encrypt_settings() {
 	esac
 
 	[ ! "${__mode}" = "warn" ] && [ "${__exit}" = "1" ] && exit 1
+}
+
+
+
+
+__tango_log() {
+	local __level="$1"
+	shift 1
+	local __msg="$@"
+
+	if [ "$TANGO_LOG_STATE" = "ON" ]; then
+		_print="0"
+
+		local _color=
+		local _reset_color_for_msg="1"
+		case ${__level} in
+				INFO )
+					_color="clr_bold clr_green"
+				;;
+				WARN )
+					_color="clr_bold"
+				;;
+				ERROR )
+					_color="clr_bold clr_red"
+					_reset_color_for_msg="0"
+				;;
+				DEBUG )
+					_color=
+				;;
+				ASK )
+					_color="clr_bold clr_blue"
+				;;
+		esac
+
+		case $TANGO_LOG_LEVEL in
+			INFO )
+				case ${__level} in
+					INFO|WARN|ERROR|ASK ) _print="1"
+					;;
+				esac
+				;;
+			WARN )
+				case ${__level} in
+					INFO|WARN|ERROR|ASK ) _print="1"
+					;;
+				esac
+			;;
+			ERROR )
+				case ${__level} in
+					INFO|WARN|ERROR|ASK ) _print="1"
+					;;
+				esac
+			;;
+			DEBUG )
+				case ${__level} in
+					INFO|WARN|ERROR|DEBUG|ASK ) _print="1"
+					;;
+				esac
+			;;
+		esac
+
+		if [ "${_print}" = "1" ]; then
+			case ${__level} in
+				# add spaces for tab alignment
+				INFO|WARN ) __level="${__level} ";;
+				ASK ) __level="${__level}  ";;
+			esac
+			if [ "${_color}" = "" ]; then
+				echo "${__level}> ${__msg}"
+			else
+				if [ "${_reset_color_for_msg}" = "1" ]; then
+					${_color} -n "${__level}> "; clr_reset "${__msg}"
+				else
+					${_color} "${__level}> ${__msg}"
+				fi
+			fi
+		fi
+	fi
+}
+
+
+# trash any output
+__tango_log_run_without_output() {
+	if [ "${TANGO_LOG_STATE}" = "ON" ]; then
+		if [ "${TANGO_LOG_LEVEL}" = "DEBUG" ]; then
+			#echo "DEBUG>" $@
+			__tango_log "DEBUG" "$@"
+		fi
+	fi
+
+	if [ "${TANGO_LOG_LEVEL}" = "DEBUG" ]; then
+		"$@"
+	else
+		"$@" 1>/dev/null
+	fi
+}
+
+# usefull when attachin tty (1>/dev/null make terminal disappear)
+__tango_log_run_with_output() {
+	if [ "${TANGO_LOG_STATE}" = "ON" ]; then
+		if [ "${TANGO_LOG_LEVEL}" = "DEBUG" ]; then
+			#echo "DEBUG>" $@
+			__tango_log "DEBUG" "$@"
+		fi
+	fi
+	"$@"
 }

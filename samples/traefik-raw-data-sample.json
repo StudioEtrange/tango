@@ -1,0 +1,716 @@
+{
+    "routers": {
+        "http-catchall-web_admin@docker": {
+            "entryPoints": [
+                "web_admin"
+            ],
+            "middlewares": [
+                "redirect-secure-web_admin@docker"
+            ],
+            "service": "traefik-tango-shared",
+            "rule": "HostRegexp(`{host:.+}`)",
+            "priority": 100,
+            "status": "enabled",
+            "using": [
+                "web_admin"
+            ]
+        },
+        "http-catchall-web_main@docker": {
+            "entryPoints": [
+                "web_main"
+            ],
+            "middlewares": [
+                "redirect-secure-web_main@docker"
+            ],
+            "service": "traefik-tango-shared",
+            "rule": "HostRegexp(`{host:.+}`)",
+            "priority": 100,
+            "status": "enabled",
+            "using": [
+                "web_main"
+            ]
+        },
+        "http-catchall-web_secondary@docker": {
+            "entryPoints": [
+                "web_secondary"
+            ],
+            "middlewares": [
+                "redirect-secure-web_secondary@docker"
+            ],
+            "service": "traefik-tango-shared",
+            "rule": "HostRegexp(`{host:.+}`)",
+            "priority": 100,
+            "status": "enabled",
+            "using": [
+                "web_secondary"
+            ]
+        },
+        "medusa-secure@docker": {
+            "entryPoints": [
+                "web_secondary_secure"
+            ],
+            "service": "medusa",
+            "rule": "HostRegexp(`{subdomain:medusa.}{domain:chimere-harpie.org}`)",
+            "tls": {
+                "certResolver": "tango",
+                "domains": [
+                    {
+                        "main": "medusa.chimere-harpie.org"
+                    }
+                ]
+            },
+            "status": "enabled",
+            "using": [
+                "web_secondary_secure"
+            ]
+        },
+        "medusa@docker": {
+            "entryPoints": [
+                "web_secondary"
+            ],
+            "service": "medusa",
+            "rule": "HostRegexp(`{subdomain:medusa.}{domain:chimere-harpie.org}`)",
+            "priority": 50,
+            "status": "enabled",
+            "using": [
+                "web_secondary"
+            ]
+        },
+        "ombi-secure@docker": {
+            "entryPoints": [
+                "web_secondary_secure"
+            ],
+            "service": "ombi",
+            "rule": "HostRegexp(`{subdomain:ombi.}{domain:chimere-harpie.org}`)",
+            "tls": {
+                "certResolver": "tango",
+                "domains": [
+                    {
+                        "main": "ombi.chimere-harpie.org"
+                    }
+                ]
+            },
+            "status": "enabled",
+            "using": [
+                "web_secondary_secure"
+            ]
+        },
+        "ombi@docker": {
+            "entryPoints": [
+                "web_secondary"
+            ],
+            "service": "ombi",
+            "rule": "HostRegexp(`{subdomain:ombi.}{domain:chimere-harpie.org}`)",
+            "priority": 50,
+            "status": "enabled",
+            "using": [
+                "web_secondary"
+            ]
+        },
+        "organizr2-secure@docker": {
+            "entryPoints": [
+                "web_main_secure"
+            ],
+            "service": "organizr2",
+            "rule": "HostRegexp(`{subdomain:media.}{domain:chimere-harpie.org}`)",
+            "tls": {
+                "certResolver": "tango",
+                "domains": [
+                    {
+                        "main": "media.chimere-harpie.org"
+                    }
+                ]
+            },
+            "status": "enabled",
+            "using": [
+                "web_main_secure"
+            ]
+        },
+        "organizr2@docker": {
+            "entryPoints": [
+                "web_main"
+            ],
+            "service": "organizr2",
+            "rule": "HostRegexp(`{subdomain:media.}{domain:chimere-harpie.org}`)",
+            "priority": 50,
+            "status": "enabled",
+            "using": [
+                "web_main"
+            ]
+        },
+        "plex-secure@docker": {
+            "entryPoints": [
+                "web_main_secure"
+            ],
+            "service": "plex",
+            "rule": "HostRegexp(`{subdomain:plex.}{domain:chimere-harpie.org}`)",
+            "tls": {
+                "certResolver": "tango",
+                "domains": [
+                    {
+                        "main": "plex.chimere-harpie.org"
+                    }
+                ]
+            },
+            "status": "enabled",
+            "using": [
+                "web_main_secure"
+            ]
+        },
+        "plex@docker": {
+            "entryPoints": [
+                "web_main"
+            ],
+            "service": "plex",
+            "rule": "HostRegexp(`{subdomain:plex.}{domain:chimere-harpie.org}`)",
+            "priority": 200,
+            "status": "enabled",
+            "using": [
+                "web_main"
+            ]
+        },
+        "sabnzbd-secure@docker": {
+            "entryPoints": [
+                "web_secondary_secure"
+            ],
+            "middlewares": [
+                "sabnzbd-stripprefix@docker"
+            ],
+            "service": "sabnzbd",
+            "rule": "HostRegexp(`{subdomain:sabnzbd.}{domain:chimere-harpie.org}`) || HostRegexp(`{domain:chimere-harpie.org}`) \u0026\u0026 PathPrefix(`/sabnzbd`)",
+            "tls": {
+                "certResolver": "tango",
+                "domains": [
+                    {
+                        "main": "sabnzbd.chimere-harpie.org"
+                    }
+                ]
+            },
+            "status": "enabled",
+            "using": [
+                "web_secondary_secure"
+            ]
+        },
+        "sabnzbd@docker": {
+            "entryPoints": [
+                "web_secondary"
+            ],
+            "middlewares": [
+                "sabnzbd-stripprefix@docker"
+            ],
+            "service": "sabnzbd",
+            "rule": "HostRegexp(`{subdomain:sabnzbd.}{domain:chimere-harpie.org}`) || HostRegexp(`{domain:chimere-harpie.org}`) \u0026\u0026 PathPrefix(`/sabnzbd`)",
+            "priority": 50,
+            "status": "enabled",
+            "using": [
+                "web_secondary"
+            ]
+        },
+        "tautulli-secure@docker": {
+            "entryPoints": [
+                "web_secondary_secure"
+            ],
+            "service": "tautulli",
+            "rule": "HostRegexp(`{subdomain:tautulli.}{domain:chimere-harpie.org}`)",
+            "tls": {
+                "certResolver": "tango",
+                "domains": [
+                    {
+                        "main": "tautulli.chimere-harpie.org"
+                    }
+                ]
+            },
+            "status": "enabled",
+            "using": [
+                "web_secondary_secure"
+            ]
+        },
+        "tautulli@docker": {
+            "entryPoints": [
+                "web_secondary"
+            ],
+            "service": "tautulli",
+            "rule": "HostRegexp(`{subdomain:tautulli.}{domain:chimere-harpie.org}`)",
+            "priority": 50,
+            "status": "enabled",
+            "using": [
+                "web_secondary"
+            ]
+        },
+        "traefik-secure@docker": {
+            "entryPoints": [
+                "web_admin",
+                "web_admin_secure",
+                "web_main",
+                "web_main_secure",
+                "web_secondary",
+                "web_secondary_secure"
+            ],
+            "service": "traefik-tango-shared",
+            "rule": "Host(`traefik-tango-shared`)",
+            "tls": {
+                "certResolver": "tango"
+            },
+            "status": "enabled",
+            "using": [
+                "web_admin",
+                "web_admin_secure",
+                "web_main",
+                "web_main_secure",
+                "web_secondary",
+                "web_secondary_secure"
+            ]
+        },
+        "traefik_api-secure@docker": {
+            "entryPoints": [
+                "web_admin_secure"
+            ],
+            "middlewares": [
+                "traefik_api-redirect@docker",
+                "traefik_api-redirect2@docker"
+            ],
+            "service": "api@internal",
+            "rule": "HostRegexp(`{subdomain:traefik.}{domain:chimere-harpie.org}`) \u0026\u0026 (PathPrefix(`/dashboard`) || PathPrefix(`/api`) || PathPrefix(`/`))",
+            "priority": 100,
+            "tls": {
+                "certResolver": "tango",
+                "domains": [
+                    {
+                        "main": "traefik.}chimere-harpie.org"
+                    }
+                ]
+            },
+            "status": "enabled",
+            "using": [
+                "web_admin_secure"
+            ]
+        },
+        "traefik_api@docker": {
+            "entryPoints": [
+                "web_admin"
+            ],
+            "middlewares": [
+                "traefik_api-redirect@docker",
+                "traefik_api-redirect2@docker"
+            ],
+            "service": "api@internal",
+            "rule": "HostRegexp(`{subdomain:traefik.}{domain:chimere-harpie.org}`) \u0026\u0026 (PathPrefix(`/dashboard`) || PathPrefix(`/api`) || PathPrefix(`/`))",
+            "priority": 50,
+            "status": "enabled",
+            "using": [
+                "web_admin"
+            ]
+        },
+        "traefik_api_rest-secure@docker": {
+            "entryPoints": [
+                "web_admin_secure"
+            ],
+            "middlewares": [
+                "traefik_api_rest-auth@docker"
+            ],
+            "service": "rest@internal",
+            "rule": "HostRegexp(`{subdomain:traefik.}{domain:chimere-harpie.org}`) \u0026\u0026 PathPrefix(`/api/providers/rest`)",
+            "priority": 101,
+            "tls": {
+                "certResolver": "tango",
+                "domains": [
+                    {
+                        "main": "traefik.}chimere-harpie.org"
+                    }
+                ]
+            },
+            "status": "enabled",
+            "using": [
+                "web_admin_secure"
+            ]
+        },
+        "traefik_api_rest@docker": {
+            "entryPoints": [
+                "web_admin"
+            ],
+            "middlewares": [
+                "traefik_api_rest-auth@docker"
+            ],
+            "service": "rest@internal",
+            "rule": "HostRegexp(`{subdomain:traefik.}{domain:chimere-harpie.org}`) \u0026\u0026 PathPrefix(`/api/providers/rest`)",
+            "priority": 51,
+            "status": "enabled",
+            "using": [
+                "web_admin"
+            ]
+        },
+        "transmission-secure@docker": {
+            "entryPoints": [
+                "web_secondary_secure"
+            ],
+            "service": "transmission",
+            "rule": "HostRegexp(`{subdomain:transmission.}{domain:chimere-harpie.org}`)",
+            "tls": {
+                "certResolver": "tango",
+                "domains": [
+                    {
+                        "main": "transmission.chimere-harpie.org"
+                    }
+                ]
+            },
+            "status": "enabled",
+            "using": [
+                "web_secondary_secure"
+            ]
+        },
+        "transmission@docker": {
+            "entryPoints": [
+                "web_secondary"
+            ],
+            "service": "transmission",
+            "rule": "HostRegexp(`{subdomain:transmission.}{domain:chimere-harpie.org}`)",
+            "priority": 50,
+            "status": "enabled",
+            "using": [
+                "web_secondary"
+            ]
+        },
+        "web-secure@docker": {
+            "entryPoints": [
+                "web_main_secure"
+            ],
+            "service": "web",
+            "rule": "HostRegexp(`{subdomain:web.}{domain:chimere-harpie.org}`)",
+            "tls": {
+                "certResolver": "tango",
+                "domains": [
+                    {
+                        "main": "web.chimere-harpie.org"
+                    }
+                ]
+            },
+            "status": "enabled",
+            "using": [
+                "web_main_secure"
+            ]
+        },
+        "web@docker": {
+            "entryPoints": [
+                "web_main"
+            ],
+            "service": "web",
+            "rule": "HostRegexp(`{subdomain:web.}{domain:chimere-harpie.org}`)",
+            "priority": 50,
+            "status": "enabled",
+            "using": [
+                "web_main"
+            ]
+        },
+        "web_newsletter-secure@docker": {
+            "entryPoints": [
+                "web_main_secure"
+            ],
+            "service": "tautulli",
+            "rule": "HostRegexp(`{subdomain:web.}{domain:chimere-harpie.org}`) \u0026\u0026 (PathPrefix(`/image`) || PathPrefix(`/newsletter`))",
+            "tls": {
+                "certResolver": "tango",
+                "domains": [
+                    {
+                        "main": "web.chimere-harpie.org"
+                    }
+                ]
+            },
+            "status": "enabled",
+            "using": [
+                "web_main_secure"
+            ]
+        },
+        "web_newsletter@docker": {
+            "entryPoints": [
+                "web_main"
+            ],
+            "service": "tautulli",
+            "rule": "HostRegexp(`{subdomain:web.}{domain:chimere-harpie.org}`) \u0026\u0026 (PathPrefix(`/image`) || PathPrefix(`/newsletter`))",
+            "priority": 50,
+            "status": "enabled",
+            "using": [
+                "web_main"
+            ]
+        }
+    },
+    "middlewares": {
+        "ombi-auth@rest": {
+            "forwardAuth": {
+                "address": "http://organizr2/api/?v1/auth\u0026group=1",
+                "tls": {
+                    "insecureSkipVerify": true
+                }
+            },
+            "status": "enabled"
+        },
+        "redirect-secure-web_admin@docker": {
+            "redirectScheme": {
+                "scheme": "https",
+                "port": "9443",
+                "permanent": true
+            },
+            "status": "enabled",
+            "usedBy": [
+                "http-catchall-web_admin@docker"
+            ]
+        },
+        "redirect-secure-web_main@docker": {
+            "redirectScheme": {
+                "scheme": "https",
+                "port": "443",
+                "permanent": true
+            },
+            "status": "enabled",
+            "usedBy": [
+                "http-catchall-web_main@docker"
+            ]
+        },
+        "redirect-secure-web_secondary@docker": {
+            "redirectScheme": {
+                "scheme": "https",
+                "port": "8443",
+                "permanent": true
+            },
+            "status": "enabled",
+            "usedBy": [
+                "http-catchall-web_secondary@docker"
+            ]
+        },
+        "sabnzbd-stripprefix@docker": {
+            "stripPrefix": {
+                "prefixes": [
+                    "/sabnzbd",
+                    "/sabnzbd/"
+                ],
+                "forceSlash": true
+            },
+            "status": "enabled",
+            "usedBy": [
+                "sabnzbd-secure@docker",
+                "sabnzbd@docker"
+            ]
+        },
+        "traefik_api-redirect2@docker": {
+            "redirectRegex": {
+                "regex": "^(http[s]?://[^:/]+(:[0-9]+)?)(/)+$",
+                "replacement": "${1}/dashboard/"
+            },
+            "status": "enabled",
+            "usedBy": [
+                "traefik_api-secure@docker",
+                "traefik_api@docker"
+            ]
+        },
+        "traefik_api-redirect@docker": {
+            "redirectRegex": {
+                "regex": "^(http[s]?://[^:/]+(:[0-9]+)?)/dashboard$",
+                "replacement": "${1}/dashboard/"
+            },
+            "status": "enabled",
+            "usedBy": [
+                "traefik_api-secure@docker",
+                "traefik_api@docker"
+            ]
+        },
+        "traefik_api_rest-auth@docker": {
+            "basicAuth": {
+                "users": [
+                    "mambo:$apr1$etVLmKTy$MDjXmWOBseqCG.XjIx.SM0"
+                ]
+            },
+            "status": "enabled",
+            "usedBy": [
+                "traefik_api_rest-secure@docker",
+                "traefik_api_rest@docker"
+            ]
+        }
+    },
+    "services": {
+        "api@internal": {
+            "status": "enabled",
+            "usedBy": [
+                "traefik_api-secure@docker",
+                "traefik_api@docker"
+            ]
+        },
+        "dashboard@internal": {
+            "status": "enabled"
+        },
+        "medusa@docker": {
+            "loadBalancer": {
+                "servers": [
+                    {
+                        "url": "http://172.20.0.13:8081"
+                    }
+                ],
+                "passHostHeader": true
+            },
+            "status": "enabled",
+            "usedBy": [
+                "medusa-secure@docker",
+                "medusa@docker"
+            ],
+            "serverStatus": {
+                "http://172.20.0.13:8081": "UP"
+            }
+        },
+        "noop@internal": {
+            "status": "enabled"
+        },
+        "ombi@docker": {
+            "loadBalancer": {
+                "servers": [
+                    {
+                        "url": "http://172.20.0.11:5000"
+                    }
+                ],
+                "passHostHeader": true
+            },
+            "status": "enabled",
+            "usedBy": [
+                "ombi-secure@docker",
+                "ombi@docker"
+            ],
+            "serverStatus": {
+                "http://172.20.0.11:5000": "UP"
+            }
+        },
+        "organizr2@docker": {
+            "loadBalancer": {
+                "servers": [
+                    {
+                        "url": "http://172.20.0.7:80"
+                    }
+                ],
+                "passHostHeader": true
+            },
+            "status": "enabled",
+            "usedBy": [
+                "organizr2-secure@docker",
+                "organizr2@docker"
+            ],
+            "serverStatus": {
+                "http://172.20.0.7:80": "UP"
+            }
+        },
+        "plex@docker": {
+            "loadBalancer": {
+                "servers": [
+                    {
+                        "url": "http://172.20.0.3:32400"
+                    }
+                ],
+                "passHostHeader": true
+            },
+            "status": "enabled",
+            "usedBy": [
+                "plex-secure@docker",
+                "plex@docker"
+            ],
+            "serverStatus": {
+                "http://172.20.0.3:32400": "UP"
+            }
+        },
+        "rest@internal": {
+            "status": "enabled",
+            "usedBy": [
+                "traefik_api_rest-secure@docker",
+                "traefik_api_rest@docker"
+            ]
+        },
+        "sabnzbd@docker": {
+            "loadBalancer": {
+                "servers": [
+                    {
+                        "url": "http://172.20.0.4:8080"
+                    }
+                ],
+                "passHostHeader": true
+            },
+            "status": "enabled",
+            "usedBy": [
+                "sabnzbd-secure@docker",
+                "sabnzbd@docker"
+            ],
+            "serverStatus": {
+                "http://172.20.0.4:8080": "UP"
+            }
+        },
+        "tautulli@docker": {
+            "loadBalancer": {
+                "servers": [
+                    {
+                        "url": "http://172.20.0.2:8181"
+                    }
+                ],
+                "passHostHeader": true
+            },
+            "status": "enabled",
+            "usedBy": [
+                "tautulli-secure@docker",
+                "tautulli@docker",
+                "web_newsletter-secure@docker",
+                "web_newsletter@docker"
+            ],
+            "serverStatus": {
+                "http://172.20.0.2:8181": "UP"
+            }
+        },
+        "traefik-tango-shared@docker": {
+            "loadBalancer": {
+                "servers": [
+                    {
+                        "url": "http://172.20.0.5:80"
+                    }
+                ],
+                "passHostHeader": true
+            },
+            "status": "enabled",
+            "usedBy": [
+                "http-catchall-web_admin@docker",
+                "http-catchall-web_main@docker",
+                "http-catchall-web_secondary@docker",
+                "traefik-secure@docker"
+            ],
+            "serverStatus": {
+                "http://172.20.0.5:80": "UP"
+            }
+        },
+        "transmission@docker": {
+            "loadBalancer": {
+                "servers": [
+                    {
+                        "url": "http://172.20.0.10:9091"
+                    }
+                ],
+                "passHostHeader": true
+            },
+            "status": "enabled",
+            "usedBy": [
+                "transmission-secure@docker",
+                "transmission@docker"
+            ],
+            "serverStatus": {
+                "http://172.20.0.10:9091": "UP"
+            }
+        },
+        "web@docker": {
+            "loadBalancer": {
+                "servers": [
+                    {
+                        "url": "http://172.20.0.8:80"
+                    }
+                ],
+                "passHostHeader": true
+            },
+            "status": "enabled",
+            "usedBy": [
+                "web-secure@docker",
+                "web@docker"
+            ],
+            "serverStatus": {
+                "http://172.20.0.8:80": "UP"
+            }
+        }
+    }
+}
