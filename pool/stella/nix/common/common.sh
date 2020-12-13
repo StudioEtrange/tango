@@ -10,7 +10,30 @@ _STELLA_COMMON_INCLUDED_=1
 # VARIOUS-----------------------------
 
 
+# https://stackoverflow.com/a/17975418
+# https://stackoverflow.com/a/49886076
+# add a scheduled command without duplication
+__crontab_add() {
+	local __cmd="$1"
+	local __username="$2"
+	if [ "${__username}" = "" ]; then
+		( crontab -l 2>/dev/null || : ; echo "${__cmd}" ) | sort - | uniq - | crontab -
+	else
+		( crontab -u ${__username} -l 2>/dev/null || : ; echo "${__cmd}" ) | sort - | uniq - | crontab -u ${__username} -
+	fi
+}
 
+# remove scheduled command without duplication
+# __crontab_remove '0 * * * * /home/me/myfunction myargs > /home/me/myfunction.log 2>&1' "$(id -un)"
+__crontab_remove() {
+	local __cmd="$1"
+	local __username="$2"
+	if [ "${__username}" = "" ]; then
+		( crontab -l 2>/dev/null | grep -v -F "${__cmd}" || : ) | crontab -
+	else
+		( crontab -u ${__username} -l 2>/dev/null | grep -v -F "${__cmd}" || : ) | crontab -u ${__username} -
+	fi
+}
 
 # output a formated table
 # input :
@@ -22,6 +45,7 @@ _STELLA_COMMON_INCLUDED_=1
 #                       __format_table "SEPARATOR "$'\t'""
 # sample :
 #               printf "head_1 "$'\t'" head_2\n val_1 "$'\t'" val_2" | __format_table "ALIGN_RIGHT CELL_DELIMITER |"
+#				printf "head_1 | head_2 | head_3 \n val_1 || val_3" | __format_table "SEPARATOR |"
 __format_table() {
         declare __str
         __str=$(</dev/stdin);
@@ -40,24 +64,25 @@ __format_table() {
                 [ "$o" = "SEPARATOR" ] && __flag_separator="ON"
         done
        
+		# NOTE : -e s/"${__separator}${__separator}"/"${__separator} ${__separator}"/g
+		#		add a blank character for an empty cell because column command have a bug with empty column
         if [ "${__cell_delim}" = "" ]; then
                 if [ "${__align_right}" = "1" ]; then
-                        # NOTE : To work around the requirement entries in the leftmost column must be of equal width« insert a dummy column and remove it later
+                        # NOTE : To work around the requirement entries in the leftmost column must be of equal width insert a dummy column and remove it later
                         #       https://stackoverflow.com/a/18022947/5027535
-                        echo "${__str}" | sed -e s/^/FOO"${__separator}"/ | rev | column -s "${__separator}" -t | rev | cut -c4-
+                        echo "${__str}" | sed -e s/"${__separator}${__separator}"/"${__separator} ${__separator}"/g -e s/"${__separator}${__separator}"/"${__separator} ${__separator}"/g | sed -e s/^/FOO"${__separator}"/ | rev | column -s "${__separator}" -t | rev | cut -c4-
                 else
-                        echo "${__str}" | column -s "${__separator}" -t
+                        echo "${__str}" | sed -e s/"${__separator}${__separator}"/"${__separator} ${__separator}"/g -e s/"${__separator}${__separator}"/"${__separator} ${__separator}"/g | column -s "${__separator}" -t
                 fi
         else
                 if [ "${__align_right}" = "1" ]; then
-                        echo "${__str}" | sed -e s/"${__separator}/${__separator}${__cell_delim}${__separator}"/g | sed -e s/^/FOO"${__separator}"/  | rev | column -s "${__separator}" -t | rev | cut -c4- 
+                        echo "${__str}" | sed -e s/"${__separator}${__separator}"/"${__separator} ${__separator}"/g -e s/"${__separator}${__separator}"/"${__separator} ${__separator}"/g | sed -e s/"${__separator}/${__separator}${__cell_delim}${__separator}"/g | sed -e s/^/FOO"${__separator}"/  | rev | column -s "${__separator}" -t | rev | cut -c4- 
                 else
-                        echo "${__str}" | sed -e s/"${__separator}/${__separator}${__cell_delim}${__separator}"/g | column -s "${__separator}" -t
+                        echo "${__str}" | sed -e s/"${__separator}${__separator}"/"${__separator} ${__separator}"/g -e s/"${__separator}${__separator}"/"${__separator} ${__separator}"/g | sed -e s/"${__separator}/${__separator}${__cell_delim}${__separator}"/g | column -s "${__separator}" -t
                 fi
         fi
-
+		echo -n
 }
-
 
 # return a randomly number list separated by space
 # PARAMETERS
@@ -385,7 +410,7 @@ __get_last_version() {
 	local list="$1"
 	local opt="$2"
 
-	echo $(__sort_version "$list" "$opt DESC") | cut -d' ' -f 1
+	echo $(__sort_version "$list" "$opt DESC LIMIT 1")
 }
 
 # pick a version from a list according to constraint
@@ -403,15 +428,18 @@ __get_last_version() {
 #				^version : pin version and select most recent version with same version part (not exactly like npm)
 #					^1.0 select the latest 1.0.* version (like 1.0.0 or 1.0.4)
 #					^1 select the latest 1.* version (like 1.0.0 or 1.2.4)
-# option :
-# ENDING_CHAR_REVERSE
-# SEP .
+
+# 	options LIMIT n, ENDING_CHAR_REVERSE, SEP c : see __sort_version
+
 #		__select_version_from_list ">1.1.1a" "1.1.0 1.1.1 1.1.1a 1.1.1b" "SEP ."
 # desc list is 1.1.1b 1.1.1a 1.1.1 1.1.0
 # select_version result is : 1.1.1b
 #		__select_version_from_list ">1.1.1b" "1.1.0 1.1.1 1.1.1a 1.1.1b" "SEP ."
 # desc list is 1.1.1b 1.1.1a 1.1.1 1.1.0
 # select_version result is : <none>
+#		__select_version_from_list ">=1.1.1a" "1.1.1 1.1.0 1.1.1a 1.1.1b" "SEP ."
+# desc list is 1.1.1b 1.1.1a 1.1.1 1.1.0
+# select_version result is : 1.1.1a
 #		__select_version_from_list "<=1.1.1c" "1.1.0 1.1.1 1.1.1a 1.1.1b" "SEP ."
 # desc list is 1.1.1b 1.1.1a 1.1.1 1.1.0
 # select_version result is : 1.1.1b
@@ -426,10 +454,14 @@ __get_last_version() {
 # select_version result is : 1.1.0
 #		__select_version_from_list "^1.1.1a" "1.1.0 1.1.1 1.1.1a 1.1.1b" "SEP ."
 # desc list is 1.1.1b 1.1.1a 1.1.1 1.1.0
-# select_version result is : 1.1.1b
+# select_version result is : 1.1.1a
 #		__select_version_from_list "^1.0" "1.0.0 1.0.1 1.1.1 1.1.1a 1.1.1b" "SEP ."
 # desc list is 1.1.1b 1.1.1a 1.1.1 1.1.0 1.0.1 1.0.8
 # select_version result is : 1.0.1
+#			__select_version_from_list "^1.1" "1.1 1.0.0" "SEP ."
+# select_version result is : 1.1
+#			__select_version_from_list "^1.1" "1.1 1.1.0" "SEP ."
+# select_version result is : 1.1.0
 __select_version_from_list() {
 	local selector="$1"
 	local list="$2"
@@ -440,58 +472,77 @@ __select_version_from_list() {
 	local sorted_list=
 	local flag
 	flag=0
+	local exist
+	exist=0
 	case ${selector} in
 		\>=*)
 			selector="${selector:2}"
-			sorted_list="$(__sort_version "${selector} ${list}" "DESC ${opt}")"
-			result="$(echo $sorted_list | cut -d' ' -f 1)"
-			# if selector is the result (equal), we must check if selector exist as is in the orignal list
-			if [ "${result}" = "${selector}" ]; then
-				result=
-				for v in ${list}; do
-					if [ "${v}" = "${selector}" ]; then
+			if __list_contains "${list}" "${selector}"; then
+				exist=1
+				sorted_list="$(__sort_version "${list}" "ASC ${opt}")"
+			else
+				sorted_list="$(__sort_version "${selector} ${list}" "ASC ${opt}")"
+			fi
+			for v in ${sorted_list}; do
+				if [ "${flag}" = "1" ]; then
+					result="${v}"
+					break;
+				fi
+				# if selector is the result (equal), we must check if selector exist as is in the orignal list
+				if [ "${v}" = "${selector}" ]; then
+					if [ "${exist}" = "1" ]; then
 						result="${selector}"
 						break;
+					else
+						flag=1
 					fi
-				done
-			fi
+				fi
+			done
 			;;
 
 
 		\>* )
 			selector="${selector:1}"
-			sorted_list="$(__sort_version "${selector} ${list}" "DESC ${opt}")"
-			result="$(echo $sorted_list | cut -d' ' -f 1)"
-			# if most recent version is equal to selector, so there is no greater version than selector
-			[ "${result}" = "${selector}" ] && result=""
+			if __list_contains "${list}" "${selector}"; then
+				sorted_list="$(__sort_version "${list}" "ASC ${opt}")"
+			else
+				sorted_list="$(__sort_version "${selector} ${list}" "ASC ${opt}")"
+			fi
+			
+			for v in ${sorted_list}; do
+				if [ "${flag}" = "1" ]; then
+					# in case of duplicate element
+					[ "${v}" = "${selector}" ] && continue
+					result="${v}"
+					break;
+				fi
+				if [ "${v}" = "${selector}" ]; then
+					flag=1
+				fi
+			done
 			;;
 
 
 		\<=* )
 			selector="${selector:2}"
-			local selector_value_exist=0
-			# we must check if selector exist as is in the orignal list
-			for v in ${list}; do
-				if [ "${v}" = "${selector}" ]; then
-					selector_value_exist=1
+			if __list_contains "${list}" "${selector}"; then
+				exist=1
+				sorted_list="$(__sort_version "${list}" "DESC ${opt}")"
+			else
+				sorted_list="$(__sort_version "${selector} ${list}" "DESC ${opt}")"
+			fi
+			for v in ${sorted_list}; do
+				if [ "${flag}" = "1" ]; then
+					result="${v}"
 					break;
 				fi
-			done
-
-			sorted_list="$(__sort_version "${selector} ${list}" "DESC ${opt}")"
-			for v in ${sorted_list}; do
-				# we reach the selector, result is the selector itself only if it exist in original list, or the next value
+				# if selector is the result (equal), we must check if selector exist as is in the orignal list
 				if [ "${v}" = "${selector}" ]; then
-					if [ "${selector_value_exist}" = "1" ]; then
-						result="${v}"
-						break
+					if [ "${exist}" = "1" ]; then
+						result="${selector}"
+						break;
 					else
 						flag=1
-					fi
-				else
-					if [ "${flag}" = "1" ]; then
-						result="${v}"
-						break
 					fi
 				fi
 			done
@@ -499,19 +550,21 @@ __select_version_from_list() {
 
 		\<* )
 			selector="${selector:1}"
-			list="${selector} ${list}"
-			sorted_list="$(__sort_version "${list}" "DESC ${opt}")"
+			if __list_contains "${list}" "${selector}"; then
+				sorted_list="$(__sort_version "${list}" "DESC ${opt}")"
+			else
+				sorted_list="$(__sort_version "${selector} ${list}" "DESC ${opt}")"
+			fi
+			
 			for v in ${sorted_list}; do
-				# NOTE : because selector version might exist in original list, we may have duplicate version in list
-				# so while v is selector we do not record value as result
+				if [ "${flag}" = "1" ]; then
+					# in case of duplicate element
+					[ "${v}" = "${selector}" ] && continue
+					result="${v}"
+					break;
+				fi
 				if [ "${v}" = "${selector}" ]; then
 					flag=1
-				else
-					# the result is the next desc value just after selector
-					if [ "${flag}" = "1" ]; then
-						result="${v}"
-						break
-					fi
 				fi
 			done
 			;;
@@ -525,19 +578,18 @@ __select_version_from_list() {
 			for v in ${list}; do
 				case ${v} in
 					# selector exist in list
-					${selector}) 	flag=1;;
+					${selector}) filtered_list="${filtered_list} ${v}"; exist=1;;
 					# matching version in list starting with ${selector}
 					${selector}*) filtered_list="${filtered_list} ${v}";;
 				esac
 			done
-			sorted_list="$(__sort_version "${selector} ${filtered_list}" "DESC ${opt}")"
+			sorted_list="$(__sort_version "${filtered_list}" "DESC ${opt}")"
 			result="$(echo $sorted_list | cut -d' ' -f 1)"
-			# if selector is the result (equal), we use it onlfy if selector exist as is in the orignal list
-			if [ "${result}" = "${selector}" ]; then
-				[ ! "${flag}" = "1" ] && result=
-			fi
 			;;
 
+		"" )
+			result=""
+			;;
 		* )
 			# check if exact version exist
 			for v in ${list}; do
@@ -551,32 +603,228 @@ __select_version_from_list() {
 	echo "${result}"
 }
 
-# sort a list of version
+# __filter_version_list filter versions list with a constraint and return a filtered sorted list in ASC (by default)
+# 	same as __select_version_from_list but return a matching list of versions instead of one picked version
+# 	options LIMIT n, ENDING_CHAR_REVERSE, SEP c : see __sort_version
+#					ASC (default), DESC : will return result filtered list in this order
+# __filter_version_list ">=1.1.0" "1.1.0 1.1.1 1.1.1a 1.1.1b" "SEP ."
+#		1.1.0 1.1.1 1.1.1a 1.1.1b
+# __filter_version_list ">=1.1.1" "1.1.0 1.1.1 1.1.1a 1.1.1b" "SEP ."
+#		1.1.1 1.1.1a 1.1.1b
+# __filter_version_list ">=1.1.1" "1.1.0 1.1.1 1.1.1a 1.1.1b" "SEP . ENDING_CHAR_REVERSE"
+#		1.1.1
+# __filter_version_list "<1.1.0" "1.1.0 1.1.1 1.1.1a 1.1.1b" "SEP ."
+#
+# __filter_version_list "<1.1.1a" "1.1.0 1.1.1 1.1.1a 1.1.1b" "SEP ."
+#		1.1.0 1.1.1
+# __filter_version_list "<=1.1.1a" "1.1.0 1.1.1 1.1.1a 1.1.1b" "SEP ."
+#		1.1.0 1.1.1 1.1.1a
+# __filter_version_list "<=1.1.1a" "1.1.0 1.1.1 1.1.1a 1.1.1b" "SEP . ENDING_CHAR_REVERSE"
+#		1.1.0 1.1.1a
+# __filter_version_list "^1.1.1a" "1.1.0 1.1.1 1.1.1a 1.1.1b" "SEP . ENDING_CHAR_REVERSE"
+#		1.1.1a
+# __filter_version_list "^1.1" "1.1.0 1.1.1 1.1.1a 1.1.1b 1.1" "SEP ."
+#		1.1 1.1.0 1.1.1 1.1.1a 1.1.1b
+# __filter_version_list "^1.1" "1.1.0 1.1.1 1.1.1a 1.1.1b 1.1" "DESC SEP ." 
+#		1.1.1b 1.1.1a 1.1.1 1.1.0 1.1
+# __filter_version_list "1.1" "1.1.0 1.1.1 1.1.1a 1.1.1b 1.1" "SEP ." 
+#		1.1
+# __filter_version_list "" "1.1.0 1.1.1 1.1.1a 1.1.1b 1.1" "SEP ." 
+#		1.1.0 1.1.1 1.1.1a 1.1.1b 1.1
 
-#sorted=$(__sort_version "build507 build510 build403 build4000 build" "ASC")
-#echo $sorted
-# > build build403 build507 build510 build4000
-#sorted=$(__sort_version "1.1.0 1.1.1 1.1.1a 1.1.1b" "ASC SEP .")
-#echo $sorted
-# > 1.1.0 1.1.1 1.1.1a 1.1.1b
-#sorted=$(__sort_version "1.1.0 1.1.1 1.1.1a 1.1.1b" "DESC SEP .")
-#echo $sorted
-# > 1.1.1b 1.1.1a 1.1.1 1.1.0
-#sorted=$(__sort_version "1.1.0 1.1.1 1.1.1alpha 1.1.1beta1 1.1.1beta2" "ASC ENDING_CHAR_REVERSE SEP .")
-#echo $sorted
-# > 1.1.0 1.1.1alpha 1.1.1beta1 1.1.1beta2 1.1.1
-#sorted=$(__sort_version "1.1.0 1.1.1 1.1.1alpha 1.1.1beta1 1.1.1beta2" "DESC ENDING_CHAR_REVERSE SEP .")
-#echo $sorted
-# > 1.1.1 1.1.1beta2 1.1.1beta1 1.1.1alpha 1.1.0
-#sorted=$(__sort_version "1.9.0 1.10.0 1.10.1.1 1.10.1 1.10.1alpha1 1.10.1beta1 1.10.1beta2 1.10.2 1.10.2.1 1.10.2.2 1.10.0RC1 1.10.0RC2" "DESC ENDING_CHAR_REVERSE SEP .")
-#echo $sorted
-# > 1.10.2.2 1.10.2.1 1.10.2 1.10.1.1 1.10.1 1.10.1beta2 1.10.1beta1 1.10.1alpha1 1.10.0 1.10.0RC2 1.10.0RC1 1.9.0
+__filter_version_list() {
+	local selector="$1"
+	local list="$2"
+	local opt="$3"
+	local result=""
+
+	local limit=
+	local __result_order="ASC"
+	local flag_sep="OFF"
+	local flag_limit="OFF"
+	local __sort_opt=
+	for o in $opt; do
+		[ "$o" = "ASC" ] && __result_order="$o"
+		[ "$o" = "DESC" ] && __result_order="$o"
+		[ "$o" = "ENDING_CHAR_REVERSE" ] && __sort_opt="${__sort_opt} ENDING_CHAR_REVERSE"
+		[ "$flag_sep" = "ON" ] && __sort_opt="${__sort_opt} $o" && flag_sep="OFF"
+		[ "$o" = "SEP" ] && flag_sep="ON" && __sort_opt="${__sort_opt} SEP"
+		[ "$flag_limit" = "ON" ] && limit="$o" && flag_limit="OFF"
+		[ "$o" = "LIMIT" ] && flag_limit="ON"
+	done
 
 
-# NOTE : ending characters in a version number can be ordered in the opposite way example :
+	local v
+	local sorted_list=
+	local flag
+	flag=0
+	local exist
+	exist=0
+	case ${selector} in
+		\>=*)
+			selector="${selector:2}"
+			if __list_contains "${list}" "${selector}"; then
+				exist=1
+				sorted_list="$(__sort_version "${list}" "ASC ${__sort_opt}")"
+			else
+				sorted_list="$(__sort_version "${selector} ${list}" "ASC ${__sort_opt}")"
+			fi
+			for v in ${sorted_list}; do
+				if [ "${flag}" = "1" ]; then
+					[ "${__result_order}" = "DESC" ] && result="${v} ${result}" || result="${result} ${v}"
+					continue;
+				fi
+				# if selector is the result (equal), we must check if selector exist as is in the orignal list
+				if [ "${v}" = "${selector}" ]; then
+					if [ "${exist}" = "1" ]; then
+						[ "${__result_order}" = "DESC" ] && result="${selector} ${result}" || result="${result} ${selector}"
+						flag=1
+					else
+						flag=1
+					fi
+				fi
+			done
+			;;
+
+
+		\>* )
+			selector="${selector:1}"
+			if __list_contains "${list}" "${selector}"; then
+				sorted_list="$(__sort_version "${list}" "ASC ${__sort_opt}")"
+			else
+				sorted_list="$(__sort_version "${selector} ${list}" "ASC ${__sort_opt}")"
+			fi
+			
+			for v in ${sorted_list}; do
+				if [ "${flag}" = "1" ]; then
+					# in case of duplicate element
+					[ "${v}" = "${selector}" ] && continue
+					[ "${__result_order}" = "DESC" ] && result="${v} ${result}" || result="${result} ${v}"
+				fi
+				if [ "${v}" = "${selector}" ]; then
+					flag=1
+				fi
+			done
+			;;
+
+
+		\<=* )
+			selector="${selector:2}"
+			if __list_contains "${list}" "${selector}"; then
+				exist=1
+				sorted_list="$(__sort_version "${list}" "DESC ${__sort_opt}")"
+			else
+				sorted_list="$(__sort_version "${selector} ${list}" "DESC ${__sort_opt}")"
+			fi
+			for v in ${sorted_list}; do
+				if [ "${flag}" = "1" ]; then
+					[ "${__result_order}" = "DESC" ] && result="${result} ${v}" || result="${v} ${result}"
+					continue
+				fi
+				# if selector is the result (equal), we must check if selector exist as is in the orignal list
+				if [ "${v}" = "${selector}" ]; then
+					if [ "${exist}" = "1" ]; then
+						[ "${__result_order}" = "DESC" ] && result="${result} ${selector}" || result="${selector} ${result}"
+						flag=1
+					else
+						flag=1
+					fi
+				fi
+			done
+			;;
+
+		\<* )
+			selector="${selector:1}"
+			if __list_contains "${list}" "${selector}"; then
+				sorted_list="$(__sort_version "${list}" "DESC ${__sort_opt}")"
+			else
+				sorted_list="$(__sort_version "${selector} ${list}" "DESC ${__sort_opt}")"
+			fi
+			
+			for v in ${sorted_list}; do
+				if [ "${flag}" = "1" ]; then
+					# in case of duplicate element
+					[ "${v}" = "${selector}" ] && continue
+					[ "${__result_order}" = "DESC" ] && result="${result} ${v}" || result="${v} ${result}"
+				fi
+				if [ "${v}" = "${selector}" ]; then
+					flag=1
+				fi
+			done
+			;;
+
+
+
+		^* )
+			selector="${selector:1}"
+			# filter list only starting with selector AND check if selector exist as is in the orignal list
+			filtered_list=
+			for v in ${list}; do
+				case ${v} in
+					# selector exist in list
+					${selector}) filtered_list="${filtered_list} ${v}"; exist=1;;
+					# matching version in list starting with ${selector}
+					${selector}*) filtered_list="${filtered_list} ${v}";;
+				esac
+			done
+			result="$(__sort_version "${filtered_list}" "${__result_order} ${__sort_opt}")"
+			;;
+
+		"" )
+			result="$(__sort_version "${list}" "${__result_order} ${__sort_opt}")"
+			;;
+		* )
+			# check if exact version exist
+			for v in ${list}; do
+				if [ "${v}" = "${selector}" ]; then
+					result="${v}"
+					break;
+				fi
+			done
+			;;
+	esac
+
+	[ ! "${limit}" = "" ] && echo "${result}" | sed -e 's/^ *//' -e 's/ *$//' | cut -d' ' -f "-${limit}" \
+	 	|| echo "${result}" | sed -e 's/^ *//' -e 's/ *$//'
+
+}
+
+
+
+# sort a list of versions
+
+#__sort_version "build507 build510 build403 build4000 build" "ASC"
+#  build build403 build507 build510 build4000
+#__sort_version "1.1.0 1.1.1 1.1.1a 1.1.1b" "ASC"
+#  1.1.0 1.1.1 1.1.1a 1.1.1b
+#__sort_version "1.1.0 1.1.1 1.1.1a 1.1.1b" "ASC SEP ."
+#  1.1.0 1.1.1 1.1.1a 1.1.1b
+#__sort_version "1.1.0 1.1.1 1.1.1a 1.1.1b" "ASC SEP . ENDING_CHAR_REVERSE"
+#  1.1.0 1.1.1a 1.1.1b 1.1.1
+#__sort_version "1.1.0 1.1.1 1.1.1a 1.1.1b" "DESC"
+#  1.1.1b 1.1.1a 1.1.1 1.1.0
+#__sort_version "1.1.0 1.1.1 1.1.1a 1.1.1b" "DESC SEP ."
+#  1.1.1b 1.1.1a 1.1.1 1.1.0
+#__sort_version "1.1.0 1.1.1 1.1.1a 1.1.1b" "DESC SEP . ENDING_CHAR_REVERSE"
+#  1.1.1 1.1.1b 1.1.1a 1.1.0
+#__sort_version "1.1.0 1.1.1 1.1.1alpha 1.1.1beta1 1.1.1beta2" "ASC ENDING_CHAR_REVERSE SEP ."
+#  1.1.0 1.1.1alpha 1.1.1beta1 1.1.1beta2 1.1.1
+#__sort_version "1.1.0 1.1.1 1.1.1alpha 1.1.1beta1 1.1.1beta2" "DESC ENDING_CHAR_REVERSE SEP ."
+#  1.1.1 1.1.1beta2 1.1.1beta1 1.1.1alpha 1.1.0
+#__sort_version "1.9.0 1.10.0 1.10.1.1 1.10.1 1.10.1alpha1 1.10.1beta1 1.10.1beta2 1.10.2 1.10.2.1 1.10.2.2 1.10.0RC1 1.10.0RC2" "DESC ENDING_CHAR_REVERSE SEP ."
+#  1.10.2.2 1.10.2.1 1.10.2 1.10.1.1 1.10.1 1.10.1beta2 1.10.1beta1 1.10.1alpha1 1.10.0 1.10.0RC2 1.10.0RC1 1.9.0
+
+# options :
+#		ASC : ascending order
+#		DESC : decresacing order
+#  		ENDING_CHAR_REVERSE ending characters in a version number can be ordered in the opposite way example :
 # 			1.0.1 is more recent than 1.0.1beta so in ASC : 1.0.1beta 1.0.1 and in DESC : 1.0.1 1.0.1beta
 # 			To activate this behaviour use "ENDING_CHAR_REVERSE" option
 # 			we must indicate separator with SEP if we use ENDING_CHAR_REVERSE and if there is any separator (obviously)
+#		LIMIT n : limit to a number of result
+# NOTE : characters "}", "!" and "{" may cause problem if they are used in versions strings
+
+
 __sort_version() {
 	local list=$1
 	local opt="$2"
@@ -585,15 +833,18 @@ __sort_version() {
 	local mode="ASC"
 
 	local separator=
-
-	local flag_sep=OFF
+	local limit=
+	local flag_sep="OFF"
+	local flag_limit="OFF"
 	for o in $opt; do
-		[ "$o" = "ASC" ] && mode=$o
-		[ "$o" = "DESC" ] && mode=$o
-		[ "$o" = "ENDING_CHAR_REVERSE" ] && opposite_order_for_ending_chars=ON
+		[ "$o" = "ASC" ] && mode="$o"
+		[ "$o" = "DESC" ] && mode="$o"
+		[ "$o" = "ENDING_CHAR_REVERSE" ] && opposite_order_for_ending_chars="ON"
 		# we need separator only if we use ENDING_CHAR_REVERSE and if there is any separator (obviously)
-		[ "$flag_sep" = "ON" ] && separator="$o" && flag_sep=OFF
-		[ "$o" = "SEP" ] && flag_sep=ON
+		[ "$flag_sep" = "ON" ] && separator="$o" && flag_sep="OFF"
+		[ "$o" = "SEP" ] && flag_sep="ON"
+		[ "$flag_limit" = "ON" ] && limit="$o" && flag_limit="OFF"
+		[ "$o" = "LIMIT" ] && flag_limit="ON"
 	done
 
 	local internal_separator="}"
@@ -607,23 +858,24 @@ __sort_version() {
 		[ "$separator" = "" ] && new_item="$(echo $r | sed "s,\([0-9]*\)\([^0-9]*\)\([0-9]*\),\1$internal_separator\2$internal_separator\3,g" | sed "s,^\([0-9]\),$internal_separator\1," | sed "s,\([0-9]\)$,\1$internal_separator,")"
 
 		if [ "$opposite_order_for_ending_chars" = "OFF" ]; then
-			[ "$mode" = "ASC" ] && substitute=A
-			[ "$mode" = "DESC" ] && substitute=A
+			# ! is before A (in C locale)
+			[ "$mode" = "ASC" ] && substitute="?"
+			[ "$mode" = "DESC" ] && substitute="?"
 		else
-			[ "$mode" = "ASC" ] && substitute=z
-			[ "$mode" = "DESC" ] && substitute=z
+			# { is after z (in C locale)
+			[ "$mode" = "ASC" ] && substitute="{"
+			[ "$mode" = "DESC" ] && substitute="{"
 		fi
 
 		[ ! "$separator" = "" ] && new_item="$(echo $new_item | sed "s,\\$separator,$substitute,g")"
 
 		new_list="$new_list $new_item"
 		match_list="$new_item $r $match_list"
-
 		number_of_block="${new_item//[^$internal_separator]}"
-		[ "${#number_of_block}" -gt "$max_number_of_block" ] && max_number_of_block="${#number_of_block}"
+		number_of_block=${#number_of_block}
+		[ "${number_of_block}" -gt "$max_number_of_block" ] && max_number_of_block="${number_of_block}"
 	done
-	max_number_of_block=$[max_number_of_block +1]
-
+	
 	# we detect block made with non-number characters for reverse order of block with non-number characters (except the first one)
 	local count=0
 	local b
@@ -631,11 +883,12 @@ __sort_version() {
 	local char_block_list=
 
 	for i in $new_list; do
+		
+		# the first empty block count as firt
+		# here there is 3 blocks, not ot 2 : }build} }build}4000} }build}403} }build}507} }build}510}
 		count=1
-
 		for b in $(echo $i | tr "$internal_separator" "\n"); do
 			count=$[$count +1]
-
 			if [ ! "$(echo $b | sed "s,[0-9]*,,g")" = "" ]; then
 				char_block_list="$char_block_list $count"
 			fi
@@ -646,33 +899,44 @@ __sort_version() {
 	# note : for non-number characters : first non-number character is sorted as wanted (ASC or DESC) and others non-number characters are sorted in the opposite way
 	# example : 1.0.1 is more recent than 1.0.1beta so in ASC : 1.0.1beta 1.0.1 and in DESC : 1.0.1 1.0.1beta
 	# example : build400 is more recent than build300 so in ASC : build300 build400 and in DESC : build400 build300
-	count=0
+
 	local sorted_arg=
+
+	# first empty arg
+	[ "$mode" = "DESC" ] && sorted_arg="-k 1,1r" || sorted_arg="-k 1,1"
+	
+	count=1
 	local j
-	while [  "$count" -lt "$max_number_of_block" ]; do
+	while [ "$count" -lt "$max_number_of_block" ]; do
 		count=$[$count +1]
 
+		# -k option to sort on a certain column
+		# -r Option: Sorting In Reverse Order
+		# -n Option : To sort numerically
 		block_arg=
 
 		block_is_char=
-		for j in $char_block_list; do
-			[ "$count" = "$j" ] && block_is_char=1
-		done
+		if __list_contains "$char_block_list" "$count"; then
+			block_is_char=1
+		fi
 		if [ "$block_is_char" = "" ]; then
-			block_arg=n$block_arg
-			[ "$mode" = "ASC" ] && block_arg=$block_arg
-			[ "$mode" = "DESC" ] && block_arg=r$block_arg
-		else
-			[ "$mode" = "ASC" ] && block_arg=$block_arg
-			[ "$mode" = "DESC" ] && block_arg=r$block_arg
+			block_arg="n${block_arg}"
 		fi
 
+		[ "$mode" = "DESC" ] && block_arg="r${block_arg}"
+
+		# -k POS1[,POS2]  # we need POS2 or order is broken ;
+		# this will not work :
+		# echo "B.507 A.510 B.403 B.4000" | tr ' ' '\n' | LC_COLLATE=C sort -t'.' -k1,1 -k 2,2n
 		sorted_arg="$sorted_arg -k $count,$count"$block_arg
+		#sorted_arg="$sorted_arg -k $count"$block_arg
 	done
 	[ "$mode" = "ASC" ] && sorted_arg="-t$internal_separator $sorted_arg"
 	[ "$mode" = "DESC" ] && sorted_arg="-t$internal_separator $sorted_arg"
 
-	sorted_list="$(echo "$new_list" | tr ' ' '\n' | sort $(echo "$sorted_arg") | tr '\n' ' ')"
+	# LC_COLLATE=C fix character order
+	# https://unix.stackexchange.com/a/19327
+	sorted_list="$(echo "$new_list" | tr ' ' '\n' | LC_COLLATE=C sort $(echo "$sorted_arg") | tr '\n' ' ')"
 
 	# restore original version strings (alternative to hashtable...)
 	local result_list=
@@ -692,8 +956,9 @@ __sort_version() {
 		done
 	done
 
-	echo "$result_list" | sed -e 's/^ *//' -e 's/ *$//'
 
+	[ ! "${limit}" = "" ] && echo "${result_list}" | sed -e 's/^ *//' -e 's/ *$//' | cut -d' ' -f "-${limit}" \
+	 	|| echo "${result_list}" | sed -e 's/^ *//' -e 's/ *$//'
 }
 
 

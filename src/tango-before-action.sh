@@ -4,21 +4,25 @@
 # ------------------- BEFORE ACTION ----------------------------
 
 case ${ACTION} in
+	# we need nothing
+	# module soulb be able to be launched without any condition
 	install|cert|letsencrypt|modules|services|vendor )
 		;;
-	info )
-		__create_path_all
-		__check_lets_encrypt_settings "warn"
-		__set_certificates_all
-		;;
+	
+	# we need everything for start services and exec plugin
 	up|restart|stop|down|plugins )
 		__create_path_all
 		__check_mandatory_path
 		__check_lets_encrypt_settings
-		__set_certificates_all
+		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __set_certificates_all
 		;;
-	status|logs|shell|update )
+
+	# we just need a docker compose file uptodate
+	# but without blocking control because we need to launch these command even if a control is not valid
+	status|logs|shell|update|info|scripts )
 		__create_path_all
-		__set_certificates_all
+		__check_mandatory_path "warn"
+		__check_lets_encrypt_settings "warn"
+		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __set_certificates_all
 		;;
 esac

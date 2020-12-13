@@ -11,7 +11,7 @@
 * Support gpu device mount for services
 
 
-## Requirements
+## REQUIREMENTS
 
 * bash 4
 * git
@@ -20,7 +20,7 @@
 
 NOTE : tango will auto install other tools like docker-compose
 
-## Usage
+## USAGE
 
 ### Install
 
@@ -71,7 +71,7 @@ See samples in `samples` folder
 
 
 
-## Available Commands
+## AVAILABLE COMMANDS
 
 ```
 	install : deploy this app."
@@ -84,7 +84,7 @@ See samples in `samples` folder
 	update <service> : get last version of docker image service. Will stop service if it was running.
 	shell <service> : launch a shell into a running service.
 	modules|plugins list : list available modules or plugins. A module is a predefined service. A plugin is plug onto a service.
-	plugins <exec-service> <service>|<exec> <plugin>: exec all plugin attached to a service OR exec a plugin into all serviced attached.
+	plugins exec-service <service>|exec <plugin>: exec all plugin attached to a service OR exec a plugin into all serviced attached.
 
 	cert <path> --domain=<domain> : generate self signed certificate for a domain into a current host folder.
     letsencrypt rm : delete generated letsencrypt cert
@@ -241,6 +241,7 @@ For full list see `tango.internal.env` file
     ./tango down <service>
     ```
 
+
 ## Modules 
 
 * There is a list of predefined services named `module`.
@@ -249,6 +250,7 @@ For full list see `tango.internal.env` file
     ./tango modules list
     ```
 
+* A module must be declared before using it
 * To declare a module into the current app 
     * use variable list `TANGO_SERVICES_MODULES` or `--module` command line option
     * `--module` command line option is cumulative with variable list `TANGO_SERVICES_MODULES`
@@ -259,23 +261,24 @@ For full list see `tango.internal.env` file
     CLOUD9_USERNAME=tango CLOUD9_PASSWORD=tango ./tango --module cloud9 --module firefox@secondary --domain mydomain.org --freeport up
     ```
 
-* Module can have other services dependencies and module launch will depends on these dependencies
-
+* Modules can have other services dependencies and module launch will depends on these dependencies
 * Predefined modules and their available variables files are in `pool/modules` folder
-
 * You can define your own modules in your app by putting their matching `.yml` and `.env` files in a `pool/modules` folder of the app
 
 ## Plugins 
 
-* A plugin is a code that will exec into a service
+* A plugin is a script that will be exececuted into a service
     * List plugins :
     ```
     ./tango plugins list
     ```
 
+* Each plugin may have some restrictions and will work only into some specific services
+
 * A plugin can be executed at each service launch or manually with plugins commands
     ```
-    tango plugins <exec-service> <service>|<exec> <plugin>
+    tango plugins exec-service <service>
+    tango plugins exec <plugin>
     ```
 
     * Manually execute all plugins attached to a service
@@ -287,21 +290,24 @@ For full list see `tango.internal.env` file
         ```
         ./tango plugins exec <plugin>
         ```
+    * If the attached service is not running, the plugin cannot be executed
 
-
+* A plugin must be declared before using it
 * To declare a plugin into the current app 
     * use variable list `TANGO_PLUGINS` or `--plugin` command line option
     * `--plugin` command line option is cumulative with variable list `TANGO_PLUGINS`
     * Item format of the list is `<plugin>[%<auto exec at launch into service1>][%!<manual exec into service2>][#arg1][#arg2]`
 
+* Plugins may have data stored in `$APP_DATA_PATH/plugins`
 
+### Plugins usage sample
 
-* Sample that attach `uname` plugin to `firefox` launch and launch `firefox` service
+* Sample that attach `uname` plugin to the start of `firefox` and launch `firefox` service
     ```
     ./tango --plugin uname%firefox --module firefox --domain mydomain.org --freeport up firefox
     ```
 
-* Sample that attach `uname` plugin to `firefox`, launch `firefox` service then exec plugins attached to `firefox`
+* Sample that attach `uname` plugin to `firefox`, launch `firefox` service then exec all plugins attached to `firefox`
     ```
     ./tango --plugin uname%!firefox --module firefox --domain mydomain.org --freeport up firefox
     ./tango plugins exec-service firefox
@@ -309,11 +315,31 @@ For full list see `tango.internal.env` file
 
 
 * Plugin code will be executed inside each attached services
-
 * Predefined plugins are in `pool/plugins` folder
+* You can define your own plugins in your app by putting executable files in a `pool/plugins` folder of the app
 
-* You can define your own modules in your app by putting executable files in a `pool/plugins` folder of the app
+## Scripts
 
+    * These are scripts and are executed directly into the host within the context of tango app. (Meaning they are sourced)
+    * Scripts files must not have extension. They are located in `pool/scripts` folder
+
+        * List scripts :
+        ```
+        ./tango scripts list
+        ```
+        * Manually execute a script
+        ```
+        ./tango scripts <script>
+        ```
+
+    * A script do not need to be declared before using it
+
+    * There are 2 special kind of scripts which are exceptions : init & info scripts which are auto executed into a lightweight container
+        * init scripts are in `pool/scripts_init`
+        * all init scripts are launched by default before all services
+        
+        * info scripts s are in `pool/scripts_info`
+        * all info scripts are launched by default when launching command `info`
 
 
 ## Network Configuration
@@ -356,14 +382,14 @@ For full list see `tango.internal.env` file
 * Any variables values ending with `_PORT` will be excluded from the free TCP ports. (including direct access port, see below)
 
     ```
-    ./tango --module firefox --domain=mydomain.org --freeport up
+    ./tango --freeport --module firefox --domain=mydomain.org up
     ```
     
 
 * `--freeport` will allocate free ports of entrypoint each times a service is started with `up` or `restart` command. These ports are saved in an internal file. When using `info` command `--freeport` will read ports from previously backup ones.
 
     ```
-    ./tango --module firefox --domain=mydomain.org --freeport info
+    ./tango --freeport --module firefox --domain=mydomain.org info
     ```
     
 
@@ -433,8 +459,40 @@ For full list see `tango.internal.env` file
 * If your Docker host also has a dedicated graphics card, the video encoding acceleration of Intel Quick Sync Video may become unavailable when the GPU is in use. 
 * If your computer has an NVIDIA GPU, please install the latest Latest NVIDIA drivers for Linux to make sure that Plex can use your NVIDIA graphics card for video encoding (only) when Intel Quick Sync Video becomes unavailable.
 
-## Tango plugins
 
+
+### TODO
+
+* NVIDIA GPU    
+    * NVIDIA GPU unlock non-pro cards : https://github.com/keylase/nvidia-patch
+
+    * show gpu usage stat
+        ```
+        /usr/lib/plexmediaserver/Plex\ Transcoder -codecs
+        /usr/lib/plexmediaserver/Plex\ Transcoder -encoders
+        nvidia-smi -q -g 0 -d UTILIZATION -l
+        ```
+    * show plex transcode custom ffmpeg
+
+        ```
+        /usr/lib/plexmediaserver/Plex\ Transcoder 
+        -formats            show available formats
+        -muxers             show available muxers
+        -demuxers           show available demuxers
+        -devices            show available devices
+        -codecs             show available codecs
+        -decoders           show available decoders
+        -encoders           show available encoders
+        -bsfs               show available bit stream filters
+        -protocols          show available protocols
+        -filters            show available filters
+        -pix_fmts           show available pixel formats
+        -layouts            show standard channel layouts
+        -sample_fmts        show available audio sample formats
+        -colors             show available color names
+        -hwaccels           show available HW acceleration methods
+
+        ```
 
 
 

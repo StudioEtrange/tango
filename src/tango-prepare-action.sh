@@ -22,6 +22,8 @@ if [ ! "${ACTION}" = "install" ]; then
 	TANGO_APP_COMPOSE_FILE="${TANGO_APP_ROOT}/${TANGO_APP_NAME}.docker-compose.yml"
 	TANGO_APP_MODULES_ROOT="${TANGO_APP_ROOT}/pool/modules"
 	TANGO_APP_PLUGINS_ROOT="${TANGO_APP_ROOT}/pool/plugins"
+	TANGO_APP_SCRIPTS_ROOT="${TANGO_APP_ROOT}/pool/scripts"
+
 
 	# workspace folder
 	TANGO_WORK_ROOT="${TANGO_ROOT}/workspace"
@@ -29,22 +31,28 @@ if [ ! "${ACTION}" = "install" ]; then
 	TANGO_APP_WORK_ROOT="${TANGO_APP_ROOT}/workspace/${TANGO_APP_NAME}"
 	mkdir -p "${TANGO_APP_WORK_ROOT}"
 
-	# available plugins from tango
-	TANGO_PLUGINS_AVAILABLE="$(__list_items "plugin" "tango")"
 	# available modules from tango
 	TANGO_MODULES_AVAILABLE="$(__list_items "module" "tango")"
+	# available plugins from tango
+	TANGO_PLUGINS_AVAILABLE="$(__list_items "plugin" "tango")"
+	# available scripts from tango
+	TANGO_SCRIPTS_AVAILABLE="$(__list_items "script" "tango")"
 	if [ "${TANGO_NOT_IN_APP}" = "1" ]; then
 		TANGO_APP_ENV_FILE=
 		TANGO_APP_COMPOSE_FILE=
-		TANGO_APP_PLUGINS_ROOT=
-		TANGO_APP_PLUGINS_AVAILABLE=
 		TANGO_APP_MODULES_ROOT=
 		TANGO_APP_MODULES_AVAILABLE=
+		TANGO_APP_PLUGINS_ROOT=
+		TANGO_APP_PLUGINS_AVAILABLE=
+		TANGO_APP_SCRIPTS_ROOT=
+		TANGO_APP_SCRIPTS_AVAILABLE=
 	else
-		# available plugins from current app
-		TANGO_APP_PLUGINS_AVAILABLE="$(__list_items "plugin" "app")"
 		# available modules from current app
 		TANGO_APP_MODULES_AVAILABLE="$(__list_items "module" "app")"
+		# available plugins from current app
+		TANGO_APP_PLUGINS_AVAILABLE="$(__list_items "plugin" "app")"
+		# available scripts from current app
+		TANGO_APP_SCRIPTS_AVAILABLE="$(__list_items "script" "app")"
 	fi
 
 	# TANGO USER FILES 
@@ -56,6 +64,9 @@ if [ ! "${ACTION}" = "install" ]; then
 	GENERATED_ENV_FILE_FOR_BASH="${TANGO_APP_ROOT}/generated.${TANGO_APP_NAME}.bash.env"
 	GENERATED_ENV_FILE_FOR_COMPOSE="${TANGO_APP_ROOT}/generated.${TANGO_APP_NAME}.compose.env"
 	GENERATED_ENV_FILE_FREEPORT="${TANGO_APP_ROOT}/generated.${TANGO_APP_NAME}.freeport.env"
+
+	# follow option
+	[ "${FOLLOW}" = 1 ] && FOLLOW="-f " || FOLLOW=
 
 	# load app libs
 	for f in ${TANGO_APP_ROOT}/pool/libs/*; do
@@ -88,7 +99,7 @@ if [ ! "${ACTION}" = "install" ]; then
 	# 	- user env file
 	# 	- app env file
 	# 	- default env file
-	__create_env_for_bash
+	[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __create_env_for_bash
 
 	# modules -----
 	# retrieve TANGO_SERVICES_MODULES defined in env files if no shell env var exist
@@ -102,7 +113,7 @@ if [ ! "${ACTION}" = "install" ]; then
 	# 			- app env file
 	# 			- default env file
 	[ "${extracted_modules_list_from_files}" = "1" ] && __create_env_for_bash
-	# test if some modules are added by command line and add them
+	# test if some modules are declared by command line and add them
 	if [ ! "${MODULE}" = "" ]; then
 		TANGO_SERVICES_MODULES="${TANGO_SERVICES_MODULES} ${MODULE//:/ }"
 	fi
@@ -115,7 +126,7 @@ if [ ! "${ACTION}" = "install" ]; then
 	if [ "${TANGO_PLUGINS}" = "" ]; then
 		TANGO_PLUGINS="$(env -i bash --noprofile --norc -c ". ${GENERATED_ENV_FILE_FOR_BASH}; echo \$TANGO_PLUGINS")"
 	fi
-	# test if some plugins are added by command line and add them
+	# test if some plugins are declared by command line and add them
 	if [ ! "${PLUGIN}" = "" ]; then
 		TANGO_PLUGINS="${TANGO_PLUGINS} ${PLUGIN//:/ }"
 	fi
@@ -124,10 +135,8 @@ if [ ! "${ACTION}" = "install" ]; then
 
 
 
-
-
 	# generate compose env files
-	__create_env_for_docker_compose
+	[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __create_env_for_docker_compose
 
 	# fill VARIABLES_LIST declared variables from all env files
 	__get_declared_variable_names
@@ -191,6 +200,11 @@ if [ ! "${ACTION}" = "install" ]; then
 	__add_declared_variables "TANGO_APP_PLUGINS_AVAILABLE"
 	__add_declared_variables "TANGO_APP_PLUGINS_ROOT"
 
+	__add_declared_variables "TANGO_SCRIPTS_AVAILABLE"
+	__add_declared_variables "TANGO_SCRIPTS_ROOT"
+	__add_declared_variables "TANGO_APP_SCRIPTS_AVAILABLE"
+	__add_declared_variables "TANGO_APP_SCRIPTS_ROOT"
+
 	__add_declared_variables "GENERATED_ENV_FILE_FOR_COMPOSE"
 	__add_declared_variables "GENERATED_ENV_FILE_FREEPORT"
 	__add_declared_variables "TANGO_NOT_IN_APP"
@@ -199,6 +213,7 @@ if [ ! "${ACTION}" = "install" ]; then
 	__add_declared_variables "TANGO_SERVICES_MODULES_FULL"
 	__add_declared_variables "TANGO_PLUGINS"
 	__add_declared_variables "TANGO_PLUGINS_FULL"
+
 
 	__add_declared_variables "TANGO_FREEPORT_MODE"
 
@@ -211,7 +226,7 @@ if [ ! "${ACTION}" = "install" ]; then
 	# 	- modules env file
 	# 	- app env file
 	# 	- default tango env file
-	__update_env_files "ingest with env variables from shell and command line"
+	[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __update_env_files "ingest with env variables from shell and command line"
 	# load env var
 	__load_env_vars
 
@@ -374,7 +389,7 @@ if [ ! "${ACTION}" = "install" ]; then
 	# 	- app env file
 	# 	- default tango env file
 	# 	- default values hardcoded and runtume computed
-	__update_env_files "ingest default hardcoded values and runtime only variables"
+	[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __update_env_files "ingest default hardcoded values and runtime only variables"
 
 
 	# STEP 4 ------ create/transform some values and create docker compose file
@@ -382,7 +397,7 @@ if [ ! "${ACTION}" = "install" ]; then
 	# update path
 	__translate_all_path
 	# generate compose file (this also add some new variables to VARIABLES_LIST)
-	__create_docker_compose_file
+	[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __create_docker_compose_file
 	
 	# update env var 
 	# env var values priority order :
@@ -394,7 +409,7 @@ if [ ! "${ACTION}" = "install" ]; then
 	# 	- app env file
 	# 	- default tango env file
 	# 	- default values hardcoded and runtume computed
-	__update_env_files "ingest created/modified/translated variables"
+	[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __update_env_files "ingest created/modified/translated variables"
 	# load env var
 	__load_env_vars
 

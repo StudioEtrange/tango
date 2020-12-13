@@ -7,16 +7,23 @@ TANGO_ROOT="${_CURRENT_FILE_DIR}"
 STELLA_LOG_STATE="OFF"
 . "${TANGO_ROOT}/stella-link.sh" include
 
+# init tango framework
 . "${TANGO_ROOT}/src/tango-init.sh" $@
 
+# set command line
 . "${TANGO_ROOT}/src/tango-set-arg.sh" $@
 
+# parse command line
 . "${TANGO_ROOT}/src/tango-parse-arg.sh" $@
 
+# generate files, variables, folders and everything for the framework to work
 . "${TANGO_ROOT}/src/tango-prepare-action.sh" $@
 
+# before action hook
 . "${TANGO_ROOT}/src/tango-before-action.sh" $@
 
+# execute requested action
 . "${TANGO_ROOT}/src/tango-action.sh" $@
 
+# after action hook
 . "${TANGO_ROOT}/src/tango-after-action.sh" $@

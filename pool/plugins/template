@@ -9,7 +9,7 @@ done
 
 
 
-PLUGIN="uname"
+PLUGIN="template"
 DATA="/plugins_data/${PLUGIN}"
 
 echo "* Plugin : ${PLUGIN}"
@@ -21,6 +21,5 @@ echo "L-- STEP : setup plugin"
 echo "  -"
 
 echo "L-- STEP : run plugin"
-uname -a
 
 echo "L-- STEP : end plugin"

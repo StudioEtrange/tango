@@ -125,8 +125,8 @@ services:
     networks:
       - default
     command: >
-      bash -c "for f in /pool/tango/scripts/*.sh; do [ -f \"$${f}\" ] && $${f} init; done &&
-      [ ! \"${TANGO_NOT_IN_APP}\" = "1" ] && for f in /pool/${TANGO_APP_NAME}/scripts/*.sh; do [ -f \"$${f}\" ] && $${f} init; done
+      bash -c "for f in /pool/tango/scripts_init/*; do [ -f \"$${f}\" ] && $${f}; done &&
+      [ ! \"${TANGO_NOT_IN_APP}\" = "1" ] && for f in /pool/${TANGO_APP_NAME}/scripts_init/*; do [ -f \"$${f}\" ] && $${f}; done
       "
 
   # info on services
@@ -139,8 +139,8 @@ services:
     networks:
       - default
     command: >
-      bash -c "for f in /pool/tango/scripts/*.sh; do [ -f \"$${f}\" ] && $${f} info; done &&
-      [ ! \"${TANGO_NOT_IN_APP}\" = "1" ] && for f in /pool/${TANGO_APP_NAME}/scripts/*.sh; do [ -f \"$${f}\" ] && $${f} info; done
+      bash -c "for f in /pool/tango/scripts_info/*; do [ -f \"$${f}\" ] && $${f}; done &&
+      [ ! \"${TANGO_NOT_IN_APP}\" = "1" ] && for f in /pool/${TANGO_APP_NAME}/scripts_info/*; do [ -f \"$${f}\" ] && $${f}; done
       "
 
 
@@ -155,6 +155,25 @@ services:
       - default
     command: >
       bash -c "echo Launching VPN."
+
+  # OFELIA DOCS : https://github.com/mcuadros/ofelia/blob/master/docs/jobs.md
+  # TO USE IT declare it in TANGO_SERVICES_DEFAULT and declare OFELIA_VERSION=v0.3.3
+  # ofelia:
+  #   image: mcuadros/ofelia:${OFELIA_VERSION:-v0.3.2}
+  #   container_name: ${TANGO_INSTANCE_NAME}_ofelia
+  #   user: 0:0
+  #   restart: unless-stopped
+  #   privileged: true
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+  #   labels:
+  #     - "${TANGO_INSTANCE_NAME}.managed=true"
+  #     - 'ofelia.job-local.ping-job.schedule=@every 5s'
+  #     - 'ofelia.job-local.ping-job.command=ping'
+  #   networks:
+  #     - default
+  #   command: >
+  #     daemon --docker
 
 
   # Router
@@ -213,6 +232,7 @@ services:
       # redirect / to /dashboard/
       - "traefik.http.middlewares.traefik_api-redirect2.redirectregex.regex=^(http[s]?://[^:/]+(:[0-9]+)?)(/)+$$"
       - "traefik.http.middlewares.traefik_api-redirect2.redirectregex.replacement=$${1}/dashboard/"
+
       # HTTP to HTTPS redirect routers - catch all request and redirect to secure entrypoint with HTTPS scheme if it is not the case
       # NOTE : we cannot use the method of set redirect middleware on each routers service because each service routers
       #        may have two entrypoints and middlewares dont know from which entrypoint the request come.
@@ -227,7 +247,6 @@ services:
       - "traefik.http.routers.http-catchall-web_admin_secure.rule=HostRegexp(`{host:.+}`)"
       - "traefik.http.routers.http-catchall-web_admin_secure.priority=100"
       - "traefik.http.routers.http-catchall-web_admin_secure.tls=true"
-      
       # catch HTTP request on web_secondary and web_secondary_secure entrypoint
       - "traefik.http.routers.http-catchall-web_secondary.entrypoints=web_secondary,web_secondary_secure"
       - "traefik.http.routers.http-catchall-web_secondary.rule=HostRegexp(`{host:.+}`)"
@@ -237,7 +256,6 @@ services:
       - "traefik.http.routers.http-catchall-web_secondary_secure.rule=HostRegexp(`{host:.+}`)"
       - "traefik.http.routers.http-catchall-web_secondary_secure.priority=100"
       - "traefik.http.routers.http-catchall-web_secondary_secure.tls=true"
-
       # catch HTTP request on web_main and web_main_secure entrypoint
       - "traefik.http.routers.http-catchall-web_main.entrypoints=web_main,web_main_secure"
       - "traefik.http.routers.http-catchall-web_main.rule=HostRegexp(`{host:.+}`)"
@@ -258,6 +276,8 @@ services:
       - "traefik.http.middlewares.redirect-web_admin_secure.redirectscheme.scheme=https"
       - "traefik.http.middlewares.redirect-web_admin_secure.redirectscheme.permanent=true"
       - "traefik.http.middlewares.redirect-web_admin_secure.redirectscheme.port=${NETWORK_PORT_ADMIN_SECURE}"
+      # to take care of websocket on HTTPS entrypoint
+      - "traefik.http.middlewares.headers-secure.headers.customrequestheaders.X-Forwarded-Proto=https"
       # Auth middleware
       - 'traefik.http.middlewares.traefik_api_rest-auth.basicauth.users=${TRAEFIK_API_USER}:${TRAEFIK_API_HASH_PASSWORD}'
       # Security middleware

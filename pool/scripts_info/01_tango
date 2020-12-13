@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-MODE="$1"
-[ "${MODE}" = "" ] && MODE="info"
-
-
 echo "---------==---- INFO  ----==---------"
 echo "* Tango current app name : ${TANGO_APP_NAME}"
 echo "L-- standalone app : $([ "${TANGO_NOT_IN_APP}" = "1" ] && echo NO || echo YES)"
@@ -135,6 +131,19 @@ echo "L-- app plugins root : [${TANGO_APP_PLUGINS_ROOT}] {/pool/${TANGO_APP_NAME
 echo "L-- app plugins list : ${TANGO_APP_PLUGINS_AVAILABLE}"
 
 
+echo "---------==---- SCRIPTS ----==---------"
+echo "* Scripts infos"
+echo "L-- a script is executed on host"
+echo "* Available Tango scripts"
+echo "L-- tango scripts root : [${TANGO_SCRIPTS_ROOT}] {/pool/tango/scripts}"
+echo "L-- tango scripts list : ${TANGO_SCRIPTS_AVAILABLE}"
+echo "* Available App scripts"
+echo "L-- app scripts root : [${TANGO_APP_SCRIPTS_ROOT}] {/pool/${TANGO_APP_NAME}/scripts}"
+echo "L-- app scripts list : ${TANGO_APP_SCRIPTS_AVAILABLE}"
+
+
+
+
 echo "---------==---- HTTPS REDIRECTION and SSL CERTIFICATES ----==---------"
 echo "* global HTTP to HTTPS redirection engine"
 echo -n "L-- status : "
@@ -204,9 +213,8 @@ done
 echo "---------==---- PATHS ----==---------"
 echo Format : [host path] is mapped to {inside container path}
 echo App data path : [$APP_DATA_PATH] is mapped to {/data}
-echo Data path of app plugins : [$PLUGINS_DATA_PATH] is mapped to {/plugins_data}
+echo Plugins data path : [$PLUGINS_DATA_PATH] is mapped to {/plugins_data}
 echo Data path of internal tango data : [$TANGO_DATA_PATH] is mapped to {/internal_data}
 echo Artefact folders : [$TANGO_ARTEFACT_FOLDERS] are mapped to {${TANGO_ARTEFACT_MOUNT_POINT:-/artefact}} subfolders
 echo Lets encrypt store file : [$TANGO_DATA_PATH/letsencrypt/acme.json] {/internal_data/letsencrypt/acme.json}
-[ "${MODE}" = "init" ] && chmod 600 /internal_data/letsencrypt/acme.json
 echo Traefik dynamic conf files directory [$TANGO_DATA_PATH/traefikconfig] {/internal_data/traefikconfig}

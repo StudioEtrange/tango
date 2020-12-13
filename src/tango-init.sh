@@ -12,9 +12,16 @@ TANGO_ENV_FILE="${TANGO_ROOT}/tango.internal.env"
 
 TANGO_MODULES_ROOT="${TANGO_ROOT}/pool/modules"
 TANGO_PLUGINS_ROOT="${TANGO_ROOT}/pool/plugins"
+TANGO_SCRIPTS_ROOT="${TANGO_ROOT}/pool/scripts"
 
 TANGO_LOG_STATE="ON"
 TANGO_LOG_LEVEL="INFO"
+
+# controls modification of generated conf files on these tango run
+# usefull to make test run or 
+# or some fonctionalities which need an uptodate context from a previsous run 
+# 	but without modification of generated files
+TANGO_ALTER_GENERATED_FILES="ON"
 
 # associative array for mapping plugins by service that are atteched to
 declare -A TANGO_PLUGINS_BY_SERVICE_FULL

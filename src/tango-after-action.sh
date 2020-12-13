@@ -8,7 +8,7 @@ case ${ACTION} in
 		# remove all anonymous volumes
 		docker-compose rm -v -f 1>/dev/null
 		;;
-	cert|letsencrypt|install|logs|modules|services|vendor)
+	cert|letsencrypt|install|logs|modules|services|vendor|scripts )
 		;;
 esac
 

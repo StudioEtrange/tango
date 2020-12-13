@@ -747,7 +747,7 @@ __exec_plugin() {
 
 # filter existing items
 # split item list between full list and name list
-# build associative array for mapping service and plugin that are atteched to 
+# build associative array for mapping service and plugin that are attached to 
 # type : module | plugin
 __filter_items_exists() {
 	local __type="${1}"
@@ -771,6 +771,7 @@ __filter_items_exists() {
 			__tango_folder="${TANGO_PLUGINS_ROOT}"
 			__file_ext=
 		;;
+	
 	esac
 	__list_names="$(echo "${__list_full}" | sed -e 's/[@%\^#][^ ]* */ /g')"
 
@@ -955,8 +956,8 @@ __parse_item() {
 
 }
 
-# list available modules or plugins
-# type : module | plugin
+# list available modules or plugins or scripts
+# type : module | plugin | script
 # mode : all (default) | app | tango
 __list_items() {
 	local __type="${1}"
@@ -968,6 +969,7 @@ __list_items() {
 	case ${__type} in
 		module ) __app_folder="${TANGO_APP_MODULES_ROOT}"; __tango_folder="${TANGO_MODULES_ROOT}"; __file_ext='*.yml';;
 		plugin ) __app_folder="${TANGO_APP_PLUGINS_ROOT}"; __tango_folder="${TANGO_PLUGINS_ROOT}"; __file_ext='*';;
+		script ) __app_folder="${TANGO_APP_SCRIPTS_ROOT}"; __tango_folder="${TANGO_SCRIPTS_ROOT}"; __file_ext='*';;
 	esac
 
 	local __result=""
@@ -1308,8 +1310,14 @@ __set_network_as_external() {
 }
 
 
-# VARIOUS -----------------
+# DOCKER -----------------
 
+# docker client available
+__is_docker_client_available() {
+	type docker &>/dev/null
+	#which docker 2>/dev/null 1>&2
+	return $?
+}
 
 __container_is_healthy() {
     local state="$(docker inspect -f '{{ .State.Health.Status }}' $1 2>/dev/null)"
@@ -1319,6 +1327,21 @@ __container_is_healthy() {
         exit ${RETURN_ERROR}
     fi
     if [ "${state}" = "healthy" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+
+__container_is_running() {
+    local state="$(docker inspect -f '{{ .State.Status }}' $1 2>/dev/null)"
+    local return_code=$?
+	
+    if [ ! ${return_code} -eq 0 ]; then
+        exit ${RETURN_ERROR}
+    fi
+    if [ "${state}" = "running" ]; then
         return 0
     else
         return 1
@@ -1339,6 +1362,18 @@ docker-compose() {
 	esac
 	
 }
+
+# VARIOUS -----------------
+
+# launch a curl command from a docker image if docker is available or from curl from host if not
+__tango_curl() {
+	if __is_docker_client_available; then
+		docker run --user "${TANGO_USER_ID}:${TANGO_GROUP_ID}" --network "${TANGO_APP_NETWORK_NAME}" --rm curlimages/curl:7.70.0 "$@"
+	else
+		type curl &>/dev/null && curl "$@"
+	fi
+}
+
 
 
 # set an attribute value of a node selected by an xpath expression
@@ -1401,19 +1436,27 @@ __create_path() {
 	local __file=
 
 	if [ ! -d "${__root}" ]; then
-		echo "* WARN : root path ${__root} do not exist"
+		__tango_log "ERROR" "root path ${__root} do not exist"
 		return
 	fi
 
+	__tango_log "DEBUG" "__create_path root : ${__root} folders : ${__list}"
 	for p in ${__list}; do
 		[ "${p}" = "FOLDER" ] && __folder=1 && __file= && continue
 		[ "${p}" = "FILE" ] && __folder= && __file=1 && continue
 		__path="${__root}/${p}"
+		# NOTE : on some case chown throw an error, it might be ignored
 		if [ "${__folder}" = "1" ]; then
-			[ ! -d "${__path}" ] && docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} -v "${__root}":"/foo" ${TANGO_SHELL_IMAGE} bash -c "mkdir -p /foo/${p} && chown ${TANGO_USER_ID}:${TANGO_GROUP_ID} /foo/${p}"
+			if [ ! -d "${__path}" ]; then
+				__msg=$(docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} --network ${TANGO_APP_NETWORK_NAME} -v "${__root}":"/foo" ${TANGO_SHELL_IMAGE} bash -c "mkdir -p /foo/${p} && chown ${TANGO_USER_ID}:${TANGO_GROUP_ID} /foo/${p}")
+				__tango_log "DEBUG" "__create_path msg : ${__msg}"
+			fi
 		fi
 		if [ "${__file}" = "1" ]; then
-			[ ! -f "${__path}" ] && docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} -v "${__root}":"/foo" ${TANGO_SHELL_IMAGE} bash -c "touch /foo/${p} && chown ${TANGO_USER_ID}:${TANGO_GROUP_ID} /foo/${p}"
+			if [ ! -f "${__path}" ]; then
+				__msg=$(docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} --network ${TANGO_APP_NETWORK_NAME} -v "${__root}":"/foo" ${TANGO_SHELL_IMAGE} bash -c "touch /foo/${p} && chown ${TANGO_USER_ID}:${TANGO_GROUP_ID} /foo/${p}")
+				__tango_log "DEBUG" "__create_path msg : ${__msg}"
+			fi
 		fi
 	done
 
@@ -1426,14 +1469,15 @@ __create_path() {
 
 # test if mandatory paths exists
 __check_mandatory_path() {
+	local __mode="$1"
 
 	for p in ${TANGO_PATH_LIST}; do
-		[ ! -d "${!p}" ] && echo "* ERROR : Mandatory root path ${p} [${!p}] do not exist" && exit 1
+		[ ! -d "${!p}" ] && echo "* ERROR : Mandatory root path ${p} [${!p}] do not exist" && [ ! "${__mode}" = "warn" ] && exit 1
 	done 
 
 	if [ ! "${TANGO_ARTEFACT_FOLDERS}" = "" ]; then
 		for f in ${TANGO_ARTEFACT_FOLDERS}; do
-			[ ! -d "${f}" ] && echo "* ERROR : Mandatory declared artefact folder [${f}] do not exist" && exit 1
+			[ ! -d "${f}" ] && echo "* ERROR : Mandatory declared artefact folder [${f}] do not exist" && [ ! "${__mode}" = "warn" ] && exit 1
 		done
 	fi
 }

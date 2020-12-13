@@ -20,11 +20,12 @@ if [ -d "${DATA}" ]; then
     echo "  + ${PLUGIN} already installed in ${DATA}"
 else
     mkdir -p "${DATA}"
-    type curl >/dev/null 2>&1 && {
-        curl -fkSL -o "/tmp/${PLUGIN}-${VERSION}.tar.gz" "https://github.com/KittyKatt/screenFetch/archive/${VERSION}.tar.gz"
-    } || {
-        wget "https://github.com/KittyKatt/screenFetch/archive/${VERSION}.tar.gz" -O "/tmp/${PLUGIN}-${VERSION}.tar.gz" --no-check-certificate
-    }
+    # type curl >/dev/null 2>&1 && {
+    #     curl -fkSL -o "/tmp/${PLUGIN}-${VERSION}.tar.gz" "https://github.com/KittyKatt/screenFetch/archive/${VERSION}.tar.gz"
+    # } || {
+    #     wget "https://github.com/KittyKatt/screenFetch/archive/${VERSION}.tar.gz" -O "/tmp/${PLUGIN}-${VERSION}.tar.gz" --no-check-certificate
+    # }
+    __tango_curl -fkSL -o "/tmp/${PLUGIN}-${VERSION}.tar.gz" "https://github.com/KittyKatt/screenFetch/archive/${VERSION}.tar.gz"
 
     cd "${DATA}"
     tar xzf "/tmp/${PLUGIN}-${VERSION}.tar.gz" --strip-components=1

@@ -44,7 +44,7 @@ __traefik_api_url
 
 # __traefik_api_main_request "GET" "rawdata"
 # NOTE : use non-hashed password here. Hashed password is used only when setting password at traefik launch
-# NOTE : we cannot update a traefik router configuration setted from provider @docker
+# NOTE : we CANNOT update a traefik router configuration setted from provider @docker
 __traefik_api_main_request() {
     __traefik_api_url
     local __http_command="$1"
@@ -63,7 +63,8 @@ __traefik_api_main_request() {
         ;;
     esac
 
-    __result="$(docker run --network "${TANGO_APP_NETWORK_NAME}" --rm curlimages/curl:7.70.0 curl -d "${__body}" -u "${TRAEFIK_API_USER}":"${TRAEFIK_API_PASSWORD}" -X ${__http_command} -skL "${__url}")"
+    #__result="$(docker run --network "${TANGO_APP_NETWORK_NAME}" --rm curlimages/curl:7.70.0 curl -d "${__body}" -u "${TRAEFIK_API_USER}":"${TRAEFIK_API_PASSWORD}" -X ${__http_command} -skL "${__url}")"
+    __result="$(__tango_curl -d "${__body}" -u "${TRAEFIK_API_USER}":"${TRAEFIK_API_PASSWORD}" -X ${__http_command} -skL "${__url}")"
 
 
     case $__http_command in
@@ -75,6 +76,7 @@ __traefik_api_main_request() {
     
 }
 
+# queued PUT request
 GLOBAL_TRAEFIK_PUT_REQUEST_CACHE=
 __traefik_api_rest_update() {
     local __request="$1"
@@ -90,7 +92,7 @@ __traefik_api_rest_update() {
         GLOBAL_TRAEFIK_PUT_REQUEST_CACHE="$(echo "${GLOBAL_TRAEFIK_PUT_REQUEST_CACHE}" "${__request}" | jq --slurp 'reduce .[] as $item ({}; . * $item)')"
 }
 
-# execute cached traefik API rest PUT request
+# execute all queued PUT request to traefik REST API endpoint
 __traefik_api_rest_update_launch() {
     if [ ! "${GLOBAL_TRAEFIK_PUT_REQUEST_CACHE}" = "" ]; then
         __traefik_api_rest_request "PUT" "${GLOBAL_TRAEFIK_PUT_REQUEST_CACHE}"
@@ -119,8 +121,11 @@ __traefik_api_rest_request() {
         ;;
     esac
 
-    [ "${__body}" = "" ] && __result="$(docker run --network "${TANGO_APP_NETWORK_NAME}" --rm curlimages/curl:7.70.0 curl -u "${TRAEFIK_API_USER}":"${TRAEFIK_API_HASH_PASSWORD}" -X ${__http_command} -skL "${__url}")" \
-        || __result="$(docker run --network "${TANGO_APP_NETWORK_NAME}" --rm curlimages/curl:7.70.0 curl -d "${__body}" -u "${TRAEFIK_API_USER}":"${TRAEFIK_API_PASSWORD}" -X ${__http_command} -skL "${__url}")"
+    #[ "${__body}" = "" ] && __result="$(docker run --network "${TANGO_APP_NETWORK_NAME}" --rm curlimages/curl:7.70.0 curl -u "${TRAEFIK_API_USER}":"${TRAEFIK_API_HASH_PASSWORD}" -X ${__http_command} -skL "${__url}")" \
+    #    || __result="$(docker run --network "${TANGO_APP_NETWORK_NAME}" --rm curlimages/curl:7.70.0 curl -d "${__body}" -u "${TRAEFIK_API_USER}":"${TRAEFIK_API_PASSWORD}" -X ${__http_command} -skL "${__url}")"
+
+    [ "${__body}" = "" ] && __result="$(__tango_curl -u "${TRAEFIK_API_USER}":"${TRAEFIK_API_HASH_PASSWORD}" -X ${__http_command} -skL "${__url}")" \
+        || __result="$(__tango_curl -d "${__body}" -u "${TRAEFIK_API_USER}":"${TRAEFIK_API_PASSWORD}" -X ${__http_command} -skL "${__url}")"
 
 
     case $__http_command in
@@ -128,7 +133,7 @@ __traefik_api_rest_request() {
             echo "$__result"
         ;;
         PUT )
-            __tango_log "DEBUG" "__traefik_api_rest_request PUT result : $__result"   
+            __tango_log "DEBUG" "__traefik_api_rest_request() : PUT request result is : $__result"   
         ;;
     esac
 
