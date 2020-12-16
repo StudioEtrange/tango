@@ -1,4 +1,4 @@
-# Tango 
+# TANGO 
 
 * A versatile app manager for a single docker node
 
@@ -74,7 +74,7 @@ See samples in `samples` folder
 ## AVAILABLE COMMANDS
 
 ```
-	install : deploy this app."
+	install : deploy this app.
 	up [service [-b]] [--module module] [--plugin plugin] [--freeport]: launch all available services or one service
 	down [service] [--mods mod-name] [--all]: down all services or one service. Except shared internal service when in shared mode (--all force stop shared service).
 	restart [service] [--module module] [--plugin plugin] [--freeport]: restart all services or one service.
@@ -95,8 +95,8 @@ See samples in `samples` folder
 
 
 
-
-## Configuration
+----
+## CONFIGURATION
 
 * You could set every tango variables through a user environment file, shell environment variables and some from command line. 
 
@@ -132,7 +132,7 @@ For full list see `tango.internal.env` file
 
 ### Using environment files
 
-* You could create a user environment file for your app to set any available variables and put it everywhere. By default it will be looked for from your home directory
+* You could create a user environment file for your app to set any available variables and put it in your $HOME` or elsewhere. By default it will be looked for from your home directory
 
     ```
     ./tango --app myapp --approot $HOME/myapp --env /foo/bar/myapp.env up
@@ -188,7 +188,7 @@ For full list see `tango.internal.env` file
 ### For Your Information about env files - internal mechanisms
 
 
-* At each launch tango use `tango.env` and `myapp.env` file files to generate
+* At each launch tango use `tango.env` and `myapp.env` files to generate
     * `generated.myapp.compose.env` file used by docker-compose
     * `generated.myapp.bash.env` file used by shell scripts
 
@@ -214,12 +214,13 @@ For full list see `tango.internal.env` file
             bash -c "echo from docker compose : $NETWORK_PORT_MAIN from running container env variable : $$NETWORK_PORT_MAIN"
     ```
 
-## Service administration
+----
+## SERVICES ADMINISTRATION
 
 ### Enable/disable
 
 * To declare a service use list `TANGO_SERVICES_AVAILABLE`
-* To enable/disable a service, use variable list `TANGO_SERVICES_AVAILABLE`
+* To enable/disable a service, use variable list `TANGO_SERVICES_DISABLED`
 
 * ie in user env file : 
     ```
@@ -241,8 +242,8 @@ For full list see `tango.internal.env` file
     ./tango down <service>
     ```
 
-
-## Modules 
+----
+## MODULES 
 
 * There is a list of predefined services named `module`.
     * List modules :
@@ -265,7 +266,8 @@ For full list see `tango.internal.env` file
 * Predefined modules and their available variables files are in `pool/modules` folder
 * You can define your own modules in your app by putting their matching `.yml` and `.env` files in a `pool/modules` folder of the app
 
-## Plugins 
+----
+## PLUGINS 
 
 * A plugin is a script that will be exececuted into a service
     * List plugins :
@@ -318,7 +320,8 @@ For full list see `tango.internal.env` file
 * Predefined plugins are in `pool/plugins` folder
 * You can define your own plugins in your app by putting executable files in a `pool/plugins` folder of the app
 
-## Scripts
+----
+## SCRIPTS
 
     * These are scripts and are executed directly into the host within the context of tango app. (Meaning they are sourced)
     * Scripts files must not have extension. They are located in `pool/scripts` folder
@@ -341,8 +344,8 @@ For full list see `tango.internal.env` file
         * info scripts s are in `pool/scripts_info`
         * all info scripts are launched by default when launching command `info`
 
-
-## Network Configuration
+----
+## NETWORK CONFIGURATION
 
 ### Logical area
 
@@ -403,8 +406,8 @@ For full list see `tango.internal.env` file
     MYSERVICE_DIRECT_ACCESS_PORT=7777
     ```
 
-
-## HTTP/HTTPS Configuration
+----
+## HTTP/HTTPS CONFIGURATION
 
 ### HTTPS redirection
 
@@ -445,7 +448,7 @@ For full list see `tango.internal.env` file
         OVH_CONSUMER_KEY=xxx
     ```
 
-
+----
 ## VPN
 
 ### addon scripts vpn https://www.privateinternetaccess.com/helpdesk/kb/articles/can-i-use-port-forwarding-without-using-the-pia-client

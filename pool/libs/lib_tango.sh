@@ -1393,6 +1393,8 @@ __xml_set_attribute_value() {
 	mv "${__file}.new" "${__file}"
 }
 
+# get an attribute value 
+#		__xml_get_attribute_value "Preferences.xml" "/Preferences/@PlexOnlineToken"
 __xml_get_attribute_value() {
 	local __file="$1"
 	local __xpath_selector="$2"
