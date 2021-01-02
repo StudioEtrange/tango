@@ -8,6 +8,9 @@ services:
     labels:
       - "${TANGO_INSTANCE_NAME}.managed=true"
       - "traefik.enable=true"
+      - "traefik.http.services.cloud9.loadbalancer.server.port=8181"
+      - "traefik.http.services.cloud9.loadbalancer.server.scheme=http"
+      - "traefik.http.services.cloud9.loadbalancer.passhostheader=true"
       - "traefik.http.routers.cloud9.entrypoints=${CLOUD9_ENTRYPOINTS:-web_main}"
       - "traefik.http.routers.cloud9.rule=HostRegexp(`{subdomain:cloud9}.{domain:${TANGO_DOMAIN:-.*}}`)"
       - "traefik.http.routers.cloud9.priority=${CLOUD9_REDIRECT_HTTPS_PRIORITY:-200}"
@@ -17,9 +20,6 @@ services:
       - "traefik.http.routers.cloud9-secure.service=cloud9"
       - "traefik.http.routers.cloud9-secure.tls=true"
       - "traefik.http.routers.cloud9-secure.tls.domains[0].main=cloud9.${TANGO_DOMAIN:-.*}"
-      - "traefik.http.services.cloud9.loadbalancer.server.port=8181"
-      - "traefik.http.services.cloud9.loadbalancer.server.scheme=http"
-      - "traefik.http.services.cloud9.loadbalancer.passhostheader=true"
     networks:
       - default
     expose:

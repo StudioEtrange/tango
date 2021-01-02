@@ -1,3 +1,95 @@
+# SERVICE LIFECYCLE -----------
+
+
+# start a service or all services 
+# if no service specified will start all service (by starting docker compose service "tango")
+# OPTIONS
+#		NO_EXEC_PLUGINS do not run attached plugins
+#		BUILD	build image before starting
+# TODO up --no-recreate ? == each time compose file is modified the container is recreated
+#							 maybe we want this, because we start or restart a service after modifying a configuration
+# 	if there are existing containers for a service, 
+#	and the service’s configuration or image was changed after the container’s creation,
+#	docker-compose up picks up the changes by stopping and recreating the containers 
+#	(preserving mounted volumes). To prevent Compose from picking up changes, use the --no-recreate flag.
+__service_up() {
+	local __service="$1"
+	local __opt="$2"
+
+	local __build=
+	local __no_exec_plugins=
+	for o in ${__opt}; do
+		[ "$o" = "BUILD" ] &&  __build="--build"
+		[ "$o" = "NO_EXEC_PLUGINS" ] && __no_exec_plugins="1"
+	done
+
+	docker-compose up -d $__build ${__service:-tango}
+
+	if [ "${__service}" = "" ]; then
+		[ ! "$__no_exec_plugins" = "1" ] && __exec_auto_plugin_service_active_all
+		docker-compose logs service_init
+	else
+		[ ! "$__no_exec_plugins" = "1" ] && __exec_auto_plugin_all_by_service ${__service}
+		docker-compose logs ${__service}
+	fi
+
+}
+
+# OPTIONS
+#	NO_DELETE do not delete containers just stop them
+__service_down_all() {
+	local __opt="$1"
+
+	local __no_delete=
+	for o in ${__opt}; do
+		[ "$o" = "NO_DELETE" ] &&  __no_delete="1"
+	done
+
+	if [ "${TANGO_INSTANCE_MODE}" = "shared" ]; then 
+		if [ ! "${ALL}" = "1" ]; then
+			# test if network already exist and set it as 'external' to not erase it
+			if [ ! -z $(docker network ls --filter name=^${TANGO_APP_NETWORK_NAME}$ --format="{{ .Name }}") ] ; then 
+				[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __set_network_as_external "default" "${TANGO_APP_NETWORK_NAME}"
+			fi
+		fi
+
+		if [ ! "${ALL}" = "1" ]; then
+			# only non shared service
+			docker stop $(docker ps -q $(__container_filter 'NON_STOPPED LIST_NAMES '${TANGO_APP_NAME}'_.*'))
+			[ ! "${__no_delete}" = "1" ] && docker rm $(docker ps -q $(__container_filter 'ONLY_STOPPED LIST_NAMES '${TANGO_APP_NAME}'_.*'))
+		else
+			# only shared and non shared service
+			if [ "${__no_delete}" = "1" ]; then
+				docker stop $(docker ps -q $(__container_filter 'NON_STOPPED LIST_NAMES '${TANGO_APP_NAME}'_.* '${TANGO_INSTANCE_NAME}'_.*'))
+			else
+				docker-compose down -v
+			fi
+		fi
+	else
+		if [ "${__no_delete}" = "1" ]; then
+			docker stop $(docker ps -q $(__container_filter 'NON_STOPPED LIST_NAMES '${TANGO_APP_NAME}'_.* '${TANGO_INSTANCE_NAME}'_.*'))
+		else
+			docker-compose down -v
+		fi
+	fi
+}
+
+# OPTIONS
+#	NO_DELETE do not delete container just stop it
+# TODO answer yes to rm
+__service_down() {
+	local __service="$1"
+	local __opt="$2"
+
+	local __no_delete=
+	for o in ${__opt}; do
+		[ "$o" = "NO_DELETE" ] &&  __no_delete="1"
+	done
+
+	docker-compose stop "${__service}"
+	[ ! "${__no_delete}" = "1" ] && docker-compose rm "${__service}"
+}
+
 # MANAGE ENV VARIABLES AND FILES GENERATION -----------------
 
 # load all declared variables (including associative arrays)
@@ -23,7 +115,9 @@ __update_env_files() {
 	echo "# ------ UPDATE : update_env_files : $(date) -- ${__text}" >> "${GENERATED_ENV_FILE_FOR_BASH}"
 	for __variable in ${VARIABLES_LIST}; do
 		[ -z ${!__variable+x} ] || echo "${__variable}=${!__variable}" >> "${GENERATED_ENV_FILE_FOR_COMPOSE}"
-		[ -z ${!__variable+x} ] || echo "${__variable}=\"$(echo ${!__variable} | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\$/\\$/g')\"" >> "${GENERATED_ENV_FILE_FOR_BASH}"	
+		# NOTE : we need to export variables because some software like ansible need to access them
+		# 		 we export variables only when update file (__update_env_files) not when file is created (__create_env_for_bash) because it easier
+		[ -z ${!__variable+x} ] || echo "export ${__variable}=\"$(echo ${!__variable} | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\$/\\$/g')\"" >> "${GENERATED_ENV_FILE_FOR_BASH}"	
 	done
 
 	# store associative arrays
@@ -43,8 +137,12 @@ __update_env_files() {
 }
 
 # extract declared variable names from various env files (tango, app and user env files)
-__get_declared_variable_names() {
-	VARIABLES_LIST=""
+__init_declared_variable_names() {
+	# reset global variables values
+	export VARIABLES_LIST=""
+	export ASSOCIATIVE_ARRAY_LIST=""
+
+	# init VARIABLES_LIST values
 	[ -f "${TANGO_ENV_FILE}" ] && VARIABLES_LIST="$(sed -e '/^[[:space:]]*$/d' -e '/^[#]\+.*$/d' -e 's/^\([^=+]*\)+\?=\(.*\)$/\1/g' "${TANGO_ENV_FILE}")"
 	[ -f "${TANGO_APP_ENV_FILE}" ] && VARIABLES_LIST="${VARIABLES_LIST} $(sed -e '/^[[:space:]]*$/d' -e '/^[#]\+.*$/d' -e 's/^\([^=+]*\)+\?=\(.*\)$/\1/g' "${TANGO_APP_ENV_FILE}")"
 	[ -f "${TANGO_USER_ENV_FILE}" ] && VARIABLES_LIST="${VARIABLES_LIST} $(sed -e '/^[[:space:]]*$/d' -e '/^[#]\+.*$/d' -e 's/^\([^=+]*\)+\?=\(.*\)$/\1/g' "${TANGO_USER_ENV_FILE}")"
@@ -330,9 +428,9 @@ __add_volume_artefact_all() {
 		f="$($STELLA_API rel_to_abs_path "${f}" "${TANGO_APP_ROOT}")"
 		target="$(basename "${f}")"
 		if [ -f "${f}" ]; then 
-			__tango_log "WARN" "[${f}] is a file, not mounted inside folder {${TANGO_ARTEFACT_MOUNT_POINT}}"
+			__tango_log "WARN" "tango" "[${f}] is a file, not mounted inside folder {${TANGO_ARTEFACT_MOUNT_POINT}}"
 		else
-			[ ! -d "${f}" ] && __tango_log "INFO" "[${f}] is not an existing directory and will be auto created."
+			[ ! -d "${f}" ] && __tango_log "INFO" "tango" "[${f}] is not an existing directory and will be auto created."
 			__name="$($STELLA_API md5 "${f}")"
 			__add_volume_local_definition "artefact_${__name}" "${f}"
 			for s in $TANGO_ARTEFACT_SERVICES; do
@@ -341,7 +439,7 @@ __add_volume_artefact_all() {
 				#	|| echo "** WARN : unknow ${s} service declared in TANGO_ARTEFACT_SERVICES"
 				
 			done
-			[ "${VERBOSE}" = "1" ] && __tango_log "DEBUG" "[${f}] will be mapped to {${TANGO_ARTEFACT_MOUNT_POINT}/${target}}"			
+			[ "${VERBOSE}" = "1" ] && __tango_log "DEBUG" "tango" "[${f}] will be mapped to {${TANGO_ARTEFACT_MOUNT_POINT}/${target}}"			
 		fi
 	done
 }
@@ -626,19 +724,19 @@ __add_service_direct_port_access_all() {
 			if __check_docker_compose_service_exist "${service}"; then
 				port_inside="$(yq r "${GENERATED_DOCKER_COMPOSE_FILE}" services.$service.expose[0])"
 				if [ ! "${port_inside}" = "" ]; then
-					[ "${VERBOSE}" = "1" ] && __tango_log "DEBUG" "Activate direct access to $service : mapping $port to $port_inside"
+					[ "${VERBOSE}" = "1" ] && __tango_log "DEBUG" "tango" "Activate direct access to $service : mapping $port to $port_inside"
 					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.$service.ports[+]" "$port:$port_inside"
 				else
-					__tango_log "WARN" "cannot activate direct access to $service through $port : Unknown inside port to map to. Inside port must be declared as first port in expose section."
+					__tango_log "WARN" "tango" "cannot activate direct access to $service through $port : Unknown inside port to map to. Inside port must be declared as first port in expose section."
 				fi
 			else
-				__tango_log "WARN" "unknow ${service} service declared in ${s}"
+				__tango_log "WARN" "tango" "unknow ${service} service declared in ${s}"
 			fi
 		fi
 	done
 }
 
-# ITEMS MANAGEMENT (an item is a module or a plugin) -------------------------
+# ITEMS MANAGEMENT (an item is a module or a plugin) -----------------------------------------
 
 __set_module_all() {
 	local __array_list_names=( ${TANGO_SERVICES_MODULES} )
@@ -739,9 +837,10 @@ __exec_plugin() {
 
 	__parse_item "plugin" "${__plugin}" "PLUGIN"
 
-	echo "* Plugin execution : ${PLUGIN_NAME}"
-	echo "L-- service : ${__service}"
-	echo "L-- arg list : ${PLUGIN_ARG_LIST}"
+	__tango_log "INFO" "tango" "Plugin execution : ${PLUGIN_NAME}"
+	__tango_log "INFO" "tango" "	into service : ${__service}"
+	__tango_log "INFO" "tango" "  with args list : ${PLUGIN_ARG_LIST}"
+
 	docker-compose exec --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} ${__service} /bin/sh -c '[ "'${PLUGIN_OWNER}'" = "APP" ] && /pool/'${TANGO_APP_NAME}'/plugins/'${PLUGIN_NAME}' '${PLUGIN_ARG_LIST}' || /pool/tango/plugins/'${PLUGIN_NAME}' '${PLUGIN_ARG_LIST}
 }
 
@@ -1005,7 +1104,7 @@ __list_items() {
 
 
 
-# FEATURES MANAGEMENT --------
+# FEATURES MANAGEMENT ------------------------
 
 __set_error_engine() {
 	# router order
@@ -1032,10 +1131,10 @@ __set_error_engine() {
 		enable|debug )
 			case ${LETS_ENCRYPT_CHALLENGE} in
 				HTTP )
-					__tango_log "DEBUG" "do not generate a *.domain.com certificate because we use HTTP challenge"
+					__tango_log "DEBUG" "tango" "do not generate a *.domain.com certificate because we use HTTP challenge"
 				;;
 				DNS )
-					__tango_log "DEBUG" "generate a *.domain.com certificate because we use DNS challenge"
+					__tango_log "DEBUG" "tango" "generate a *.domain.com certificate because we use DNS challenge"
 					__add_letsencrypt_service "error"
 				;;
 			esac
@@ -1310,7 +1409,7 @@ __set_network_as_external() {
 }
 
 
-# DOCKER -----------------
+# DOCKER ---------------------------------
 
 # docker client available
 __is_docker_client_available() {
@@ -1348,15 +1447,73 @@ __container_is_running() {
     fi
 }
 
+
+
+
+# OPTIONS
+# filter user
+#		can be empty or "all" to list all container
+# filter status options
+# 		NON_RUNNING, NON_STOPPED, ONLY_RUNNING, ONLY_STOPPED are exclusive (can not be cumulated with any other filters)
+#		RUNNING, STOPPED can be cumulated
+#		NON_RUNNING is the same than ONLY_STOPPED
+#		NON_STOPPED is the same than ONLY_RUNNING
+#		LIST_NAMES name1 name2 name3  : will include filter which have these names
+# sample
+#		${DOCKER_CMD} ps -a $(__container_filter "ONLY_RUNNING") --format "{{.Names}}#{{.Status}}#{{.Image}}"
+__container_filter() {
+	local __opt="$1"
+
+	local __opt_running=
+	local __opt_non_running=
+	local __opt_only_running=
+	local __opt_stopped=
+	local __opt_non_stopped=
+	local __opt_only_stopped=
+	local __flag_names=
+	local __names_list=
+	for o in ${__opt}; do
+		[ "$o" = "RUNNING" ] && __opt_running="1" && __opt_non_running="0" && __opt_only_running="0" && __opt_non_stopped="0" && __opt_only_stopped="0" && __flag_names=
+		[ "$o" = "NON_RUNNING" ] && __opt_running="0" && __opt_stopped="0" && __opt_non_running="1" && __opt_only_running="0" && __opt_non_stopped="0" && __opt_only_stopped="0" && __flag_names=
+		[ "$o" = "ONLY_RUNNING" ] && __opt_running="0" && __opt_stopped="0" && __opt_non_running="0" && __opt_only_running="1" && __opt_non_stopped="0" && __opt_only_stopped="0" && __flag_names=
+		[ "$o" = "STOPPED" ] && __opt_stopped="1" && __opt_non_running="0" && __opt_only_running="0" && __opt_non_stopped="0" && __opt_only_stopped="0" && __flag_names=
+		[ "$o" = "NON_STOPPED" ] && __opt_running="0" && __opt_stopped="0" && __opt_non_running="0" && __opt_only_running="0" && __opt_non_stopped="1" && __opt_only_stopped="0" && __flag_names=
+		[ "$o" = "ONLY_STOPPED" ] && __opt_running="0" && __opt_stopped="0" && __opt_non_running="0" && __opt_only_running="0" && __opt_non_stopped="0" && __opt_only_stopped="1" && __flag_names=
+		[ "$__flag_names" = "1" ] && __names_list="$__names_list $o"
+		[ "$o" = "LIST_NAMES" ] && __flag_names=1
+	done
+
+	local __filter_default="--filter=label=${TANGO_INSTANCE_NAME}.managed=true"
+
+	local __filter_names=
+	if [ ! "${__names_list}"  = "" ]; then
+		__names_list="$($STELLA_API trim "${__names_list}")"
+		__filter_names="--filter=name=^/$(echo -n ${__names_list} | sed -e 's/ /$|^\//g')$"
+	fi
+
+	local __filter_status=
+	[ "$__opt_running" = "1" ] && __filter_status="${__filter_status} --filter=status=running"
+	[ "$__opt_stopped" = "1" ] && __filter_status="${__filter_status} --filter=status=exited --filter=status=created"
+	[ "$__opt_non_running" = "1" ] && __filter_status="--filter=status=exited --filter=status=created"
+	[ "$__opt_only_running" = "1" ] && __filter_status="--filter=status=running"
+	[ "$__opt_non_stopped" = "1" ] && __filter_status="--filter=status=running"
+	[ "$__opt_only_stopped" = "1" ] && __filter_status="--filter=status=exited --filter=status=created"
+
+
+
+	echo "${__filter_default} ${__filter_names} ${__filter_status}"
+}
+
+
 docker-compose() {
 	# NOTE we need to specify project directory because when launching from an other directory, docker compose seems to NOT auto load .env file
 	case ${TANGO_INSTANCE_MODE} in
 		shared ) 
-			__tango_log "DEBUG" "COMPOSE_IGNORE_ORPHANS=1 docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_INSTANCE_NAME}" --project-directory "${TANGO_APP_ROOT}" "$@""
+			__tango_log "DEBUG" "tango" "COMPOSE_IGNORE_ORPHANS=1 docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_INSTANCE_NAME}" --project-directory "${TANGO_APP_ROOT}" "$@""
 			COMPOSE_IGNORE_ORPHANS=1 command docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_INSTANCE_NAME}" --project-directory "${TANGO_APP_ROOT}" "$@"
 			;;
 		* ) 
-			__tango_log "DEBUG" "COMPOSE_IGNORE_ORPHANS=1 docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_APP_NAME}" --project-directory "${TANGO_APP_ROOT}" "$@""
+			__tango_log "DEBUG" "tango" "COMPOSE_IGNORE_ORPHANS=1 docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_APP_NAME}" --project-directory "${TANGO_APP_ROOT}" "$@""
 			COMPOSE_IGNORE_ORPHANS=1 command docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_APP_NAME}" --project-directory "${TANGO_APP_ROOT}" "$@"
 			;;
 	esac
@@ -1364,6 +1521,14 @@ docker-compose() {
 }
 
 # VARIOUS -----------------
+
+# generate a string to be used as header Authentification: Basic
+__base64_basic_authentification() {
+	local __user="$1"
+	local __password="$2"
+
+	python -c 'import base64;print(base64.b64encode(b"'$__user':'$__password'").decode("ascii"))'
+}
 
 # launch a curl command from a docker image if docker is available or from curl from host if not
 __tango_curl() {
@@ -1403,6 +1568,19 @@ __xml_get_attribute_value() {
 }
 
 
+# simple extract value in an ini file
+# support	key=value and key = value
+__ini_get_key_value() {
+	local __file="$1"
+	local __key="$2"
+
+	if [ ! -z $__key ]; then
+		if [ -f "${__file}" ]; then
+	        cat "${__file}" | sed -e 's,'$__key'[[:space:]]*=[[:space:]]*,'$__key'=,g' | awk 'match($0,/^'$__key'=.*$/) {print substr($0, RSTART+'$(( ${#__key} + 1 ))',RLENGTH);}'
+    	fi            
+	fi
+}
+
 # create all path according to _SUBPATH_CREATE variables content
 # see __create_path
 __create_path_all() {
@@ -1438,11 +1616,11 @@ __create_path() {
 	local __file=
 
 	if [ ! -d "${__root}" ]; then
-		__tango_log "ERROR" "root path ${__root} do not exist"
+		__tango_log "ERROR" "tango" "root path ${__root} do not exist"
 		return
 	fi
 
-	__tango_log "DEBUG" "__create_path root : ${__root} folders : ${__list}"
+	__tango_log "DEBUG" "tango" "__create_path root : ${__root} folders : ${__list}"
 	for p in ${__list}; do
 		[ "${p}" = "FOLDER" ] && __folder=1 && __file= && continue
 		[ "${p}" = "FILE" ] && __folder= && __file=1 && continue
@@ -1451,13 +1629,13 @@ __create_path() {
 		if [ "${__folder}" = "1" ]; then
 			if [ ! -d "${__path}" ]; then
 				__msg=$(docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} --network ${TANGO_APP_NETWORK_NAME} -v "${__root}":"/foo" ${TANGO_SHELL_IMAGE} bash -c "mkdir -p /foo/${p} && chown ${TANGO_USER_ID}:${TANGO_GROUP_ID} /foo/${p}")
-				__tango_log "DEBUG" "__create_path msg : ${__msg}"
+				__tango_log "DEBUG" "tango" "__create_path msg : ${__msg}"
 			fi
 		fi
 		if [ "${__file}" = "1" ]; then
 			if [ ! -f "${__path}" ]; then
 				__msg=$(docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} --network ${TANGO_APP_NETWORK_NAME} -v "${__root}":"/foo" ${TANGO_SHELL_IMAGE} bash -c "touch /foo/${p} && chown ${TANGO_USER_ID}:${TANGO_GROUP_ID} /foo/${p}")
-				__tango_log "DEBUG" "__create_path msg : ${__msg}"
+				__tango_log "DEBUG" "tango" "__create_path msg : ${__msg}"
 			fi
 		fi
 	done
@@ -1474,12 +1652,12 @@ __check_mandatory_path() {
 	local __mode="$1"
 
 	for p in ${TANGO_PATH_LIST}; do
-		[ ! -d "${!p}" ] && echo "* ERROR : Mandatory root path ${p} [${!p}] do not exist" && [ ! "${__mode}" = "warn" ] && exit 1
+		[ ! -d "${!p}" ] && echo "* ERROR : Mandatory root path ${p} [${!p}] do not exist" && [ ! "${__mode}" = "WARN" ] && exit 1
 	done 
 
 	if [ ! "${TANGO_ARTEFACT_FOLDERS}" = "" ]; then
 		for f in ${TANGO_ARTEFACT_FOLDERS}; do
-			[ ! -d "${f}" ] && echo "* ERROR : Mandatory declared artefact folder [${f}] do not exist" && [ ! "${__mode}" = "warn" ] && exit 1
+			[ ! -d "${f}" ] && echo "* ERROR : Mandatory declared artefact folder [${f}] do not exist" && [ ! "${__mode}" = "WARN" ] && exit 1
 		done
 	fi
 }
@@ -1503,11 +1681,10 @@ __check_lets_encrypt_settings() {
 }
 
 
-
-
 __tango_log() {
 	local __level="$1"
-	shift 1
+	local __domain="$2"
+	shift 2
 	local __msg="$@"
 
 	if [ "$TANGO_LOG_STATE" = "ON" ]; then
@@ -1568,25 +1745,26 @@ __tango_log() {
 				ASK ) __level="${__level}  ";;
 			esac
 			if [ "${_color}" = "" ]; then
-				echo "${__level}> ${__msg}"
+				echo "${__level}@${__domain}> ${__msg}"
 			else
 				if [ "${_reset_color_for_msg}" = "1" ]; then
-					${_color} -n "${__level}> "; clr_reset "${__msg}"
+					${_color} -n "${__level}@${__domain}> "; clr_reset "${__msg}"
 				else
-					${_color} "${__level}> ${__msg}"
+					${_color} "${__level}@${__domain}> ${__msg}"
 				fi
 			fi
 		fi
 	fi
 }
 
-
 # trash any output
 __tango_log_run_without_output() {
+	local __domain="$1"
+	shift 1
 	if [ "${TANGO_LOG_STATE}" = "ON" ]; then
 		if [ "${TANGO_LOG_LEVEL}" = "DEBUG" ]; then
 			#echo "DEBUG>" $@
-			__tango_log "DEBUG" "$@"
+			__tango_log "DEBUG" "$__domain" "$@"
 		fi
 	fi
 
@@ -1599,10 +1777,12 @@ __tango_log_run_without_output() {
 
 # usefull when attachin tty (1>/dev/null make terminal disappear)
 __tango_log_run_with_output() {
+	local __domain="$1"
+	shift 1
 	if [ "${TANGO_LOG_STATE}" = "ON" ]; then
 		if [ "${TANGO_LOG_LEVEL}" = "DEBUG" ]; then
 			#echo "DEBUG>" $@
-			__tango_log "DEBUG" "$@"
+			__tango_log "DEBUG" "$__domain" "$@"
 		fi
 	fi
 	"$@"

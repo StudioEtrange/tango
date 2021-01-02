@@ -5,7 +5,7 @@
 
 case ${ACTION} in
 	# we need nothing
-	# module soulb be able to be launched without any condition
+	# module should be able to be launched without any condition
 	install|cert|letsencrypt|modules|services|vendor )
 		;;
 	
@@ -21,8 +21,8 @@ case ${ACTION} in
 	# but without blocking control because we need to launch these command even if a control is not valid
 	status|logs|shell|update|info|scripts )
 		__create_path_all
-		__check_mandatory_path "warn"
-		__check_lets_encrypt_settings "warn"
+		__check_mandatory_path "WARN"
+		__check_lets_encrypt_settings "WARN"
 		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __set_certificates_all
 		;;
 esac

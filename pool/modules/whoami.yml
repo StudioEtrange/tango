@@ -9,6 +9,9 @@ services:
     labels:
       - "${TANGO_INSTANCE_NAME}.managed=true"
       - "traefik.enable=true"
+      - "traefik.http.services.whoami.loadbalancer.server.port=80"
+      - "traefik.http.services.whoami.loadbalancer.server.scheme=http"
+      - "traefik.http.services.whoami.loadbalancer.passhostheader=true"
       - "traefik.http.routers.whoami.entrypoints=${WHOAMI_ENTRYPOINTS:-web_main}"
       - "traefik.http.routers.whoami.rule=HostRegexp(`{subdomain:whoami}.{domain:${TANGO_DOMAIN:-.*}}`)"
       - "traefik.http.routers.whoami.priority=${WHOAMI_REDIRECT_HTTPS_PRIORITY:-200}"
@@ -18,9 +21,6 @@ services:
       - "traefik.http.routers.whoami-secure.service=whoami"
       - "traefik.http.routers.whoami-secure.tls=true"
       - "traefik.http.routers.whoami-secure.tls.domains[0].main=whoami.${TANGO_DOMAIN:-.*}"
-      - "traefik.http.services.whoami.loadbalancer.server.port=80"
-      - "traefik.http.services.whoami.loadbalancer.server.scheme=http"
-      - "traefik.http.services.whoami.loadbalancer.passhostheader=true"
     networks:
       - default
     expose:

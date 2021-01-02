@@ -16,6 +16,9 @@ services:
     labels:
       - "${TANGO_INSTANCE_NAME}.managed=true"
       - "traefik.enable=true"
+      - "traefik.http.services.firefox.loadbalancer.server.port=5800"
+      - "traefik.http.services.firefox.loadbalancer.server.scheme=http"
+      - "traefik.http.services.firefox.loadbalancer.passhostheader=true"
       - "traefik.http.routers.firefox.entrypoints=${FIREFOX_ENTRYPOINTS:-web_main}"
       - "traefik.http.routers.firefox.rule=HostRegexp(`{subdomain:firefox}.{domain:${TANGO_DOMAIN:-.*}}`)"
       - "traefik.http.routers.firefox.priority=${FIREFOX_REDIRECT_HTTPS_PRIORITY:-200}"
@@ -25,9 +28,6 @@ services:
       - "traefik.http.routers.firefox-secure.service=firefox"
       - "traefik.http.routers.firefox-secure.tls=true"
       - "traefik.http.routers.firefox-secure.tls.domains[0].main=firefox.${TANGO_DOMAIN:-.*}"
-      - "traefik.http.services.firefox.loadbalancer.server.port=5800"
-      - "traefik.http.services.firefox.loadbalancer.server.scheme=http"
-      - "traefik.http.services.firefox.loadbalancer.passhostheader=true"
     networks:
       - default
     expose:

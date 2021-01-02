@@ -1,11 +1,10 @@
 # TANGO 
 
-* A versatile app manager for a single docker node
+A versatile app manager for a single docker node
 
 * Define an app as a group of services
 * Support configurable services
 * Configurable through env variables or env file
-
 * Support Let's encrypt for HTTPS certificate generation
 * Highly based on traefik2 for internal routing
 * Support gpu device mount for services
@@ -242,6 +241,27 @@ For full list see `tango.internal.env` file
     ./tango down <service>
     ```
 
+## Adding a new service
+
+* Steps for adding a `foo` service
+    * in `docker-compose.yml` 
+        * add a `foo` service block
+        * add a dependency on this service into `mambo` service
+    * in `mambo.env`
+        * add a variable `FOO_VERSION=latest`
+        * add service to `TANGO_SERVICES_AVAILABLE` list
+        * if this service has subservices, declare subservices into `TANGO_SUBSERVICES_ROUTER`
+        * if this service needs to access all media folders, add it to `TANGO_ARTEFACT_SERVICES`
+        * choose to which logical network areas by default this service will be attached `main`, `secondary`, `admin` and add it to `NETWORK_SERVICES_AREA_MAIN`,`NETWORK_SERVICES_AREA_SECONDARY` and `NETWORK_SERVICES_AREA_ADMIN`
+        * to generate an HTTPS certificate add service to `LETS_ENCRYPT_SERVICES`
+        * if HTTPS redirection add service to `NETWORK_SERVICES_REDIRECT_HTTPS`
+        * for time setting add service to TANGO_TIME_VOLUME_SERVICES or `TANGO_TIME_VAR_TZ_SERVICES`
+    * in `mambo`
+        * add `foo` in command line argument definition of `TARGET` choices
+    * in README.md
+        * add a section to describe its configuration
+
+
 ----
 ## MODULES 
 
@@ -274,6 +294,7 @@ For full list see `tango.internal.env` file
     ```
     ./tango plugins list
     ```
+* A module stay in background as a service but a plugin just execute a script and stop 
 
 * Each plugin may have some restrictions and will work only into some specific services
 
@@ -524,7 +545,8 @@ For full list see `tango.internal.env` file
     * https://rclone.org/
         * rclone desktop browser : https://github.com/kapitainsky/RcloneBrowser
         * rclone desktop browser on docker with VNC : https://github.com/romancin/rclonebrowser-docker
-    * https://github.com/restic/restic
+        * rclone for android : https://github.com/x0b/rcx
+    * restic is a backup program, can use rclone https://github.com/restic/restic
 
 * VPN
     * dperson openvpn client

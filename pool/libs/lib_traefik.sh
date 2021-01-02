@@ -54,7 +54,7 @@ __traefik_api_main_request() {
     local __result=
 
     [ "${__http_command}" = "" ] && __http_command="GET"
-    [ "${__http_command}" = "PUT" ] && __tango_log "ERROR" "__traefik_api_main_request : no PUT method on main API " && return
+    [ "${__http_command}" = "PUT" ] && __tango_log "ERROR" "traefik" "__traefik_api_main_request : no PUT method on main API " && return
     
     case $__http_command in
         GET ) 
@@ -82,7 +82,7 @@ __traefik_api_rest_update() {
     local __request="$1"
 
 
-    __tango_log "DEBUG" "Traefik API REST store PUT request : ${__request}"
+    __tango_log "DEBUG" "traefik" "Traefik API REST store PUT request : ${__request}"
 
     __request="$(echo {} | jq -r "${__request}")"
     
@@ -133,7 +133,7 @@ __traefik_api_rest_request() {
             echo "$__result"
         ;;
         PUT )
-            __tango_log "DEBUG" "__traefik_api_rest_request() : PUT request result is : $__result"   
+            __tango_log "DEBUG" "INFO" "__traefik_api_rest_request() : PUT request result is : $__result"   
         ;;
     esac
 

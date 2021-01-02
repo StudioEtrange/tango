@@ -16,6 +16,7 @@ echo "---------==---- INFO SERVICES ----==---------"
 echo "* Available services : ${TANGO_SERVICES_AVAILABLE}"
 echo "* Available subservices : ${TANGO_SUBSERVICES_ROUTER}"
 for service in ${TANGO_SERVICES_AVAILABLE}; do
+    #[ ! "$1" = "" ] && [ ! "$service" = "$1" ] && continue
     service="${service^^}"
     version="${service}_VERSION"
     version="${!version}"

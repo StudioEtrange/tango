@@ -64,8 +64,18 @@ case ${ACTION} in
 	;;
 
 	install )
-		echo "** Install requirements"
-		$STELLA_API get_features
+		if [ "$TANGO_NOT_IN_APP" = "1" ]; then
+			# standalone tango
+			__tango_log "INFO" "tango" "Install tango requirements : $STELLA_APP_FEATURE_LIST"
+			$STELLA_API get_features
+		else
+			STELLA_APP_FEATURE_LIST="$(__get_all_properties $(__select_app $TANGO_ROOT); echo $STELLA_APP_FEATURE_LIST) $STELLA_APP_FEATURE_LIST"
+			__tango_log "INFO" "tango" "Install tango and $TANGO_APP_NAME requirements : $STELLA_APP_FEATURE_LIST"
+			$STELLA_API get_features
+		fi
+		
+		
+		
 	;;
 
 	update )
@@ -87,10 +97,10 @@ case ${ACTION} in
 		else
 			case ${TARGET} in
 				traefik )
-					docker-compose exec --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} ${TARGET} /bin/sh -c '[ -e /bin/bash ] && /bin/bash || /bin/sh'
+					docker-compose exec --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} ${TARGET} /bin/sh
 				;;
 				* )
-					docker-compose exec --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} ${TARGET} /bin/sh -c '[ -e /bin/bash ] && /bin/bash || /bin/sh'
+					docker-compose exec --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} ${TARGET} /bin/sh
 				;;
 			esac
 		fi
@@ -105,37 +115,18 @@ case ${ACTION} in
 	;;
 
 	up )
-		# TODO up --no-recreate ?
-		docker-compose up -d ${BUILD} ${TARGET:-tango}
-		if [ "${TARGET}" = "" ]; then
-			__exec_auto_plugin_service_active_all
-			docker-compose logs ${FOLLOW} service_init
-		else
-			__exec_auto_plugin_all_by_service "${TARGET}"
-			docker-compose logs  ${FOLLOW} "${TARGET}"
-		fi
+		[ "${BUILD}" = "1" ] && BUILD="BUILD"
+		__service_up "${TARGET}" "${BUILD}"
+		
 	;;
 
 	down )
 		case "${TARGET}" in
 			"") 
-				if [ "${TANGO_INSTANCE_MODE}" = "shared" ]; then 
-					# test if network already exist and set it as 'external' to not erase it
-					if [ ! -z $(docker network ls --filter name=^${TANGO_APP_NETWORK_NAME}$ --format="{{ .Name }}") ] ; then 
-						[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __set_network_as_external "default" "${TANGO_APP_NETWORK_NAME}"
-						#__set_network_as_external "default" "${TANGO_APP_NETWORK_NAME}"
-					fi
-				fi
-				docker-compose down -v
-				# restart common services like traefik when in shared mode because we do not want to stop them
-                # TODO : tango and vpn are shared, we may restart them (or not stop them) if they were already running : all service wich container name are container_name: ${TANGO_INSTANCE_NAME}___service 
-				if [ "${TANGO_INSTANCE_MODE}" = "shared" ]; then 
-					[ ! "${ALL}" = "1" ] && docker-compose up -d traefik
-				fi
+				__service_down_all
 			;;
 			*) 
-				docker-compose stop "${TARGET}"
-				docker-compose rm "${TARGET}"
+				__service_down "${TARGET}"
 			;;
 		esac
 	;;
@@ -143,22 +134,17 @@ case ${ACTION} in
 	restart )
 		case "${TARGET}" in
 			"") 
-				docker-compose down -v
+				#docker-compose down -v
+				__service_down_all "NO_DELETE"
 			;;
 			*) 
-				docker-compose stop "${TARGET}"
+				#docker-compose stop "${TARGET}"
+				__service_down "${TARGET}" "NO_DELETE"
 			;;
 		esac
-		# TODO up --no-recreate ?
-		docker-compose up -d ${BUILD} ${TARGET:-tango}
-
-		if [ "${TARGET}" = "" ]; then
-			__exec_auto_plugin_service_active_all
-			docker-compose logs ${FOLLOW} service_init
-		else
-			__exec_auto_plugin_all_by_service "${TARGET}"
-			docker-compose logs ${FOLLOW} "${TARGET}"
-		fi
+		
+		[ "${BUILD}" = "1" ] && BUILD="BUILD"
+		__service_up "${TARGET}" "${BUILD}"
 	;;
 
 	status )
