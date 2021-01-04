@@ -247,19 +247,20 @@ For full list see `tango.internal.env` file
     * in `docker-compose.yml` 
         * add a `foo` service block
         * add a dependency on this service into `mambo` service
-    * in `mambo.env`
+
+    * in `file.env`
         * add a variable `FOO_VERSION=latest`
         * add service to `TANGO_SERVICES_AVAILABLE` list
-        * if this service has subservices, declare subservices into `TANGO_SUBSERVICES_ROUTER`
-        * if this service needs to access all media folders, add it to `TANGO_ARTEFACT_SERVICES`
+        * if this service has subservices, declare subservices into `TANGO_SUBSERVICES_ROUTER` (listed in their priority ascending order)
+        * if this service needs to access all artefact folders, add it to `TANGO_ARTEFACT_SERVICES`
         * choose to which logical network areas by default this service will be attached `main`, `secondary`, `admin` and add it to `NETWORK_SERVICES_AREA_MAIN`,`NETWORK_SERVICES_AREA_SECONDARY` and `NETWORK_SERVICES_AREA_ADMIN`
         * to generate an HTTPS certificate add service to `LETS_ENCRYPT_SERVICES`
         * if HTTPS redirection add service to `NETWORK_SERVICES_REDIRECT_HTTPS`
         * for time setting add service to TANGO_TIME_VOLUME_SERVICES or `TANGO_TIME_VAR_TZ_SERVICES`
-    * in `mambo`
-        * add `foo` in command line argument definition of `TARGET` choices
-    * in README.md
-        * add a section to describe its configuration
+        * auto created variables : 
+            * `FOO_SUBDOMAIN` value `foo.`
+            * `FOO_PRIORITY` and `FOO_SUBSERVICES_PRIORITY` are auto managed
+
 
 
 ----
@@ -439,7 +440,6 @@ For full list see `tango.internal.env` file
     ```
     NETWORK_SERVICES_REDIRECT_HTTPS=traefik ombi organizr2
     ```
-
 ### Certificate with Let's encrypt
 
 * Variable LETS_ENCRYPT control if let's encrypt (https://letsencrypt.org/) is enabled or disabled for certificate generation
@@ -468,6 +468,35 @@ For full list see `tango.internal.env` file
         OVH_APPLICATION_SECRET=xxx
         OVH_CONSUMER_KEY=xxx
     ```
+
+
+
+
+### Conception design note on router order and HTTPS Redirection
+
+* To make the system of HTTPS redirection fully customisable, we use the priority rules of traefik. Each service that need to have an HTTPS redirection use it
+
+* We cannot use the method of set redirect middleware on each routers service because each service routers may have two entrypoints and redirect middlewares dont know from which entrypoint the request come. So we use a global catch all router rule, using priority for exclude some services
+
+*Router order algorithm*
+
+* if global HTTPS redirection engine disabled
+    * 1.will match any HTTP service router with priority ROUTER_PRIORITY_DEFAULT_VALUE (i.e:2000)
+	* 2.match error router which have a priority of ROUTER_PRIORITY_ERROR_VALUE (i.e:1800)
+
+* if global HTTPS redirection engine enabled
+    * 1.match router with HTTPS router with redirection middleware with priority ROUTER_PRIORITY_HTTP_TO_HTTPS_VALUE (i.e:1000)
+    * 2.match any other router including HTTP service router with their lowered priority (i.e:500)
+        * amount of priority to subtract : ROUTER_PRIORITY_DEFAULT_VALUE - ROUTER_PRIORITY_HTTP_TO_HTTPS_VALUE + (ROUTER_PRIORITY_HTTP_TO_HTTPS_VALUE / 2) (i.e:1500)
+	* 3.match error router which have a lowered priority too (i.e:300)
+
+Subservices have a priority higher than their service parent. 
+In TANGO_SUBSERVICES_ROUTER each subservices, listed by group of parent service, get an increasing bonus of ROUTER_PRIORITY_DEFAULT_STEP (i.e:5) priority.
+
+i.e with HTTPS redirection engine disabled
+* TANGO_SERVICES_AVAILABLE=service1 service2
+* TANGO_SUBSERVICES_ROUTER=service1_subservice1 service1_subservice2 service2_subservice1
+* priorities computed : service1 : 2000, servce1_subservice1 : 2005, servce1_subservice2 : 2010,  service2 : 2000, servce2_subservice1 : 2005
 
 ----
 ## VPN
@@ -536,6 +565,9 @@ For full list see `tango.internal.env` file
     * Traefik2 minimal forward authentication service that provides OAuth/SSO login and authentication for the traefik reverse proxy/load balancer (have several fork)
             * https://github.com/thomseddon/traefik-forward-auth
     * Traefik2 REST API : https://community.containo.us/t/rest-provider-put-giving-404-when-api-auth-is-enabled/2832/6
+
+* Nginx
+    * various services nginx configuration https://github.com/linuxserver/reverse-proxy-confs
     
 * Let's encrypt
     * challenge types : https://letsencrypt.org/fr/docs/challenge-types/

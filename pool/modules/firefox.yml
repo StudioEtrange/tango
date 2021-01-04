@@ -21,7 +21,7 @@ services:
       - "traefik.http.services.firefox.loadbalancer.passhostheader=true"
       - "traefik.http.routers.firefox.entrypoints=${FIREFOX_ENTRYPOINTS:-web_main}"
       - "traefik.http.routers.firefox.rule=HostRegexp(`{subdomain:firefox}.{domain:${TANGO_DOMAIN:-.*}}`)"
-      - "traefik.http.routers.firefox.priority=${FIREFOX_REDIRECT_HTTPS_PRIORITY:-200}"
+      - "traefik.http.routers.firefox.priority=${FIREFOX_PRIORITY:-200}"
       - "traefik.http.routers.firefox.service=firefox"
       - "traefik.http.routers.firefox-secure.entrypoints=${FIREFOX_ENTRYPOINTS_SECURE:-web_main_secure}"
       - "traefik.http.routers.firefox-secure.rule=HostRegexp(`{subdomain:firefox}.{domain:${TANGO_DOMAIN:-.*}}`)"

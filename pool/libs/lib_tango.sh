@@ -87,7 +87,7 @@ __service_down() {
 	done
 
 	docker-compose stop "${__service}"
-	[ ! "${__no_delete}" = "1" ] && docker-compose rm "${__service}"
+	[ ! "${__no_delete}" = "1" ] && docker-compose rm -v "${__service}"
 }
 
 # MANAGE ENV VARIABLES AND FILES GENERATION -----------------
@@ -655,39 +655,37 @@ __set_entrypoints_service_all() {
 }
 
 
-
 __set_priority_router_all() {
 	
-
-	local __default_priority=200
+	local __default_priority=${ROUTER_PRIORITY_DEFAULT_VALUE}
 	local __priority=
 
 	local __current_parent=
 	local __previous_parent
 	local __current_offset=0
 	
-	local __parent_saved=
+	# for each declared subservices
 	for s in ${TANGO_SUBSERVICES_ROUTER}; do
-		__priority=${__default_priority}
 
 		__current_parent="$(__get_subservice_parent "${s}")"
 		if [ ! "${__current_parent}" = "" ]; then
 			if [ "${__current_parent}" = "${__previous_parent}" ]; then
-				# same parent service
-				(( __priority++ ))
+				# same parent service, get a priority bonus
+				__priority=$(( __priority + ROUTER_PRIORITY_DEFAULT_STEP ))
 				__set_priority_router "${s}" "${__priority}"
 			else
-				__parent_saved="${__current_parent} ${__parent_saved}"
+				# set first surbservice of a parent service
+				__priority=$(( __default_priority + ROUTER_PRIORITY_DEFAULT_STEP ))
 				__set_priority_router "${s}" "${__priority}"
 			fi
 		fi
 		__previous_parent="${__current_parent}"
 	done
 
-	# we do not affact priority to service which have subservices
-	local __already_setted_services="$($STELLA_API filter_list_with_list "${TANGO_SERVICES_AVAILABLE}" "${__parent_saved}")"
+
 	
-	for s in ${__already_setted_services}; do
+	# affect priority to other services
+	for s in ${TANGO_SERVICES_AVAILABLE}; do
 		__set_priority_router "${s}" "${__default_priority}"
 	done
 }
@@ -1107,19 +1105,12 @@ __list_items() {
 # FEATURES MANAGEMENT ------------------------
 
 __set_error_engine() {
-	# router order
-	# 	global HTTPS redirection engine disabled
-	#   	first : it search for matching any router (priority 200 by default) 
-	#		second : if not found match error router (priory 180)
-	# 	global HTTPS redirection engine enabled
-    #   	first : match router with HTTPS redirection middleware (priority 100)
-	#		second : it search for matching any router (prioriy 50), 
-	#		lastly : match error router (priory 30)
 
-	__set_priority_router "error" "180"
+
+	__set_priority_router "error" "${ROUTER_PRIORITY_ERROR_VALUE}"
 	case ${NETWORK_REDIRECT_HTTPS} in
 		enable )
-			# lower error router priority by 150
+			# lower error router priority
 			__set_redirect_https_service "error"
 			;;
 	esac
@@ -1351,6 +1342,7 @@ __set_entrypoint_service() {
 
 }
 
+# set a priority for a traefik router
 __set_priority_router() {	
 	local __service="$1"
 	local __priority="$2"
@@ -1358,21 +1350,27 @@ __set_priority_router() {
 	__service="${__service^^}"
 
 	local __var="${__service}_PRIORITY"
+
 	eval "export ${__var}=${__priority}"
 	__add_declared_variables "${__var}"
-
 	
 }
 
-# change rule priority of a service to be overriden by the http-catchall rule wich have a prority of 100
+# change rule priority of a service to be overriden by the http-catchall rule which have a prority of ROUTER_PRIORITY_HTTP_TO_HTTPS_VALUE
 __set_redirect_https_service() {
 	local __service="$1"
 	
 	__service="${__service^^}"
 
+	# determine how much priority we have to lower the router
+	local __lower_http_router_priority_value="$(( ROUTER_PRIORITY_DEFAULT_VALUE - ROUTER_PRIORITY_HTTP_TO_HTTPS_VALUE + (ROUTER_PRIORITY_HTTP_TO_HTTPS_VALUE / 2) ))"
+	# exemple : (( 2000 - 1000 + (1000/2) )) --> 1500 - this is the amount to subtract to an HTTP router priority
+	
+
+
 	local __var="${__service}_PRIORITY"
 	__var=${!__var}
-	__var="$(($__var - 150))"
+	__var="$(($__var - $__lower_http_router_priority_value))"
 	__set_priority_router "${__service}" "${__var}" 
 	# DEPRECATED : technique was to add a middleware redirect rule for each service
 	# add only once ',' separator to compose file only if there is other middlewars declarated 

@@ -13,7 +13,7 @@ services:
       - "traefik.http.services.cloud9.loadbalancer.passhostheader=true"
       - "traefik.http.routers.cloud9.entrypoints=${CLOUD9_ENTRYPOINTS:-web_main}"
       - "traefik.http.routers.cloud9.rule=HostRegexp(`{subdomain:cloud9}.{domain:${TANGO_DOMAIN:-.*}}`)"
-      - "traefik.http.routers.cloud9.priority=${CLOUD9_REDIRECT_HTTPS_PRIORITY:-200}"
+      - "traefik.http.routers.cloud9.priority=${CLOUD9_PRIORITY:-200}"
       - "traefik.http.routers.cloud9.service=cloud9"
       - "traefik.http.routers.cloud9-secure.entrypoints=${CLOUD9_ENTRYPOINTS_SECURE:-web_main_secure}"
       - "traefik.http.routers.cloud9-secure.rule=HostRegexp(`{subdomain:cloud9}.{domain:${TANGO_DOMAIN:-.*}}`)"

@@ -134,12 +134,12 @@ case ${ACTION} in
 	restart )
 		case "${TARGET}" in
 			"") 
-				#docker-compose down -v
-				__service_down_all "NO_DELETE"
+				#__service_down_all "NO_DELETE"
+				__service_down_all
 			;;
 			*) 
-				#docker-compose stop "${TARGET}"
-				__service_down "${TARGET}" "NO_DELETE"
+				#__service_down "${TARGET}" "NO_DELETE"
+				__service_down "${TARGET}"
 			;;
 		esac
 		

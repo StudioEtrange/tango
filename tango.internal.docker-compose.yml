@@ -241,29 +241,29 @@ services:
       # catch HTTP request on web_admin and web_admin_secure entrypoint
       - "traefik.http.routers.http-catchall-web_admin.entrypoints=web_admin,web_admin_secure"
       - "traefik.http.routers.http-catchall-web_admin.rule=HostRegexp(`{host:.+}`)"
-      - "traefik.http.routers.http-catchall-web_admin.priority=100"
+      - "traefik.http.routers.http-catchall-web_admin.priority=${ROUTER_PRIORITY_HTTP_TO_HTTPS_VALUE}"
       # catch HTTPS request on web_admin only entrypoint (no need to catch HTTPS on web_admin_secure)
       - "traefik.http.routers.http-catchall-web_admin_secure.entrypoints=web_admin"
       - "traefik.http.routers.http-catchall-web_admin_secure.rule=HostRegexp(`{host:.+}`)"
-      - "traefik.http.routers.http-catchall-web_admin_secure.priority=100"
+      - "traefik.http.routers.http-catchall-web_admin_secure.priority=${ROUTER_PRIORITY_HTTP_TO_HTTPS_VALUE}"
       - "traefik.http.routers.http-catchall-web_admin_secure.tls=true"
       # catch HTTP request on web_secondary and web_secondary_secure entrypoint
       - "traefik.http.routers.http-catchall-web_secondary.entrypoints=web_secondary,web_secondary_secure"
       - "traefik.http.routers.http-catchall-web_secondary.rule=HostRegexp(`{host:.+}`)"
-      - "traefik.http.routers.http-catchall-web_secondary.priority=100"
+      - "traefik.http.routers.http-catchall-web_secondary.priority=${ROUTER_PRIORITY_HTTP_TO_HTTPS_VALUE}"
       # catch HTTPS request on web_secondary only entrypoint (no need to catch HTTPS on web_secondary_secure)
       - "traefik.http.routers.http-catchall-web_secondary_secure.entrypoints=web_secondary"
       - "traefik.http.routers.http-catchall-web_secondary_secure.rule=HostRegexp(`{host:.+}`)"
-      - "traefik.http.routers.http-catchall-web_secondary_secure.priority=100"
+      - "traefik.http.routers.http-catchall-web_secondary_secure.priority=${ROUTER_PRIORITY_HTTP_TO_HTTPS_VALUE}"
       - "traefik.http.routers.http-catchall-web_secondary_secure.tls=true"
       # catch HTTP request on web_main and web_main_secure entrypoint
       - "traefik.http.routers.http-catchall-web_main.entrypoints=web_main,web_main_secure"
       - "traefik.http.routers.http-catchall-web_main.rule=HostRegexp(`{host:.+}`)"
-      - "traefik.http.routers.http-catchall-web_main.priority=100"
+      - "traefik.http.routers.http-catchall-web_main.priority=${ROUTER_PRIORITY_HTTP_TO_HTTPS_VALUE}"
       # catch HTTPS request on web_main only entrypoint (no need to catch HTTPS on web_main_secure)
       - "traefik.http.routers.http-catchall-web_main_secure.entrypoints=web_main"
       - "traefik.http.routers.http-catchall-web_main_secure.rule=HostRegexp(`{host:.+}`)"
-      - "traefik.http.routers.http-catchall-web_main_secure.priority=100"
+      - "traefik.http.routers.http-catchall-web_main_secure.priority=${ROUTER_PRIORITY_HTTP_TO_HTTPS_VALUE}"
       - "traefik.http.routers.http-catchall-web_main_secure.tls=true"
       
       # HTTP to HTTPS redirect middleware

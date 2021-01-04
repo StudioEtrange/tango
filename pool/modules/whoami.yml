@@ -14,7 +14,7 @@ services:
       - "traefik.http.services.whoami.loadbalancer.passhostheader=true"
       - "traefik.http.routers.whoami.entrypoints=${WHOAMI_ENTRYPOINTS:-web_main}"
       - "traefik.http.routers.whoami.rule=HostRegexp(`{subdomain:whoami}.{domain:${TANGO_DOMAIN:-.*}}`)"
-      - "traefik.http.routers.whoami.priority=${WHOAMI_REDIRECT_HTTPS_PRIORITY:-200}"
+      - "traefik.http.routers.whoami.priority=${WHOAMI_PRIORITY:-200}"
       - "traefik.http.routers.whoami.service=whoami"
       - "traefik.http.routers.whoami-secure.entrypoints=${WHOAMI_ENTRYPOINTS_SECURE:-web_main_secure}"
       - "traefik.http.routers.whoami-secure.rule=HostRegexp(`{subdomain:whoami}.{domain:${TANGO_DOMAIN:-.*}}`)"
