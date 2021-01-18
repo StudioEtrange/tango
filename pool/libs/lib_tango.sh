@@ -76,7 +76,6 @@ __service_down_all() {
 
 # OPTIONS
 #	NO_DELETE do not delete container just stop it
-# TODO answer yes to rm
 __service_down() {
 	local __service="$1"
 	local __opt="$2"
@@ -87,7 +86,7 @@ __service_down() {
 	done
 
 	docker-compose stop "${__service}"
-	[ ! "${__no_delete}" = "1" ] && docker-compose rm -v "${__service}"
+	[ ! "${__no_delete}" = "1" ] && docker-compose rm -f -v "${__service}"
 }
 
 # MANAGE ENV VARIABLES AND FILES GENERATION -----------------
@@ -1592,6 +1591,7 @@ __create_path_all() {
 
 	for p in $(compgen -A variable | grep _SUBPATH_CREATE$); do
 		__create_path_instructions="${!p}"
+		__tango_log "DEBUG" "tango" "__create_path_all ${p} create instructions : ${!p}"
 		if [ ! "${__create_path_instructions}" = "" ]; then
 			__root="${p%_SUBPATH_CREATE}"
 			[ ! "${!__root}" = "" ] && __create_path "${!__root}" "${__create_path_instructions}"
@@ -1626,14 +1626,14 @@ __create_path() {
 		# NOTE : on some case chown throw an error, it might be ignored
 		if [ "${__folder}" = "1" ]; then
 			if [ ! -d "${__path}" ]; then
-				__msg=$(docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} --network ${TANGO_APP_NETWORK_NAME} -v "${__root}":"/foo" ${TANGO_SHELL_IMAGE} bash -c "mkdir -p /foo/${p} && chown ${TANGO_USER_ID}:${TANGO_GROUP_ID} /foo/${p}")
-				__tango_log "DEBUG" "tango" "__create_path msg : ${__msg}"
+				__msg=$(docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} --network ${TANGO_APP_NETWORK_NAME} -v "${__root}":"/foo" ${TANGO_SHELL_IMAGE} bash -c 'mkdir -p /foo/'${p}' && chown '${TANGO_USER_ID}':'${TANGO_GROUP_ID}' /foo/'${p})
+				[ ! "${__msg}" = "" ] && __tango_log "DEBUG" "tango" "__create_path msg : ${__msg}"
 			fi
 		fi
 		if [ "${__file}" = "1" ]; then
 			if [ ! -f "${__path}" ]; then
-				__msg=$(docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} --network ${TANGO_APP_NETWORK_NAME} -v "${__root}":"/foo" ${TANGO_SHELL_IMAGE} bash -c "touch /foo/${p} && chown ${TANGO_USER_ID}:${TANGO_GROUP_ID} /foo/${p}")
-				__tango_log "DEBUG" "tango" "__create_path msg : ${__msg}"
+				__msg=$(docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} --network ${TANGO_APP_NETWORK_NAME} -v "${__root}":"/foo" ${TANGO_SHELL_IMAGE} bash -c 'touch /foo/'${p}' && chown '${TANGO_USER_ID}':'${TANGO_GROUP_ID}' /foo/'${p})
+				[ ! "${__msg}" = "" ] && __tango_log "DEBUG" "tango" "__create_path msg : ${__msg}"
 			fi
 		fi
 	done
