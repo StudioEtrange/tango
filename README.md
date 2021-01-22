@@ -17,7 +17,7 @@ A versatile app manager for a single docker node
 * docker
 
 
-NOTE : tango will auto install other tools like docker-compose
+NOTE : tango will auto install other tools like docker-compose inside of its tree folder
 
 ## USAGE
 
