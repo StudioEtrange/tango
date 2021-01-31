@@ -373,10 +373,12 @@ __set_active_services_all() {
 __set_vpn_service_all() {
 
 	local _tmp=
+	local _id=
 	for v in ${VPN_SERVICES_LIST}; do
 		_tmp="${v^^}_SERVICES"
+		_id="${v/#*_}"
 		for s in ${!_tmp}; do
-			__check_docker_compose_service_exist "${s}" && __set_vpn_service "${s}" "${v}" || echo "** WARN : unknow ${s} service declared in ${_tmp}"
+			__check_docker_compose_service_exist "${s}" && __set_vpn_service "${s}" "${_id}" "${v}" || echo "** WARN : unknow ${s} service declared in ${_tmp}"
 		done
 
 	done
@@ -1164,18 +1166,27 @@ __pick_free_port() {
 	fi
 }
 
-
- __set_vpn_service() {
+# service_name : attatch vpn to a service_name
+# vpn_id : integer id of vpn
+# vpn_service_name : vpn docker service
+__set_vpn_service() {
  	local __service_name="$1"
- 	local __vpn_name="$2"
+	local __vpn_id="$2"
+ 	local __vpn_service_name="$3"
 
 	yq d -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.networks"
 	yq d -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.expose"
 	yq d -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.ports"
 
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.network_mode" "service:${__vpn_name}"
+	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.network_mode" "service:${__vpn_service_name}"
 
-	__add_service_dependency "${__service_name}" "${__vpn_name}"
+	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "VPN_ID=${__vpn_id}"
+
+	# add volume from vpn service to get conf files into /vpn
+	__add_volume_from_service "${__service_name}" "${__vpn_service_name}"
+
+	__add_service_dependency "${__service_name}" "${__vpn_service_name}"
+
 }
 
 
@@ -1382,9 +1393,15 @@ __add_volume_mapping_service() {
 	local __mapping="$2"
 	
 	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.volumes[+]" "${__mapping}"
-
-
 }
+
+__add_volume_from_service() {
+	local __service="$1"
+	local __from_service="$2"
+	
+	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.volumes_from[+]" "${__from_service}"
+}
+
 
 __add_volume_local_definition() {
 	local __name="$1"
@@ -1527,7 +1544,7 @@ __base64_basic_authentification() {
 	python -c 'import base64;print(base64.b64encode(b"'$__user':'$__password'").decode("ascii"))'
 }
 
-# launch a curl command from a docker image if docker is available or from curl from host if not
+# launch a curl command from a docker image in priority if docker is available or from curl from host if not
 __tango_curl() {
 	if __is_docker_client_available; then
 		docker run --user "${TANGO_USER_ID}:${TANGO_GROUP_ID}" --network "${TANGO_APP_NETWORK_NAME}" --rm curlimages/curl:7.70.0 "$@"
@@ -1536,7 +1553,15 @@ __tango_curl() {
 	fi
 }
 
-
+# launch a git command from a docker image in priority if docker is available or from git from host if not
+__tango_git() {
+	if __is_docker_client_available; then
+		# https://hub.docker.com/r/alpine/git
+		docker run --user "${TANGO_USER_ID}:${TANGO_GROUP_ID}" --network "${TANGO_APP_NETWORK_NAME}" --rm -it -v $(pwd):/git alpine/git:latest "$@"
+	else
+		type git &>/dev/null && git "$@"
+	fi
+}
 
 # set an attribute value of a node selected by an xpath expression
 # 	__xml_replace_attribute_value "Preferences.xml" "/Preferences" "Preferences" "TranscoderTempDirectory" "/transode"

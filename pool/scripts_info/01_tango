@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+
 echo "---------==---- INFO  ----==---------"
 echo "* Tango current app name : ${TANGO_APP_NAME}"
 echo "L-- standalone app : $([ "${TANGO_NOT_IN_APP}" = "1" ] && echo NO || echo YES)"
@@ -15,6 +16,15 @@ echo "L-- user compose file : ${TANGO_USER_COMPOSE_FILE}"
 echo "---------==---- INFO SERVICES ----==---------"
 echo "* Available services : ${TANGO_SERVICES_AVAILABLE}"
 echo "* Available subservices : ${TANGO_SUBSERVICES_ROUTER}"
+# precompute service attached to vpn service
+for v in ${VPN_SERVICES_LIST}; do
+    _tmp="${v^^}_SERVICES"
+    _id="${v/#*_}"
+    for s in ${!_tmp}; do
+        eval $(echo VPN_SERVICE_${s^^}="$v")
+    done
+done
+# service loop
 for service in ${TANGO_SERVICES_AVAILABLE}; do
     #[ ! "$1" = "" ] && [ ! "$service" = "$1" ] && continue
     service="${service^^}"
@@ -64,6 +74,9 @@ for service in ${TANGO_SERVICES_AVAILABLE}; do
         
         __direct_access="${service}_DIRECT_ACCESS_PORT"; __direct_access="${!__direct_access}";
         echo "L-- direct access port : ${__direct_access}"
+
+        __connected_vpn="VPN_SERVICE_${service}"; __connected_vpn="${!__connected_vpn}"
+        echo "L-- connected to vpn : ${__connected_vpn}"
 
         __urls=
         __urls_api_get=

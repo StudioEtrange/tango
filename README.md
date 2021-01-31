@@ -1,4 +1,4 @@
-# TANGO 
+# Tango 
 
 A versatile app manager for a single docker node
 
@@ -10,7 +10,7 @@ A versatile app manager for a single docker node
 * Support gpu device mount for services
 
 
-## REQUIREMENTS
+## Requirements
 
 * bash 4
 * git
@@ -19,7 +19,7 @@ A versatile app manager for a single docker node
 
 NOTE : tango will auto install other tools like docker-compose inside of its tree folder
 
-## USAGE
+## Usage
 
 ### Install
 
@@ -33,13 +33,15 @@ NOTE : tango will auto install other tools like docker-compose inside of its tre
 
 ### Minimal standalone usage
 
-* Launch an instance with firefox predefined service
+* Launch an instance with a firefox predefined service (aka a tango module)
 
     ```
     ./tango --module firefox --domain mydomain.org --freeport up
     ```
 
 ### Minimal application
+
+An application is a set of services preconfigured and tied together
 
 See samples in `samples` folder
 
@@ -48,7 +50,7 @@ See samples in `samples` folder
     mkdir $HOME/myapp
     ```
 
-* Create a `myapp.env` file with
+* Create a `$HOME/myapp/myapp.env` file with
     ```
     TANGO_DOMAIN=mydomain.com
     ```
@@ -70,7 +72,7 @@ See samples in `samples` folder
 
 
 
-## AVAILABLE COMMANDS
+## Available Commands
 
 ```
 	install : deploy this app.
@@ -95,9 +97,9 @@ See samples in `samples` folder
 
 
 ----
-## CONFIGURATION
+## Configuration
 
-* You could set every tango variables through a user environment file, shell environment variables and some from command line. 
+* You could set every tango variables through an user environment file, shell environment variables and some from command line. 
 
 * Resolution priority order :
     * Shell environment variables
@@ -163,7 +165,7 @@ For full list see `tango.internal.env` file
 
 
 
-### PATH variables
+### Variables of type "PATH"
 
 * All variables ending with `_PATH` are translated to absolute path relative to app root folder at launch
 
@@ -179,12 +181,12 @@ For full list see `tango.internal.env` file
 
 * WARN : before changing path variables or instance mode (`shared` or `isolated`) attached to a volume (like `APP_DATA_PATH`) use `tango down` command to delete volume.
 
-### Artefacts
+### Special variable : artefacts
 
 * `TANGO_ARTEFACT_FOLDERS` is a list of artefact path. All listed artefact folders are attached to services listed in `TANGO_ARTEFACT_SERVICES` to a specified mount point in `TANGO_ARTEFACT_MOUNT_POINT`
 
 
-### For Your Information about env files - internal mechanisms
+### For Your Information about env files and tango internal mechanisms
 
 
 * At each launch tango use `tango.env` and `myapp.env` files to generate
@@ -214,12 +216,14 @@ For full list see `tango.internal.env` file
     ```
 
 ----
-## SERVICES ADMINISTRATION
+## Services administration
+
+A service match a docker container.
 
 ### Enable/disable
 
 * To declare a service use list `TANGO_SERVICES_AVAILABLE`
-* To enable/disable a service, use variable list `TANGO_SERVICES_DISABLED`
+* To disable a service, use variable list `TANGO_SERVICES_DISABLED`, by default all services are enabled
 
 * ie in user env file : 
     ```
@@ -264,7 +268,9 @@ For full list see `tango.internal.env` file
 
 
 ----
-## MODULES 
+## Modules 
+
+* A module is a predefined ready-to-use service
 
 * There is a list of predefined services named `module`.
     * List modules :
@@ -287,10 +293,16 @@ For full list see `tango.internal.env` file
 * Predefined modules and their available variables files are in `pool/modules` folder
 * You can define your own modules in your app by putting their matching `.yml` and `.env` files in a `pool/modules` folder of the app
 
-----
-## PLUGINS 
+### Tango modules list
 
-* A plugin is a script that will be exececuted into a service
+* cloud9
+* firefox
+* whoami
+
+----
+## Plugins 
+
+* A plugin is a script that will be exececuted *into a running service*
     * List plugins :
     ```
     ./tango plugins list
@@ -326,7 +338,7 @@ For full list see `tango.internal.env` file
 
 ### Plugins usage sample
 
-* Sample that attach `uname` plugin to the start of `firefox` and launch `firefox` service
+* Sample that attach `uname` plugin to the start of `firefox` and launch `firefox` service module
     ```
     ./tango --plugin uname%firefox --module firefox --domain mydomain.org --freeport up firefox
     ```
@@ -338,12 +350,12 @@ For full list see `tango.internal.env` file
     ```
 
 
-* Plugin code will be executed inside each attached services
+* Plugin will be executed inside each attached services
 * Predefined plugins are in `pool/plugins` folder
 * You can define your own plugins in your app by putting executable files in a `pool/plugins` folder of the app
 
 ----
-## SCRIPTS
+## Scripts
 
     * These are scripts and are executed directly into the host within the context of tango app. (Meaning they are sourced)
     * Scripts files must not have extension. They are located in `pool/scripts` folder
@@ -367,7 +379,7 @@ For full list see `tango.internal.env` file
         * all info scripts are launched by default when launching command `info`
 
 ----
-## NETWORK CONFIGURATION
+## Network
 
 ### Logical area
 
@@ -398,9 +410,8 @@ For full list see `tango.internal.env` file
     TANGO_SERVICES_ENTRYPOINT_SECONDARY=ombi medusa sabnzbd
     ```
 
-### Ports
 
-#### Random free port
+### Ports and Random free port
 
 * With `--freeport` option the port associated with each entrypoints will be randomly choosen among free TCP ports. This option override any other entrypoint ports defined with variables from shell or env files.
 
@@ -420,7 +431,6 @@ For full list see `tango.internal.env` file
 
 #### Direct access port
 
-
 * For various purpose like debugging, you can declare a direct access HTTP port to the service to bypass traefik ang get directly to the service with variables `*_DIRECT_ACCESS_PORT`. The first port declared as `expose` in docker-compose file is mapped to its value.
 
     * access directly throuh http://host:7777
@@ -429,7 +439,7 @@ For full list see `tango.internal.env` file
     ```
 
 ----
-## HTTP/HTTPS CONFIGURATION
+## HTTP/HTTPS configuration
 
 ### HTTPS redirection
 
@@ -472,7 +482,7 @@ For full list see `tango.internal.env` file
 
 
 
-### Conception design note on router order and HTTPS Redirection
+### Conception design note on router order and HTTPS Redirection (tango internal mechanisms)
 
 * To make the system of HTTPS redirection fully customisable, we use the priority rules of traefik. Each service that need to have an HTTPS redirection use it
 
@@ -501,95 +511,44 @@ i.e with HTTPS redirection engine disabled
 ----
 ## VPN
 
-### addon scripts vpn https://www.privateinternetaccess.com/helpdesk/kb/articles/can-i-use-port-forwarding-without-using-the-pia-client
+* Declare a vpn connection with `1` as id
+    ```
+    VPN_1_PATH=../mambo-data/vpn/pia_ovpn_default_recommended_conf_20200509
+    VPN_1_VPN_FILES=Switzerland.ovpn
+    VPN_1_VPN_AUTH=user;password
+    VPN_1_DNS=1
+    ```
+    * These settings match ones from https://github.com/StudioEtrange/openvpn-client
+
+
+### Connect a service to a VPN
+* You can isolate some of your services to use this vpn connection :
+    ```
+    VPN_1_SERVICES=<service>
+    ```
+
+* How-To check service isolation, by checking its external ip
+    ```
+    ./mambo shell <service>
+    curl 'https://api.ipify.org?format=json'
+    ```
+
+* services connected to a vpn 
+    * have env var `VPN_ID` setted with the id of the vpn
+    * inherits all env var `VPN_*`
+    * have all config files inside a mounted volume at `/vpn`
+
+
+
 
 ## GPU
 
 
-### Information
-
 * To confirm your host kernel supports the Intel Quick Sync feature, the following command can be executed on the host `lspci -v -s $(lspci | grep VGA | cut -d" " -f 1)` which should output `Kernel driver in use: i915` 
 * If your Docker host also has a dedicated graphics card, the video encoding acceleration of Intel Quick Sync Video may become unavailable when the GPU is in use. 
-* If your computer has an NVIDIA GPU, please install the latest Latest NVIDIA drivers for Linux to make sure that Plex can use your NVIDIA graphics card for video encoding (only) when Intel Quick Sync Video becomes unavailable.
-
-
-
-### TODO
-
-* NVIDIA GPU    
-    * NVIDIA GPU unlock non-pro cards : https://github.com/keylase/nvidia-patch
-
-    * show gpu usage stat
-        ```
-        /usr/lib/plexmediaserver/Plex\ Transcoder -codecs
-        /usr/lib/plexmediaserver/Plex\ Transcoder -encoders
-        nvidia-smi -q -g 0 -d UTILIZATION -l
-        ```
-    * show plex transcode custom ffmpeg
-
-        ```
-        /usr/lib/plexmediaserver/Plex\ Transcoder 
-        -formats            show available formats
-        -muxers             show available muxers
-        -demuxers           show available demuxers
-        -devices            show available devices
-        -codecs             show available codecs
-        -decoders           show available decoders
-        -encoders           show available encoders
-        -bsfs               show available bit stream filters
-        -protocols          show available protocols
-        -filters            show available filters
-        -pix_fmts           show available pixel formats
-        -layouts            show standard channel layouts
-        -sample_fmts        show available audio sample formats
-        -colors             show available color names
-        -hwaccels           show available HW acceleration methods
-
-        ```
 
 
 
 ## Side notes
 
 * I cannot use 3.x docker compose version, while `--runtime` or `--gpus` are not supported in docker compose format (https://github.com/docker/compose/issues/6691)
-
-## Links
-
-* Traefik2
-    * Traefik1 forward auth and keycloak https://geek-cookbook.funkypenguin.co.nz/ha-docker-swarm/traefik-forward-auth/keycloak/
-    * Traefik2 reverse proxy + reverse an external url : https://blog.eleven-labs.com/fr/utiliser-traefik-comme-reverse-proxy/
-    * Traefik1 and oauth2 proxy https://geek-cookbook.funkypenguin.co.nz/reference/oauth_proxy/
-    * Traefik1 and OpenIDConnect provider with keycloak 
-            * https://geek-cookbook.funkypenguin.co.nz/ha-docker-swarm/traefik-forward-auth/keycloak/
-            * https://geek-cookbook.funkypenguin.co.nz/recipes/keycloak/setup-oidc-provider/
-    * Traefik2 minimal forward authentication service that provides OAuth/SSO login and authentication for the traefik reverse proxy/load balancer (have several fork)
-            * https://github.com/thomseddon/traefik-forward-auth
-    * Traefik2 REST API : https://community.containo.us/t/rest-provider-put-giving-404-when-api-auth-is-enabled/2832/6
-
-* Nginx
-    * various services nginx configuration https://github.com/linuxserver/reverse-proxy-confs
-    
-* Let's encrypt
-    * challenge types : https://letsencrypt.org/fr/docs/challenge-types/
-
-* Backup solutions
-    * https://geek-cookbook.funkypenguin.co.nz/recipes/duplicity/
-    * https://rclone.org/
-        * rclone desktop browser : https://github.com/kapitainsky/RcloneBrowser
-        * rclone desktop browser on docker with VNC : https://github.com/romancin/rclonebrowser-docker
-        * rclone for android : https://github.com/x0b/rcx
-    * restic is a backup program, can use rclone https://github.com/restic/restic
-
-* VPN
-    * dperson openvpn client
-        * https://github.com/dperson/openvpn-client
-        * https://hub.docker.com/r/dperson/openvpn-client/
-
-    * test leaks : https://dnsleaktest.com/
-
-    * sample with openvpn server https://gist.github.com/darth-veitcher/93acda9617bab3e1de0264cebf4637fc
-
-    * free vpn provider for test https://pilovali.nl/free-vpn/
-    
-    * UI
-        * qomui - Qt - openvpn client conf management  https://github.com/corrad1nho/qomui
