@@ -282,15 +282,16 @@ __parse_env_file() {
 __create_docker_compose_file() {
 	rm -f "${GENERATED_DOCKER_COMPOSE_FILE}"
 
-	# concatenate compose files
+	# concatenate compose files starting with tango compose file
+	# NOTE : do not explode anchors here, we need to keep anchor &default-vpn, because we add vpn sections later and we need &default-vpn still exists
 	cp -f "${TANGO_COMPOSE_FILE}" "${GENERATED_DOCKER_COMPOSE_FILE}"
+	
 
 	# app compose file
-	[ -f "${TANGO_APP_COMPOSE_FILE}" ] && yq m -i -a -- "${GENERATED_DOCKER_COMPOSE_FILE}" "${TANGO_APP_COMPOSE_FILE}"
-
+	[ -f "${TANGO_APP_COMPOSE_FILE}" ] && yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_APP_COMPOSE_FILE}")
 
 	# user compose file
-	[ -f "${TANGO_USER_COMPOSE_FILE}" ] && yq m -i -a -- "${GENERATED_DOCKER_COMPOSE_FILE}" "${TANGO_USER_COMPOSE_FILE}"
+	[ -f "${TANGO_USER_COMPOSE_FILE}" ] && yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_USER_COMPOSE_FILE}")
 
 	__set_module_all
 	__set_active_services_all
@@ -366,7 +367,7 @@ __translate_all_path() {
 __set_active_services_all() {
 	# declare all active service in tango depdenciess
 	for s in ${TANGO_SERVICES_ACTIVE}; do
-		__check_docker_compose_service_exist "${s}" && __add_service_dependency "tango" "${s}" || echo "** WARN : unknow ${s} service declared in TANGO_SERVICES_ACTIVE"
+		__check_docker_compose_service_exist "${s}" && __add_service_dependency "tango" "${s}" || __tango_log "WARN" "tango" "unknow service ${s} declared in TANGO_SERVICES_ACTIVE"
 	done
 }
 
@@ -378,7 +379,7 @@ __set_vpn_service_all() {
 		_tmp="${v^^}_SERVICES"
 		_id="${v/#*_}"
 		for s in ${!_tmp}; do
-			__check_docker_compose_service_exist "${s}" && __set_vpn_service "${s}" "${_id}" "${v}" || echo "** WARN : unknow ${s} service declared in ${_tmp}"
+			__check_docker_compose_service_exist "${s}" && __set_vpn_service "${s}" "${_id}" "${v}" || __tango_log "WARN" "tango" "unknow service ${s} declared in ${_tmp}"
 		done
 
 	done
@@ -488,7 +489,7 @@ __add_gpu_all() {
 		if [ ! "${gpu}" = "" ]; then
 			service="${s%_GPU}"
 			service="${service,,}"
-			__check_docker_compose_service_exist "${service}" && __add_gpu "${service}" "${gpu}" || echo "** WARN : unknow ${service} service declared in ${s}"
+			__check_docker_compose_service_exist "${service}" && __add_gpu "${service}" "${gpu}" || __tango_log "WARN" "tango" "unknow service ${service} declared in ${s}"
 		fi
 	done
 }
@@ -497,11 +498,11 @@ __add_gpu_all() {
 __set_time_all() {
 
 	for s in $TANGO_TIME_VOLUME_SERVICES; do
-		__check_docker_compose_service_exist "${s}" && __add_volume_for_time "$s" || echo "** WARN : unknow ${s} service declared in TANGO_TIME_VOLUME_SERVICES"
+		__check_docker_compose_service_exist "${s}" && __add_volume_for_time "$s" || __tango_log "WARN" "tango" "unknow service ${s} declared in TANGO_TIME_VOLUME_SERVICES"
 	done
 
 	for s in $TANGO_TIME_VAR_TZ_SERVICES; do
-		__check_docker_compose_service_exist "${s}" && __add_tz_var_for_time "$s" || echo "** WARN : unknow ${s} service declared in TANGO_TIME_VAR_TZ_SERVICES"
+		__check_docker_compose_service_exist "${s}" && __add_tz_var_for_time "$s" || __tango_log "WARN" "tango" "unknow service ${s} declared in TANGO_TIME_VAR_TZ_SERVICES"
 	done
 
 }
@@ -631,7 +632,7 @@ __set_entrypoints_service_all() {
 			__add_declared_variables "${s^^}_ENTRYPOINTS_DEFAULT"
 			eval "export ${s^^}_ENTRYPOINTS_DEFAULT=web_admin"
 		else
-			echo "** WARN : unknow ${s} service declared in NETWORK_SERVICES_AREA_ADMIN"
+			__tango_log "WARN" "tango" "unknow service ${s} declared in NETWORK_SERVICES_AREA_ADMIN"
 		fi
 	done
 	for s in ${NETWORK_SERVICES_AREA_SECONDARY}; do
@@ -640,7 +641,7 @@ __set_entrypoints_service_all() {
 			__add_declared_variables "${s^^}_ENTRYPOINTS_DEFAULT"
 			eval "export ${s^^}_ENTRYPOINTS_DEFAULT=web_secondary"
 		else
-			echo "** WARN : unknow ${s} service declared in NETWORK_SERVICES_AREA_SECONDARY"
+			__tango_log "WARN" "tango" "unknow service ${s} declared in NETWORK_SERVICES_AREA_SECONDARY"
 		fi
 	done
 	for s in ${NETWORK_SERVICES_AREA_MAIN}; do
@@ -649,7 +650,7 @@ __set_entrypoints_service_all() {
 			__add_declared_variables "${s^^}_ENTRYPOINTS_DEFAULT"
 			eval "export ${s^^}_ENTRYPOINTS_DEFAULT=web_main"
 		else
-			echo "** WARN : unknow ${s} service declared in NETWORK_SERVICES_AREA_MAIN"
+			__tango_log "WARN" "tango" "unknow service ${s} declared in NETWORK_SERVICES_AREA_MAIN"
 		fi
 	done
 
@@ -729,7 +730,7 @@ __add_service_direct_port_access_all() {
 					__tango_log "WARN" "tango" "cannot activate direct access to $service through $port : Unknown inside port to map to. Inside port must be declared as first port in expose section."
 				fi
 			else
-				__tango_log "WARN" "tango" "unknow ${service} service declared in ${s}"
+				__tango_log "WARN" "tango" "unknow service ${service} declared in ${s}"
 			fi
 		fi
 	done
@@ -754,10 +755,14 @@ __set_module() {
 	# add yml to docker compose file
 	case ${MODULE_OWNER} in
 		APP )
-			yq m -i -a -- "${GENERATED_DOCKER_COMPOSE_FILE}" "${TANGO_APP_MODULES_ROOT}/${MODULE_NAME}.yml"
+			# NOTE : if problem appears with anchos in module
+			yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_APP_MODULES_ROOT}/${MODULE_NAME}.yml")
+			#yq m -i -a=overwrite -- "${GENERATED_DOCKER_COMPOSE_FILE}" "${TANGO_APP_MODULES_ROOT}/${MODULE_NAME}.yml"
 		;;
 		TANGO )
-			yq m -i -a -- "${GENERATED_DOCKER_COMPOSE_FILE}" "${TANGO_MODULES_ROOT}/${MODULE_NAME}.yml"
+			# NOTE : if problem appears with anchos in module
+			yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_MODULES_ROOT}/${MODULE_NAME}.yml")
+			#yq m -i -a=overwrite -- "${GENERATED_DOCKER_COMPOSE_FILE}" "${TANGO_MODULES_ROOT}/${MODULE_NAME}.yml"
 		;;
 	esac
 
@@ -1218,10 +1223,11 @@ __create_vpn() {
 	local __route="${!_tmp}"
 	_tmp="VPN_${__vpn_id}_ROUTE6"
 	local __route6="${!_tmp}"
-	
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.<<" default-vpn
+	# !!merge <<: default-vpn
+	yq w -i "${GENERATED_DOCKER_COMPOSE_FILE}" --makeAlias "services.${__service_name}.<<" "default-vpn" 
+	#yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.<<" default-vpn
 	# need tweak '*default-vpn' yaml anchor while this issue exist in yq : https://github.com/mikefarah/yq/issues/377
-	sed -i 's/[^&]default-vpn/ \*default-vpn/' "${GENERATED_DOCKER_COMPOSE_FILE}"
+	#sed -i 's/[^&]default-vpn/ \*default-vpn/' "${GENERATED_DOCKER_COMPOSE_FILE}"
 	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.container_name" '${TANGO_INSTANCE_NAME}_'${__service_name}
 	[ "${__folder}" ] && __add_volume_mapping_service "${__service_name}" "${__folder}:/vpn"
 	[ "${__vpn_files}" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "VPN_FILES=${__vpn_files}"
@@ -1328,7 +1334,7 @@ __add_letsencrypt_service() {
 	if __check_docker_compose_service_exist "${__parent}"; then
 		yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__parent}.labels[+]" "traefik.http.routers.${__service}-secure.tls.certresolver=tango"
 	else
-		echo "** WARN : unknow ${__parent} service declared in LETS_ENCRYPT_SERVICES"
+		__tango_log "WARN" "tango" "unknow service ${__parent} declared in LETS_ENCRYPT_SERVICES"
 	fi
 }
 

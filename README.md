@@ -537,8 +537,9 @@ i.e with HTTPS redirection engine disabled
     * have env var `VPN_ID` setted with the id of the vpn
     * inherits all env var `VPN_*`
     * have all config files inside a mounted volume at `/vpn`
-
-
+    * all port declaration mapping and exposed port in compose-file are removed
+    * its network alias coming from service name ais replaced by network alias from `vpn_<id>` container. Meaning cannot `ping <service>` from within other service, but `ping vpn_<id>` instead
+    * the service container network become : `network_mode: service:vpn_<id>` meaning its network stack is the one from `vpn_<id>` container
 
 
 ## GPU

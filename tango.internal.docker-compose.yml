@@ -95,7 +95,7 @@ services:
       bash -c "echo Hello ${TANGO_APP_NAME}."
 
   # do some init on internal volume
-  # populate artefact named volume with a foo file because when mounting an empty named volume on {$TANGO_ARTEFACT_MOUNT_POINT}, it might get existing content (i.e : cdrom, floppy, usb... for /media)
+  # populate artefact named volume with a foo file because when mounting an empty named volume on {$TANGO_ARTEFACT_MOUNT_POINT}, it might get existing content if TANGO_ARTEFACT_MOUNT_POINT have content on host (i.e : cdrom, floppy, usb... for /media)
   volume_init:
     image: ${TANGO_SHELL_IMAGE}
     container_name: ${TANGO_INSTANCE_NAME}_volume_init
@@ -119,7 +119,7 @@ services:
     volumes:
       - data:/data
       - internal_data:/internal_data
-      - artefact:${TANGO_ARTEFACT_MOUNT_POINT:-/artefact}
+      #- artefact:${TANGO_ARTEFACT_MOUNT_POINT:-/artefact}
     env_file:
       - ${GENERATED_ENV_FILE_FOR_COMPOSE}
     networks:
