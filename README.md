@@ -544,10 +544,26 @@ i.e with HTTPS redirection engine disabled
 
 ## GPU
 
+* First, you will need nvidia-docker2 or nvidia-container-toolkit depending on your docker version
 
-* To confirm your host kernel supports the Intel Quick Sync feature, the following command can be executed on the host `lspci -v -s $(lspci | grep VGA | cut -d" " -f 1)` which should output `Kernel driver in use: i915` 
-* If your Docker host also has a dedicated graphics card, the video encoding acceleration of Intel Quick Sync Video may become unavailable when the GPU is in use. 
+* To make a GPU available into some service declare it with `SERVICE_GPU=INTEL_QUICKSYNC|NVIDIA` (ie : `PLEX_GPU=NVIDIA`)
 
+* About intel quicksync :
+    * To confirm your host kernel supports the Intel Quick Sync feature, the following command can be executed on the host `lspci -v -s $(lspci | grep VGA | cut -d" " -f 1)` which should output `Kernel driver in use: i915` 
+    * If your Docker host also has a dedicated graphics card, the video encoding acceleration of Intel Quick Sync Video may become unavailable when the GPU is in use. 
+
+
+## Troubleshooting
+
+
+* Problem with a volume
+    * May occurs when you move some folder with your data
+    * FIX : delete docker volume with `docker volume rm <volumename>`
+    * Sample
+    ```
+       ERROR: Configuration for volume tango_shared_internal_data specifies "device" driver_opt /foo/folder/tango_shared, but a volume with the same name uses a different "device" driver_opt (/foo/bar/tango_shared). If you wish to use the new configuration, please remove the existing volume "tango_shared_internal_data" first:
+        $ docker volume rm tango_shared_internal_data
+    ```
 
 
 ## Side notes
