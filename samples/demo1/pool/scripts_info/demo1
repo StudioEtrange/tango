@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+echo "---------==---- ${TANGO_APP_NAME_CAPS} SPECIFIC INFO ----==---------"
+echo Hello from ${TANGO_APP_NAME}
+

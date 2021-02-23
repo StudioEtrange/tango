@@ -50,12 +50,12 @@
                 "web_secondary_secure"
             ],
             "service": "medusa",
-            "rule": "HostRegexp(`{subdomain:medusa.}{domain:chimere-harpie.org}`)",
+            "rule": "HostRegexp(`{subdomain:medusa.}{domain:domain.com}`)",
             "tls": {
                 "certResolver": "tango",
                 "domains": [
                     {
-                        "main": "medusa.chimere-harpie.org"
+                        "main": "medusa.domain.com"
                     }
                 ]
             },
@@ -69,7 +69,7 @@
                 "web_secondary"
             ],
             "service": "medusa",
-            "rule": "HostRegexp(`{subdomain:medusa.}{domain:chimere-harpie.org}`)",
+            "rule": "HostRegexp(`{subdomain:medusa.}{domain:domain.com}`)",
             "priority": 50,
             "status": "enabled",
             "using": [
@@ -81,12 +81,12 @@
                 "web_secondary_secure"
             ],
             "service": "ombi",
-            "rule": "HostRegexp(`{subdomain:ombi.}{domain:chimere-harpie.org}`)",
+            "rule": "HostRegexp(`{subdomain:ombi.}{domain:domain.com}`)",
             "tls": {
                 "certResolver": "tango",
                 "domains": [
                     {
-                        "main": "ombi.chimere-harpie.org"
+                        "main": "ombi.domain.com"
                     }
                 ]
             },
@@ -100,7 +100,7 @@
                 "web_secondary"
             ],
             "service": "ombi",
-            "rule": "HostRegexp(`{subdomain:ombi.}{domain:chimere-harpie.org}`)",
+            "rule": "HostRegexp(`{subdomain:ombi.}{domain:domain.com}`)",
             "priority": 50,
             "status": "enabled",
             "using": [
@@ -112,12 +112,12 @@
                 "web_main_secure"
             ],
             "service": "organizr2",
-            "rule": "HostRegexp(`{subdomain:media.}{domain:chimere-harpie.org}`)",
+            "rule": "HostRegexp(`{subdomain:media.}{domain:domain.com}`)",
             "tls": {
                 "certResolver": "tango",
                 "domains": [
                     {
-                        "main": "media.chimere-harpie.org"
+                        "main": "media.domain.com"
                     }
                 ]
             },
@@ -131,7 +131,7 @@
                 "web_main"
             ],
             "service": "organizr2",
-            "rule": "HostRegexp(`{subdomain:media.}{domain:chimere-harpie.org}`)",
+            "rule": "HostRegexp(`{subdomain:media.}{domain:domain.com}`)",
             "priority": 50,
             "status": "enabled",
             "using": [
@@ -143,12 +143,12 @@
                 "web_main_secure"
             ],
             "service": "plex",
-            "rule": "HostRegexp(`{subdomain:plex.}{domain:chimere-harpie.org}`)",
+            "rule": "HostRegexp(`{subdomain:plex.}{domain:domain.com}`)",
             "tls": {
                 "certResolver": "tango",
                 "domains": [
                     {
-                        "main": "plex.chimere-harpie.org"
+                        "main": "plex.domain.com"
                     }
                 ]
             },
@@ -162,7 +162,7 @@
                 "web_main"
             ],
             "service": "plex",
-            "rule": "HostRegexp(`{subdomain:plex.}{domain:chimere-harpie.org}`)",
+            "rule": "HostRegexp(`{subdomain:plex.}{domain:domain.com}`)",
             "priority": 200,
             "status": "enabled",
             "using": [
@@ -177,12 +177,12 @@
                 "sabnzbd-stripprefix@docker"
             ],
             "service": "sabnzbd",
-            "rule": "HostRegexp(`{subdomain:sabnzbd.}{domain:chimere-harpie.org}`) || HostRegexp(`{domain:chimere-harpie.org}`) \u0026\u0026 PathPrefix(`/sabnzbd`)",
+            "rule": "HostRegexp(`{subdomain:sabnzbd.}{domain:domain.com}`) || HostRegexp(`{domain:domain.com}`) \u0026\u0026 PathPrefix(`/sabnzbd`)",
             "tls": {
                 "certResolver": "tango",
                 "domains": [
                     {
-                        "main": "sabnzbd.chimere-harpie.org"
+                        "main": "sabnzbd.domain.com"
                     }
                 ]
             },
@@ -199,7 +199,7 @@
                 "sabnzbd-stripprefix@docker"
             ],
             "service": "sabnzbd",
-            "rule": "HostRegexp(`{subdomain:sabnzbd.}{domain:chimere-harpie.org}`) || HostRegexp(`{domain:chimere-harpie.org}`) \u0026\u0026 PathPrefix(`/sabnzbd`)",
+            "rule": "HostRegexp(`{subdomain:sabnzbd.}{domain:domain.com}`) || HostRegexp(`{domain:domain.com}`) \u0026\u0026 PathPrefix(`/sabnzbd`)",
             "priority": 50,
             "status": "enabled",
             "using": [
@@ -211,12 +211,12 @@
                 "web_secondary_secure"
             ],
             "service": "tautulli",
-            "rule": "HostRegexp(`{subdomain:tautulli.}{domain:chimere-harpie.org}`)",
+            "rule": "HostRegexp(`{subdomain:tautulli.}{domain:domain.com}`)",
             "tls": {
                 "certResolver": "tango",
                 "domains": [
                     {
-                        "main": "tautulli.chimere-harpie.org"
+                        "main": "tautulli.domain.com"
                     }
                 ]
             },
@@ -230,7 +230,7 @@
                 "web_secondary"
             ],
             "service": "tautulli",
-            "rule": "HostRegexp(`{subdomain:tautulli.}{domain:chimere-harpie.org}`)",
+            "rule": "HostRegexp(`{subdomain:tautulli.}{domain:domain.com}`)",
             "priority": 50,
             "status": "enabled",
             "using": [
@@ -270,13 +270,13 @@
                 "traefik_api-redirect2@docker"
             ],
             "service": "api@internal",
-            "rule": "HostRegexp(`{subdomain:traefik.}{domain:chimere-harpie.org}`) \u0026\u0026 (PathPrefix(`/dashboard`) || PathPrefix(`/api`) || PathPrefix(`/`))",
+            "rule": "HostRegexp(`{subdomain:traefik.}{domain:domain.com}`) \u0026\u0026 (PathPrefix(`/dashboard`) || PathPrefix(`/api`) || PathPrefix(`/`))",
             "priority": 100,
             "tls": {
                 "certResolver": "tango",
                 "domains": [
                     {
-                        "main": "traefik.}chimere-harpie.org"
+                        "main": "traefik.}domain.com"
                     }
                 ]
             },
@@ -294,7 +294,7 @@
                 "traefik_api-redirect2@docker"
             ],
             "service": "api@internal",
-            "rule": "HostRegexp(`{subdomain:traefik.}{domain:chimere-harpie.org}`) \u0026\u0026 (PathPrefix(`/dashboard`) || PathPrefix(`/api`) || PathPrefix(`/`))",
+            "rule": "HostRegexp(`{subdomain:traefik.}{domain:domain.com}`) \u0026\u0026 (PathPrefix(`/dashboard`) || PathPrefix(`/api`) || PathPrefix(`/`))",
             "priority": 50,
             "status": "enabled",
             "using": [
@@ -309,13 +309,13 @@
                 "traefik_api_rest-auth@docker"
             ],
             "service": "rest@internal",
-            "rule": "HostRegexp(`{subdomain:traefik.}{domain:chimere-harpie.org}`) \u0026\u0026 PathPrefix(`/api/providers/rest`)",
+            "rule": "HostRegexp(`{subdomain:traefik.}{domain:domain.com}`) \u0026\u0026 PathPrefix(`/api/providers/rest`)",
             "priority": 101,
             "tls": {
                 "certResolver": "tango",
                 "domains": [
                     {
-                        "main": "traefik.}chimere-harpie.org"
+                        "main": "traefik.}domain.com"
                     }
                 ]
             },
@@ -332,7 +332,7 @@
                 "traefik_api_rest-auth@docker"
             ],
             "service": "rest@internal",
-            "rule": "HostRegexp(`{subdomain:traefik.}{domain:chimere-harpie.org}`) \u0026\u0026 PathPrefix(`/api/providers/rest`)",
+            "rule": "HostRegexp(`{subdomain:traefik.}{domain:domain.com}`) \u0026\u0026 PathPrefix(`/api/providers/rest`)",
             "priority": 51,
             "status": "enabled",
             "using": [
@@ -344,12 +344,12 @@
                 "web_secondary_secure"
             ],
             "service": "transmission",
-            "rule": "HostRegexp(`{subdomain:transmission.}{domain:chimere-harpie.org}`)",
+            "rule": "HostRegexp(`{subdomain:transmission.}{domain:domain.com}`)",
             "tls": {
                 "certResolver": "tango",
                 "domains": [
                     {
-                        "main": "transmission.chimere-harpie.org"
+                        "main": "transmission.domain.com"
                     }
                 ]
             },
@@ -363,7 +363,7 @@
                 "web_secondary"
             ],
             "service": "transmission",
-            "rule": "HostRegexp(`{subdomain:transmission.}{domain:chimere-harpie.org}`)",
+            "rule": "HostRegexp(`{subdomain:transmission.}{domain:domain.com}`)",
             "priority": 50,
             "status": "enabled",
             "using": [
@@ -375,12 +375,12 @@
                 "web_main_secure"
             ],
             "service": "web",
-            "rule": "HostRegexp(`{subdomain:web.}{domain:chimere-harpie.org}`)",
+            "rule": "HostRegexp(`{subdomain:web.}{domain:domain.com}`)",
             "tls": {
                 "certResolver": "tango",
                 "domains": [
                     {
-                        "main": "web.chimere-harpie.org"
+                        "main": "web.domain.com"
                     }
                 ]
             },
@@ -394,7 +394,7 @@
                 "web_main"
             ],
             "service": "web",
-            "rule": "HostRegexp(`{subdomain:web.}{domain:chimere-harpie.org}`)",
+            "rule": "HostRegexp(`{subdomain:web.}{domain:domain.com}`)",
             "priority": 50,
             "status": "enabled",
             "using": [
@@ -406,12 +406,12 @@
                 "web_main_secure"
             ],
             "service": "tautulli",
-            "rule": "HostRegexp(`{subdomain:web.}{domain:chimere-harpie.org}`) \u0026\u0026 (PathPrefix(`/image`) || PathPrefix(`/newsletter`))",
+            "rule": "HostRegexp(`{subdomain:web.}{domain:domain.com}`) \u0026\u0026 (PathPrefix(`/image`) || PathPrefix(`/newsletter`))",
             "tls": {
                 "certResolver": "tango",
                 "domains": [
                     {
-                        "main": "web.chimere-harpie.org"
+                        "main": "web.domain.com"
                     }
                 ]
             },
@@ -425,7 +425,7 @@
                 "web_main"
             ],
             "service": "tautulli",
-            "rule": "HostRegexp(`{subdomain:web.}{domain:chimere-harpie.org}`) \u0026\u0026 (PathPrefix(`/image`) || PathPrefix(`/newsletter`))",
+            "rule": "HostRegexp(`{subdomain:web.}{domain:domain.com}`) \u0026\u0026 (PathPrefix(`/image`) || PathPrefix(`/newsletter`))",
             "priority": 50,
             "status": "enabled",
             "using": [
