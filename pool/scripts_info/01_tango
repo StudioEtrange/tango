@@ -134,7 +134,7 @@ echo "L-- app modules list : ${TANGO_APP_MODULES_AVAILABLE}"
 
 echo "---------==---- PLUGINS ----==---------"
 echo "* Active plugins infos"
-echo "L-- a plugin act on a service"
+echo "L-- a plugin execute code into a running service"
 echo "L-- format : <plugin>[%<auto exec at launch into service1>][%!<manual exec into service2>][#arg1][#arg2]"
 echo "L-- list : ${TANGO_PLUGINS_FULL}"
 echo "* Available Tango plugins"

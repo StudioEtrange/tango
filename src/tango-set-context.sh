@@ -302,18 +302,23 @@ case ${ACTION} in
 		TANGO_DATA_PATH_SUBPATH_CREATE=
 		
 		# manage generic path
+		__tango_log "DEBUG" "tango" "path management -- list of path to manage : TANGO_PATH_LIST=${TANGO_PATH_LIST}"
 		for p in ${TANGO_PATH_LIST}; do
+			__tango_log "DEBUG" "tango" "       -L manage $p"
+			# if xxx_PATH not setted, will create TANGO_APP_WORK_ROOT/xxx_PATH_DEFAULT
 			if [ "${!p}" = "" ]; then
 				__default_path="${p}_DEFAULT"
 				__path="${!__default_path}"
+				__tango_log "DEBUG" "tango" "                -L $p not setted : will create folder ${p}_DEFAULT=$__path under TANGO_APP_WORK_ROOT=${TANGO_APP_WORK_ROOT}"
 				# export this path will update its value inside env files
 				eval "export ${p}=\"${TANGO_APP_WORK_ROOT}/${__path}\""
-				TANGO_APP_WORK_ROOT_SUBPATH_CREATE="${TANGO_APP_WORK_ROOT_SUBPATH} FOLDER ${__path}"
+				TANGO_APP_WORK_ROOT_SUBPATH_CREATE="${TANGO_APP_WORK_ROOT_SUBPATH_CREATE} FOLDER ${__path}"
 			fi
 			
 			# manage subpath list
 			__subpath_list="${p}_SUBPATH_LIST"
-			if [ ! "${__subpath_list}" = "" ]; then
+			__tango_log "DEBUG" "tango" "                -L manage subpath list of $p : ${__subpath_list}=${!__subpath_list}"
+			if [ ! "${!__subpath_list}" = "" ]; then
 				__create_path_instructions=
 				for s in ${!__subpath_list}; do
 					if [ ! "${!s}" = "" ]; then
@@ -324,6 +329,7 @@ case ${ACTION} in
 					fi
 				done
 				# all subpath are FOLDER type
+				__tango_log "DEBUG" "tango" "                -L will create ${__create_path_instructions} as subpath of $p"
 				eval "${p}_SUBPATH_CREATE=\"FOLDER ${__create_path_instructions}\""
 			fi
 		done
@@ -334,24 +340,45 @@ case ${ACTION} in
 				TANGO_INSTANCE_NAME="tango_shared"
 				mkdir -p "${TANGO_WORK_ROOT}/tango_shared"
 				TANGO_DATA_PATH="${TANGO_WORK_ROOT}/tango_shared"
+				__tango_log "DEBUG" "tango" "Traefik is in shared mode between several app"
+				__tango_log "DEBUG" "tango" "        L [TANGO_INSTANCE_NAME=$TANGO_INSTANCE_NAME]"
+				__tango_log "DEBUG" "tango" "        L [TANGO_DATA_PATH=$TANGO_DATA_PATH]"
+				__tango_log "DEBUG" "tango" "        L [APP_DATA_PATH=$APP_DATA_PATH]"
 				;;
 			isolated )
 				TANGO_INSTANCE_NAME="${TANGO_APP_NAME}"
 				TANGO_DATA_PATH="${APP_DATA_PATH}"
+				__tango_log "DEBUG" "tango" "This traefik instance is dedicated to current app ${TANGO_APP_NAME}, so TANGO_DATA_PATH=APP_DATA_PATH"
+				__tango_log "DEBUG" "tango" "        L [TANGO_INSTANCE_NAME=$TANGO_INSTANCE_NAME]"
+				__tango_log "DEBUG" "tango" "        L [TANGO_DATA_PATH=$TANGO_DATA_PATH]"
+				__tango_log "DEBUG" "tango" "        L [APP_DATA_PATH=$APP_DATA_PATH]"
 				;;
 		esac
 
-		# hardocoded subpath relative to tango data
-		TANGO_DATA_PATH_SUBPATH_CREATE="${TANGO_DATA_PATH_SUBPATH_CREATE} FOLDER letsencrypt traefikconfig FILE letsencrypt/acme.json traefikconfig/generated.${TANGO_APP_NAME}.tls.yml"
 		TANGO_APP_NETWORK_NAME="${TANGO_INSTANCE_NAME}_default"
+		__tango_log "DEBUG" "tango" "        L [TANGO_APP_NETWORK_NAME=$TANGO_APP_NETWORK_NAME]"
+
+		# hardcoded subpath relative to tango data path
+		LETS_ENCRYPT_DATA_PATH="${TANGO_DATA_PATH}/letsencrypt"
+		TRAEFIK_CONFIG_DATA_PATH="${TANGO_DATA_PATH}/traefikconfig"
+		TANGO_DATA_PATH_SUBPATH_CREATE="${TANGO_DATA_PATH_SUBPATH_CREATE} FOLDER letsencrypt traefikconfig FILE letsencrypt/acme.json traefikconfig/generated.${TANGO_APP_NAME}.tls.yml"
 		GENERATED_TLS_FILE_PATH="${TANGO_DATA_PATH}/traefikconfig/generated.${TANGO_APP_NAME}.tls.yml"
+		
+		PLUGINS_DATA_PATH="${APP_DATA_PATH}/plugins"
+		__tango_log "DEBUG" "tango" "        L [PLUGINS_DATA_PATH=$PLUGINS_DATA_PATH]"
+		APP_DATA_PATH_SUBPATH_CREATE="${APP_DATA_PATH_SUBPATH_CREATE} FOLDER plugins"
+		__tango_log "DEBUG" "tango" "Add hardcoded paths instructions to create letsencrypt, traefik config and plugins data folders"
+		__tango_log "DEBUG" "tango" "        L TANGO_DATA_PATH_SUBPATH_CREATE=$TANGO_DATA_PATH_SUBPATH_CREATE"
+		__tango_log "DEBUG" "tango" "        L APP_DATA_PATH_SUBPATH_CREATE=$APP_DATA_PATH_SUBPATH_CREATE"
 
 		# path pointing where the tango cross-app data will be stored
 		__add_declared_variables "TANGO_DATA_PATH"
 		__add_declared_variables "TANGO_INSTANCE_NAME"
-		#__add_declared_variables "TANGO_SHARED_DATA_PATH"
 		__add_declared_variables "GENERATED_TLS_FILE_PATH"
 		__add_declared_variables "TANGO_APP_NETWORK_NAME"
+		__add_declared_variables "PLUGINS_DATA_PATH"
+		__add_declared_variables "LETS_ENCRYPT_DATA_PATH"
+		__add_declared_variables "TRAEFIK_CONFIG_DATA_PATH"
 
 
 		

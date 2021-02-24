@@ -1615,14 +1615,22 @@ __create_path_all() {
 	local __create_path_instructions=
 	local __root=
 
-	# first create these root folders before all other that might be subfolders
-	__create_path "${TANGO_APP_WORK_ROOT}" "${TANGO_APP_WORK_ROOT_SUBPATH_CREATE}"
-	__create_path "${TANGO_DATA_PATH}" "${TANGO_DATA_PATH_SUBPATH_CREATE}"
-	
+	# force to create first these root folders before all other that might be subfolders
+	if [ ! "${TANGO_APP_WORK_ROOT_SUBPATH_CREATE}" = "" ]; then
+		__tango_log "DEBUG" "tango" "__create_path_all() parse TANGO_APP_WORK_ROOT_SUBPATH_CREATE instructions"
+		__create_path "${TANGO_APP_WORK_ROOT}" "${TANGO_APP_WORK_ROOT_SUBPATH_CREATE}"
+	fi
+	if [ ! "${TANGO_DATA_PATH_SUBPATH_CREATE}" = "" ]; then
+		__tango_log "DEBUG" "tango" "__create_path_all() parse TANGO_DATA_PATH_SUBPATH_CREATE instructions"
+		__create_path "${TANGO_DATA_PATH}" "${TANGO_DATA_PATH_SUBPATH_CREATE}"
+	fi
 
+	# create others folders
 	for p in $(compgen -A variable | grep _SUBPATH_CREATE$); do
+		[ "$p" = "TANGO_APP_WORK_ROOT_SUBPATH_CREATE" ] && continue
+		[ "$p" = "TANGO_DATA_PATH_SUBPATH_CREATE" ] && continue
+		__tango_log "DEBUG" "tango" "__create_path_all() instructions of ${p}"
 		__create_path_instructions="${!p}"
-		__tango_log "DEBUG" "tango" "__create_path_all ${p} create instructions : ${!p}"
 		if [ ! "${__create_path_instructions}" = "" ]; then
 			__root="${p%_SUBPATH_CREATE}"
 			[ ! "${!__root}" = "" ] && __create_path "${!__root}" "${__create_path_instructions}"
@@ -1635,7 +1643,7 @@ __create_path_all() {
 # create various sub folder and files if not exist
 # using TANGO_USER_ID
 # root must exist
-# format example : xxx_SUBPATH="FOLDER letsencrypt traefikconfig FILE letsencrypt/acme.json traefikconfig/generated.${TANGO_APP_NAME}.tls.yml"
+# format example : __create_path "/path" "FOLDER foo bar FILE foo/file.txt FOLDER letsencrypt traefikconfig FILE letsencrypt/acme.json traefikconfig/generated.${TANGO_APP_NAME}.tls.yml"
 __create_path() {
 	local __root="$1"
 	local __list="$2"
@@ -1649,7 +1657,7 @@ __create_path() {
 		return
 	fi
 
-	__tango_log "DEBUG" "tango" "__create_path root : ${__root} folders : ${__list}"
+	__tango_log "DEBUG" "tango" "__create_path() ROOT=${__root} INSTRUCTIONS=${__list}"
 	for p in ${__list}; do
 		[ "${p}" = "FOLDER" ] && __folder=1 && __file= && continue
 		[ "${p}" = "FILE" ] && __folder= && __file=1 && continue
@@ -1658,13 +1666,13 @@ __create_path() {
 		if [ "${__folder}" = "1" ]; then
 			if [ ! -d "${__path}" ]; then
 				__msg=$(docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} --network ${TANGO_APP_NETWORK_NAME} -v "${__root}":"/foo" ${TANGO_SHELL_IMAGE} bash -c 'mkdir -p /foo/'${p}' && chown '${TANGO_USER_ID}':'${TANGO_GROUP_ID}' /foo/'${p})
-				[ ! "${__msg}" = "" ] && __tango_log "DEBUG" "tango" "__create_path msg : ${__msg}"
+				[ ! "${__msg}" = "" ] && __tango_log "DEBUG" "tango" "__create_path() msg : ${__msg}"
 			fi
 		fi
 		if [ "${__file}" = "1" ]; then
 			if [ ! -f "${__path}" ]; then
 				__msg=$(docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} --network ${TANGO_APP_NETWORK_NAME} -v "${__root}":"/foo" ${TANGO_SHELL_IMAGE} bash -c 'touch /foo/'${p}' && chown '${TANGO_USER_ID}':'${TANGO_GROUP_ID}' /foo/'${p})
-				[ ! "${__msg}" = "" ] && __tango_log "DEBUG" "tango" "__create_path msg : ${__msg}"
+				[ ! "${__msg}" = "" ] && __tango_log "DEBUG" "tango" "__create_path() msg : ${__msg}"
 			fi
 		fi
 	done

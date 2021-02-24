@@ -1,6 +1,6 @@
 .DS_Store
-cache/
-workspace/
+**/cache/
+**/workspace/
 generated*
-letsencrypt/
-traefikconfig/
+**/letsencrypt/
+**/traefikconfig/

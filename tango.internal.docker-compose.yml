@@ -35,14 +35,14 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: ${TANGO_DATA_PATH}/letsencrypt
+      device: ${LETS_ENCRYPT_DATA_PATH}
     name: ${TANGO_INSTANCE_NAME}_letsencrypt
   traefikconfig:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: ${TANGO_DATA_PATH}/traefikconfig
+      device: ${TRAEFIK_CONFIG_DATA_PATH}
     name: ${TANGO_INSTANCE_NAME}_traefikconfig
 
 # See detail variable here : https://github.com/StudioEtrange/openvpn-client

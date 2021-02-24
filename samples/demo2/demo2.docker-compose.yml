@@ -5,7 +5,7 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: ${APP_DATA_PATH}/${WEB2_ROOT_FOLDER}
+      device: ${WEB2_PATH}
     name: ${TANGO_APP_NAME}_web2_data
 
 services:
@@ -23,10 +23,11 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.web2.entrypoints=${WEB2_ENTRYPOINTS:-web_main}"
       - "traefik.http.routers.web2.rule=HostRegexp(`{subdomain:web2}.{domain:${TANGO_DOMAIN:-.*}}`)"
-      - "traefik.http.routers.web2.priority=${WEB2_PRIORITY:-200}"
+      - "traefik.http.routers.web2.priority=${WEB2_PRIORITY}"
       - "traefik.http.routers.web2.service=web2"
       - "traefik.http.routers.web2-secure.entrypoints=${WEB2_ENTRYPOINTS_SECURE:-web_main_secure}"
       - "traefik.http.routers.web2-secure.rule=HostRegexp(`{subdomain:web2}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.web2-secure.priority=${WEB2_PRIORITY}"
       - "traefik.http.routers.web2-secure.service=web2"
       - "traefik.http.routers.web2-secure.tls=true"
       - "traefik.http.routers.web2-secure.tls.domains[0].main=web2.${TANGO_DOMAIN:-.*}"
@@ -49,10 +50,11 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.whoami.entrypoints=${WHOAMI_ENTRYPOINTS:-web_main}"
       - "traefik.http.routers.whoami.rule=HostRegexp(`{subdomain:whoami}.{domain:${TANGO_DOMAIN:-.*}}`)"
-      - "traefik.http.routers.whoami.priority=${WWHOAMI_PRIORITY:-200}"
+      - "traefik.http.routers.whoami.priority=${WHOAMI_PRIORITY}"
       - "traefik.http.routers.whoami.service=whoami"
-      - "traefik.http.routers.whoami-secure.entrypoints=${WWHOAMI_ENTRYPOINTS_SECURE:-web_main_secure}"
+      - "traefik.http.routers.whoami-secure.entrypoints=${WHOAMI_ENTRYPOINTS_SECURE:-web_main_secure}"
       - "traefik.http.routers.whoami-secure.rule=HostRegexp(`{subdomain:whoami}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.whoami-secure.priority=${WHOAMI_PRIORITY}"
       - "traefik.http.routers.whoami-secure.service=whoami"
       - "traefik.http.routers.whoami-secure.tls=true"
       - "traefik.http.routers.whoami-secure.tls.domains[0].main=whoami.${TANGO_DOMAIN:-.*}"
@@ -85,10 +87,11 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.firefox.entrypoints=${FIREFOX_ENTRYPOINTS:-web_main}"
       - "traefik.http.routers.firefox.rule=HostRegexp(`{subdomain:firefox}.{domain:${TANGO_DOMAIN:-.*}}`)"
-      - "traefik.http.routers.firefox.priority=${FIREFOX_PRIORITY:-200}"
+      - "traefik.http.routers.firefox.priority=${FIREFOX_PRIORITY}"
       - "traefik.http.routers.firefox.service=firefox"
       - "traefik.http.routers.firefox-secure.entrypoints=${FIREFOX_ENTRYPOINTS_SECURE:-web_main_secure}"
       - "traefik.http.routers.firefox-secure.rule=HostRegexp(`{subdomain:firefox}.{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.firefox-secure.priority=${FIREFOX_PRIORITY}"
       - "traefik.http.routers.firefox-secure.service=firefox"
       - "traefik.http.routers.firefox-secure.tls=true"
       - "traefik.http.routers.firefox-secure.tls.domains[0].main=firefox.${TANGO_DOMAIN:-.*}"
@@ -97,7 +100,6 @@ services:
       - "traefik.http.services.firefox.loadbalancer.passhostheader=true"
     networks:
       - default
-    #network_mode: "service:vpn"
     expose:
       - 5000
     
