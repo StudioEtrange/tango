@@ -141,7 +141,7 @@ case ${ACTION} in
 		# check plugins exist and build list and map
 		[ ! "${TANGO_PLUGINS}" = "" ] && __filter_items_exists "plugin"
 
-
+		
 
 		# generate compose env files
 		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __create_env_for_docker_compose

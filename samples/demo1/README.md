@@ -1,5 +1,10 @@
 # tango sample
 
+Into demo1.docker-compose.yml and demo1.env
+
+* services definition for
+    * web2
+    * whoami
 
 ## commands
 

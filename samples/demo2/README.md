@@ -1,5 +1,16 @@
 # tango sample
 
+## content
+
+Into demo2.docker-compose.yml and demo2.env
+
+* services definition for
+    * web2
+    * whoami
+    * firefox
+
+* usage declaration of tango predefined module cloud9
+
 ## commands
 
 ```
