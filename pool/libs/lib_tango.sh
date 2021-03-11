@@ -286,6 +286,9 @@ __create_docker_compose_file() {
 	# NOTE : do not explode anchors here, we need to keep anchor &default-vpn, because we add vpn sections later and we need &default-vpn still exists
 	cp -f "${TANGO_COMPOSE_FILE}" "${GENERATED_DOCKER_COMPOSE_FILE}"
 	
+	# manage traefik entrypoint
+	__add_entrypoints_all
+
 
 	# app compose file
 	[ -f "${TANGO_APP_COMPOSE_FILE}" ] && yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_APP_COMPOSE_FILE}")
@@ -293,10 +296,12 @@ __create_docker_compose_file() {
 	# user compose file
 	[ -f "${TANGO_USER_COMPOSE_FILE}" ] && yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_USER_COMPOSE_FILE}")
 
+
 	__set_module_all
 	__set_active_services_all
 	__set_time_all
 	__set_entrypoints_service_all
+	__set_entrypoints_subservice_all
 	__set_uri_info_service_all
 	__set_priority_router_all
 	__set_redirect_https_service_all
@@ -521,7 +526,7 @@ __set_letsencrypt_service_all() {
 			case ${LETS_ENCRYPT_CHALLENGE} in
 				HTTP )
 					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.httpchallenge=true"
-					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.httpchallenge.entrypoint=web_main"
+					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.httpchallenge.entrypoint=entry_main_http"
 				;;
 				DNS )
 					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.dnschallenge=true"
@@ -568,53 +573,71 @@ __set_uri_info_service_all() {
 				__subdomain="${!__var}"
 			fi
 			__add_declared_variables "${__service^^}_HOSTNAME"
-			[ "${TANGO_DOMAIN}" = ".*" ] && __hostname="${__subdomain}" || __hostname="${__subdomain}${TANGO_DOMAIN}"
+			[ "${TANGO_DOMAIN}" = '.*' ] && __hostname="${__subdomain}" || __hostname="${__subdomain}${TANGO_DOMAIN}"
 			eval "export ${__service^^}_HOSTNAME=${__hostname}"
 
 		fi
 
 		__service="${__service^^}"
 
-		__var="${__service}_ENTRYPOINTS_DEFAULT"
+		__var="${__service}_ENTRYPOINT_DEFAULT"
 		__entrypoint_default="${!__var}"
 		__entrypoint_default="${__entrypoint_default^^}"
 		
+		#WEB1_ENTRYPOINTS=entry_main_http
+		#WEB1_ENTRYPOINTS_SECURE=entry_main_http_secure
         for e in ${__entrypoints}; do
 			e="${e^^}"
-            __var="${e/WEB_/NETWORK_PORT_}"
+			# turn entry_main_http_secure into NETWORK_PORT_MAIN_SECURE
+            __var="${e/ENTRY_/NETWORK_PORT_}"
+			__var="${__var/_HTTP/}"
+			__var="${__var/_TCP/}"
+			__var="${__var/_UDP/}"
             __var="${__var^^}"
 			__port="${!__var}"
 			[ "${__port}" = "" ] && __address="${__hostname}" || __address="${__hostname}:${__port}"
-			__http=
-            case $e in
-                *SECURE )
-					__add_declared_variables "${__service}_HTTP_PORT_${e}"
-					__add_declared_variables "${__service}_HTTP_ADDRESS_${e}"
-					__add_declared_variables "${__service}_HTTP_URL_${e}"
-					__http="https://${__address}"
-					eval "export ${__service}_HTTP_PORT_${e}=${__port}"
-					eval "export ${__service}_HTTP_ADDRESS_${e}=${__address}"
-					eval "export ${__service}_HTTP_URL_${e}=${__http}"
-					if [ "${__entrypoint_default}_SECURE" = "$e" ]; then
-						__add_declared_variables "${__service}_HTTP_URL_DEFAULT_SECURE"
-						eval "export ${__service}_HTTP_URL_DEFAULT_SECURE=${__http}"
-					fi
+
+			case $e in
+				*_HTTP*)
+					case $e in
+						*SECURE )
+							__uri="https://${__address}"
+							;;
+						* )
+							__uri="http://${__address}"
+							;;
+					esac
 					;;
-				* )
-					__add_declared_variables "${__service}_HTTP_PORT_${e}"
-					__add_declared_variables "${__service}_HTTP_ADDRESS_${e}"
-					__add_declared_variables "${__service}_HTTP_URL_${e}"
-					__http="http://${__address}"
-					eval "export ${__service}_HTTP_PORT_${e}=${__port}"
-					eval "export ${__service}_HTTP_ADDRESS_${e}=${__address}"
-					eval "export ${__service}_HTTP_URL_${e}=${__http}"
-					if [ "${__entrypoint_default}" = "$e" ]; then
-						__add_declared_variables "${__service}_HTTP_URL_DEFAULT"
-						eval "export ${__service}_HTTP_URL_DEFAULT=${__http}"
-					fi
-				 	;;
-            esac
+				*_TCP*)
+					__uri="tcp://${__address}"
+					;;
+				*_UDP*)
+					__uri="udp://${__address}"
+					;;
+			esac
+		
+			__add_declared_variables "${__service}_PORT_${e}"
+			__add_declared_variables "${__service}_ADDRESS_${e}"
+			__add_declared_variables "${__service}_URI_${e}"
+			eval "export ${__service}_PORT_${e}=${__port}"
+			eval "export ${__service}_ADDRESS_${e}=${__address}"
+			eval "export ${__service}_URI_${e}=${__uri}"
 			
+			case $e in
+				*SECURE )
+					if [ "${__entrypoint_default}_SECURE" = "$e" ]; then
+						__add_declared_variables "${__service}_URI_DEFAULT_SECURE"
+						eval "export ${__service}_URI_DEFAULT_SECURE=${__uri}"
+					fi
+				;;
+				* )
+					if [ "${__entrypoint_default}" = "$e" ]; then
+						__add_declared_variables "${__service}_URI_DEFAULT"
+						eval "export ${__service}_URI_DEFAULT=${__uri}"
+					fi
+				;;
+			esac
+				
         done
 
 		
@@ -623,39 +646,168 @@ __set_uri_info_service_all() {
 	done
 }
 
+# Define network areas
+# Each network area have traefik entrypoint with a name, a protocol an internal port and an optionnal associated entrypoint
+# The associated entrypoint have same name with postfix _secure is mainly used to declare an alternative HTTPS entrypoint to a HTTP entrypoint
+# NETWORK_SERVICES_AREA_LIST=main|tcp|80|443 secondary|tcp|8000|8443 test|udp|41000 
+__add_entrypoints_all() {
+	
+	local __area_main_done=
+	for area in ${NETWORK_SERVICES_AREA_LIST}; do
+		IFS="|" read -r name proto internal_port secure_port <<<$(echo ${area})
+		__add_entrypoint "$name" "$proto" "$internal_port" "$secure_port"
+		[ "$name" = "main" ] && __area_main_done=1
+		__add_declared_variables "NETWORK_SERVICES_AREA_${name^^}_${proto^^}"
+	done
 
-# NOTE : a subservie as same entrypoint than its parent service
-__set_entrypoints_service_all() {
-	for s in ${NETWORK_SERVICES_AREA_ADMIN}; do
-		if __check_docker_compose_service_exist "${s}"; then
-			__set_entrypoint_service "${s}"  "web_admin"
-			__add_declared_variables "${s^^}_ENTRYPOINTS_DEFAULT"
-			eval "export ${s^^}_ENTRYPOINTS_DEFAULT=web_admin"
-		else
-			__tango_log "WARN" "tango" "unknow service ${s} declared in NETWORK_SERVICES_AREA_ADMIN"
-		fi
-	done
-	for s in ${NETWORK_SERVICES_AREA_SECONDARY}; do
-		if __check_docker_compose_service_exist "${s}"; then
-			__set_entrypoint_service "${s}"  "web_secondary"
-			__add_declared_variables "${s^^}_ENTRYPOINTS_DEFAULT"
-			eval "export ${s^^}_ENTRYPOINTS_DEFAULT=web_secondary"
-		else
-			__tango_log "WARN" "tango" "unknow service ${s} declared in NETWORK_SERVICES_AREA_SECONDARY"
-		fi
-	done
-	for s in ${NETWORK_SERVICES_AREA_MAIN}; do
-		if __check_docker_compose_service_exist "${s}"; then
-			__set_entrypoint_service "${s}"  "web_main"
-			__add_declared_variables "${s^^}_ENTRYPOINTS_DEFAULT"
-			eval "export ${s^^}_ENTRYPOINTS_DEFAULT=web_main"
-		else
-			__tango_log "WARN" "tango" "unknow service ${s} declared in NETWORK_SERVICES_AREA_MAIN"
-		fi
-	done
+	# add by default the main network area if not defined
+	if [ ! "$__area_main_done" = "1" ]; then
+		__add_entrypoint "main" "http" "80" "443"
+		NETWORK_SERVICES_AREA_LIST="main|http|80|443 $NETWORK_SERVICES_AREA_LIST"
+		__add_declared_variables "NETWORK_SERVICES_AREA_MAIN_HTTP"
+	fi
 
 }
 
+# __add_entrypoint "test" "udp" "41000"
+# 		"--entrypoints.entry_test_udp=true"
+#	    "--entrypoints.entry_test_udp.address=:41000/udp"
+# __add_entrypoint "second" "tcp" "8000"
+# 		"--entrypoints.entry_main_tcp=true"
+#	    "--entrypoints.entry_main_tcp.address=:8000/tcp"
+# __add_entrypoint "main" "http" "80" "443"
+# 		"--entrypoints.entry_main_http=true"
+#	    "--entrypoints.entry_main_http.address=:80/tcp"
+# 		"--entrypoints.entry_main_http_secure=true"
+#	    "--entrypoints.entry_main_http_secure.address=:443/tcp"
+__add_entrypoint() {
+	local __name="$1"
+	local __proto="$2"
+	local __internal_port="$3"
+	local __assiocated_entrypoint="$4" # optional
+	
+	local __real_proto
+	
+	case ${__proto} in
+		http|tcp )
+			__real_proto="tcp"
+		;;
+		udp )
+			__real_proto="udp"
+		;;
+	esac
+
+	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--entrypoints.entry_${__name}_${__proto}=true"
+	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--entrypoints.entry_${__name}_${__proto}.address=:${__internal_port}/${__real_proto}"
+	export TRAEFIK_ENTRYPOINTS_LIST="$TRAEFIK_ENTRYPOINTS_LIST entry_${__name}_${__proto}"
+	# add port mapping to traefik
+	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.ports[+]" "\${NETWORK_PORT_${__name^^}}:$__internal_port/${__real_proto}"
+	__add_declared_variables "NETWORK_PORT_${__name^^}"
+	
+	case ${__proto} in
+		http )
+			if [ ! "$__assiocated_entrypoint" = "" ]; then
+				yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--entrypoints.entry_${__name}_${__proto}_secure=true"
+				yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--entrypoints.entry_${__name}_${__proto}_secure.address=:${__assiocated_entrypoint}/${__real_proto}"
+				export TRAEFIK_ENTRYPOINTS_LIST="$TRAEFIK_ENTRYPOINTS_LIST entry_${__name}_${__proto}_secure"
+				# add port mapping to traefik
+				yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.ports[+]" "\${NETWORK_PORT_${__name^^}_SECURE}:$__assiocated_entrypoint/${__real_proto}"
+				__add_declared_variables "NETWORK_PORT_${__name^^}_SECURE"
+			fi
+		;;
+	esac
+
+	TRAEFIK_ENTRYPOINTS_LIST="$($STELLA_API trim ${TRAEFIK_ENTRYPOINTS_LIST})"
+	TRAEFIK_ENTRYPOINTS_LIST="${TRAEFIK_ENTRYPOINTS_LIST// /,}"
+	__add_declared_variables "TRAEFIK_ENTRYPOINTS_LIST"
+	
+}
+
+
+
+
+__set_entrypoints_service_all() {
+
+	local var
+	local parent_entrypoints_list
+
+	for area in ${NETWORK_SERVICES_AREA_LIST}; do
+		IFS="|" read -r name proto internal_port secure_port <<<$(echo ${area})
+
+		var="NETWORK_SERVICES_AREA_${name^^}_${proto^^}"
+
+		# assign each declared service or subservice attached to this area
+		for s in ${!var}; do
+			if __check_docker_compose_service_exist "${s}"; then
+				if [ "$secure_port" = "" ]; then
+					__set_entrypoint_service "${s}"  "entry_${name}_${proto}"
+				else
+					__set_entrypoint_service "${s}"  "entry_${name}_${proto}"
+					__set_entrypoint_service "${s}"  "entry_${name}_${proto}" "secure"
+				fi
+			else
+				__tango_log "WARN" "tango" "unknow service ${s} declared in $var"
+			fi
+		done
+	done
+
+
+}
+
+
+# parse subservice list to attach each subservice to its parent entrypoint if any and if not already attached
+# because by default each subservice have the same entrypoint than its parent service
+__set_entrypoints_subservice_all() {
+	local var
+	local parent
+	local parent_entrypoints_list
+	local __previous
+
+	for s in ${TANGO_SUBSERVICES_ROUTER}; do
+
+		parent=$(__get_subservice_parent "$s")
+
+		var="${s^^}_ENTRYPOINTS"
+		parent_entrypoints_list="${parent^^}_ENTRYPOINTS"
+
+		if [ "${!var}" = "" ]; then
+			__previous=
+			for pe in ${!parent_entrypoints_list}; do
+				#__var="${__service^^}_ENTRYPOINTS"
+				if [ ! "${!var}" = "" ]; then
+					__previous=",${!var}"
+				else
+					# first entrypoint attached to a service is the default one
+					__add_declared_variables "${s^^}_ENTRYPOINT_DEFAULT"
+					eval "export ${s^^}_ENTRYPOINT_DEFAULT=${pe}"
+				fi
+				eval "export ${var}=${pe}${__previous}"
+				__add_declared_variables "${var}"
+			done
+		fi
+
+		var="${s^^}_ENTRYPOINTS_SECURE"
+		parent_entrypoints_list="${parent^^}_ENTRYPOINTS_SECURE"
+
+		if [ "${!var}" = "" ]; then
+			__previous=
+			for pe in ${!parent_entrypoints_list}; do
+				#__var="${__service^^}_ENTRYPOINTS"
+				if [ ! "${!var}" = "" ]; then
+					__previous=",${!var}"
+				else
+					# first entrypoint attached to a service is the default one
+					__add_declared_variables "${s^^}_ENTRYPOINT_DEFAULT_SECURE"
+					eval "export ${s^^}_ENTRYPOINT_DEFAULT_SECURE=${pe}"
+				fi
+				eval "export ${var}=${pe}${__previous}"
+				__add_declared_variables "${var}"
+			done
+		fi
+
+
+	done
+}
 
 __set_priority_router_all() {
 	
@@ -692,22 +844,64 @@ __set_priority_router_all() {
 	done
 }
 
+
+# HTTP to HTTPS redirect routers - catch all request and redirect to secure entrypoint with HTTPS scheme if it is not the case
+# NOTE : we cannot use the method of set redirect middleware on each routers service because each service routers
+#        may have two entrypoints and middlewares dont know from which entrypoint the request come.
+#        So we use a global catch all router rule, using priority for exclude some services
+# NOTE : a redirect middleware will be dynamicly attached on each of these http-catchall-web_* routers
 __set_redirect_https_service_all() {
 	case ${NETWORK_REDIRECT_HTTPS} in
 		enable )
-			yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-web_admin.middlewares=redirect-web_admin_secure@docker"
-			yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-web_secondary.middlewares=redirect-web_secondary_secure@docker"
-			yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-web_main.middlewares=redirect-web_main_secure@docker"
-			yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-web_admin_secure.middlewares=redirect-web_admin_secure@docker"
-			yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-web_secondary_secure.middlewares=redirect-web_secondary_secure@docker"
-			yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-web_main_secure.middlewares=redirect-web_main_secure@docker"
-			
+			# create catchall routers
+			for area in ${NETWORK_SERVICES_AREA_LIST}; do
+				IFS="|" read -r name proto internal_port secure_port <<<$(echo ${area})
+				if [ "$proto" = "http" ]; then
+					if [ ! "$secure_port" = "" ]; then
+						# catch HTTP request on entry_xxx_tcp and entry_xxx_tcp_secure entrypoint
+						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}.entrypoints=entry_${name}_${proto},entry_${name}_${proto}_secure"
+						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}.rule=HostRegexp(\`{host:.+}\`)"
+						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}.priority=\${ROUTER_PRIORITY_HTTP_TO_HTTPS_VALUE}"
+						# catch HTTPS request on entry_xxx_tcp only entrypoint (no need to catch HTTPS on entry_xxx_tcp_secure)
+						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}_secure.entrypoints=entry_${name}_${proto}"
+						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}_secure.rule=HostRegexp(\`{host:.+}\`)"
+						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}_secure.priority=\${ROUTER_PRIORITY_HTTP_TO_HTTPS_VALUE}"
+						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}_secure.tls=true"
+						
+						# - "traefik.http.routers.http-catchall-entry_admin_tcp.entrypoints=entry_admin_tcp,entry_admin_tcp_secure"
+						# - "traefik.http.routers.http-catchall-entry_admin_tcp.rule=HostRegexp(`{host:.+}`)"
+						# - "traefik.http.routers.http-catchall-entry_admin_tcp.priority=${ROUTER_PRIORITY_HTTP_TO_HTTPS_VALUE}"
+
+						# - "traefik.http.routers.http-catchall-entry_admin_tcp_secure.entrypoints=entry_admin_tcp"
+						# - "traefik.http.routers.http-catchall-entry_admin_tcp_secure.rule=HostRegexp(`{host:.+}`)"
+						# - "traefik.http.routers.http-catchall-entry_admin_tcp_secure.priority=${ROUTER_PRIORITY_HTTP_TO_HTTPS_VALUE}"
+						# - "traefik.http.routers.http-catchall-entry_admin_tcp_secure.tls=true"
+						
+						# declare HTTP to HTTPS redirect middlewares
+						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.middlewares.redirect-entry_${name}_${proto}_secure.redirectscheme.scheme=https"
+						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.middlewares.redirect-entry_${name}_${proto}_secure.redirectscheme.permanent=true"
+						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.middlewares.redirect-entry_${name}_${proto}_secure.redirectscheme.port=\${NETWORK_PORT_${name^^}_SECURE}"
+						
+						# - "traefik.http.middlewares.redirect-entry_main_tcp_secure.redirectscheme.scheme=https"
+						# - "traefik.http.middlewares.redirect-entry_main_tcp_secure.redirectscheme.permanent=true"
+						# - "traefik.http.middlewares.redirect-entry_main_tcp_secure.redirectscheme.port=${NETWORK_PORT_MAIN_SECURE}"
+
+						# add middleware to catchall routers
+						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}.middlewares=redirect-entry_${name}_${proto}_secure@docker"
+						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}_secure.middlewares=redirect-entry_${name}_${proto}_secure@docker"	
+
+						#   - traefik.http.routers.http-catchall-entry_main_tcp.middlewares=redirect-entry_main_tcp_secure@docker
+						#   - traefik.http.routers.http-catchall-entry_main_tcp_secure.middlewares=redirect-entry_main_tcp_secure@docker
+					fi
+				fi
+			done
+
 			for s in ${NETWORK_SERVICES_REDIRECT_HTTPS}; do
 				__set_redirect_https_service "${s}"
 			done
-			;;
+		;;
 		* )
-			;;
+		;;
 	esac
 
 	
@@ -767,8 +961,9 @@ __set_module() {
 	esac
 
 	# entrypoint
-	# default area is 'main'
-	local __area="main"
+	# default area is 'main_http'
+	local __area="main_http"
+	# MODULE_NETWORK_AREA is setted by __parse_item()
 	[ ! "${MODULE_NETWORK_AREA}" = "" ] && __area="${MODULE_NETWORK_AREA}"
 	__area="NETWORK_SERVICES_AREA_${__area^^}"
 	eval "export ${__area}=\"${!__area} ${MODULE_NAME}\""
@@ -1152,22 +1347,44 @@ __pick_free_port() {
 	done
 	[ ! "${__exclude}" = "" ] && __exclude="EXCLUDE_LIST_BEGIN ${__exclude} EXCLUDE_LIST_END"
 
-	__free_port_list="$($STELLA_API find_free_port "6" "TCP RANGE_BEGIN 10000 RANGE_END 65000 CONSECUTIVE ${__exclude}")"
+	local __nb_port=0
+	for area in ${NETWORK_SERVICES_AREA_LIST}; do
+		IFS="|" read -r name proto internal_port secure_port <<<$(echo ${area})
+		(( __nb_port ++ ))
+		[ ! "$secure_port" = "" ] && (( __nb_port ++ ))
+	done
+
+	__free_port_list="$($STELLA_API find_free_port "$__nb_port" "TCP RANGE_BEGIN 10000 RANGE_END 65000 CONSECUTIVE ${__exclude}")"
+
 	if [ ! "${__free_port_list}" = "" ]; then
 		__free_port_list=( ${__free_port_list} )
-		NETWORK_PORT_MAIN=${__free_port_list[0]}
-		NETWORK_PORT_MAIN_SECURE=${__free_port_list[1]}
-		NETWORK_PORT_SECONDARY=${__free_port_list[2]}
-		NETWORK_PORT_SECONDARY_SECURE=${__free_port_list[3]}
-		NETWORK_PORT_ADMIN=${__free_port_list[4]}
-		NETWORK_PORT_ADMIN_SECURE=${__free_port_list[5]}
+		
+		local i=0
+		for area in ${NETWORK_SERVICES_AREA_LIST}; do
+			IFS="|" read -r name proto internal_port secure_port <<<$(echo ${area})
+			
+			eval NETWORK_PORT_${name^^}=${__free_port_list[$i]}
+			echo "NETWORK_PORT_${name^^}=${__free_port_list[$i]}" > "${GENERATED_ENV_FILE_FREEPORT}"
+			(( i ++ ))
+			if [ ! "$secure_port" = "" ]; then
+				eval NETWORK_PORT_${name^^}_SECURE=${__free_port_list[$i]}
+				echo "NETWORK_PORT_${name^^}_SECURE=${__free_port_list[$i]}" >> "${GENERATED_ENV_FILE_FREEPORT}"
+				(( i ++ ))
+			fi
+			# NETWORK_PORT_MAIN=${__free_port_list[0]}
+			# NETWORK_PORT_MAIN_SECURE=${__free_port_list[1]}
+			# NETWORK_PORT_SECONDARY=${__free_port_list[2]}
+			# NETWORK_PORT_SECONDARY_SECURE=${__free_port_list[3]}
+			# NETWORK_PORT_ADMIN=${__free_port_list[4]}
+			# NETWORK_PORT_ADMIN_SECURE=${__free_port_list[5]}
 
-		echo "NETWORK_PORT_MAIN=${__free_port_list[0]}" > "${GENERATED_ENV_FILE_FREEPORT}"
-		echo "NETWORK_PORT_MAIN_SECURE=${__free_port_list[1]}" >> "${GENERATED_ENV_FILE_FREEPORT}"
-		echo "NETWORK_PORT_SECONDARY=${__free_port_list[2]}" >> "${GENERATED_ENV_FILE_FREEPORT}"
-		echo "NETWORK_PORT_SECONDARY_SECURE=${__free_port_list[3]}" >> "${GENERATED_ENV_FILE_FREEPORT}"
-		echo "NETWORK_PORT_ADMIN=${__free_port_list[4]}" >> "${GENERATED_ENV_FILE_FREEPORT}"
-		echo "NETWORK_PORT_ADMIN_SECURE=${__free_port_list[5]}" >> "${GENERATED_ENV_FILE_FREEPORT}"
+			# echo "NETWORK_PORT_MAIN=${__free_port_list[0]}" > "${GENERATED_ENV_FILE_FREEPORT}"
+			# echo "NETWORK_PORT_MAIN_SECURE=${__free_port_list[1]}" >> "${GENERATED_ENV_FILE_FREEPORT}"
+			# echo "NETWORK_PORT_SECONDARY=${__free_port_list[2]}" >> "${GENERATED_ENV_FILE_FREEPORT}"
+			# echo "NETWORK_PORT_SECONDARY_SECURE=${__free_port_list[3]}" >> "${GENERATED_ENV_FILE_FREEPORT}"
+			# echo "NETWORK_PORT_ADMIN=${__free_port_list[4]}" >> "${GENERATED_ENV_FILE_FREEPORT}"
+			# echo "NETWORK_PORT_ADMIN_SECURE=${__free_port_list[5]}" >> "${GENERATED_ENV_FILE_FREEPORT}"
+		done
 	fi
 }
 
@@ -1243,7 +1460,7 @@ __create_vpn() {
 	export TANGO_TIME_VOLUME_SERVICES="${TANGO_TIME_VOLUME_SERVICES} ${__service_name}"
 }
 
-
+# NOTE : check a docker compose service exist (not a subservice)
 __check_docker_compose_service_exist() {
 	local __service="$1"
 	
@@ -1338,23 +1555,45 @@ __add_letsencrypt_service() {
 	fi
 }
 
-# declare an entrypoint to a service as well to the secured version of the entrypoint
+# attach an entrypoint to a service or a subservice as well to the secured version of the entrypoint
+# it will update a list of entrypoint for the service
 # NOTE : a subservie as same entrypoint than its parent service
+# __service : service name
+# __entrypoint : entrypoint name
+# __secure : "secure|<empty>" declare the entrypoint as secure
+# __set_entrypoint_service "web1" "entry_main_http" "secure"
 __set_entrypoint_service() {
 	local __service="$1"
 	local __entrypoint="$2"
-	local __var="${__service^^}_ENTRYPOINTS"
-	local __var_secure="${__service^^}_ENTRYPOINTS_SECURE"
+	local __secure="$3"
 
+	local __var
 	local __previous
-	[ ! "${!__var}" = "" ] && __previous=",${!__var}"
-	eval "export ${__var}=${__entrypoint}${__previous}"
-	__add_declared_variables "${__var}"
 
-	__previous=
-	[ ! "${!__var_secure}" = "" ] && __previous=",${!__var_secure}"
-	eval "export ${__var_secure}=${__entrypoint}_secure${__previous}"
-	__add_declared_variables "${__var_secure}"
+
+	if [ "$__secure" = "secure" ]; then
+		__var="${__service^^}_ENTRYPOINTS_SECURE"
+		if [ ! "${!__var}" = "" ]; then
+			__previous=",${!__var}"
+		else
+			# first entrypoint attached to a service is the default one
+			__add_declared_variables "${__service^^}_ENTRYPOINT_DEFAULT_SECURE"
+			eval "export ${__service^^}_ENTRYPOINT_DEFAULT_SECURE=${__entrypoint}_secure"
+		fi
+		eval "export ${__var}=${__entrypoint}_secure${__previous}"
+		__add_declared_variables "${__var}"
+	else
+		__var="${__service^^}_ENTRYPOINTS"
+		if [ ! "${!__var}" = "" ]; then
+			__previous=",${!__var}"
+		else
+			# first entrypoint attached to a service is the default one
+			__add_declared_variables "${__service^^}_ENTRYPOINT_DEFAULT"
+			eval "export ${__service^^}_ENTRYPOINT_DEFAULT=${__entrypoint}"
+		fi
+		eval "export ${__var}=${__entrypoint}${__previous}"
+		__add_declared_variables "${__var}"
+	fi
 
 }
 
@@ -1553,7 +1792,9 @@ __base64_basic_authentification() {
 # launch a curl command from a docker image in priority if docker is available or from curl from host if not
 __tango_curl() {
 	if __is_docker_client_available; then
-		docker run --user "${TANGO_USER_ID}:${TANGO_GROUP_ID}" --network "${TANGO_APP_NETWORK_NAME}" --rm curlimages/curl:7.70.0 "$@"
+		local __id="mambo_$($STELLA_API generate_password 8 "[:alnum:]")"
+		docker run --name $__id --user "${TANGO_USER_ID}:${TANGO_GROUP_ID}" --network "${TANGO_APP_NETWORK_NAME}" --rm curlimages/curl:7.70.0 "$@"
+		docker rm $__is 1>&2 2>/dev/null
 	else
 		type curl &>/dev/null && curl "$@"
 	fi
@@ -1665,14 +1906,34 @@ __create_path() {
 		# NOTE : on some case chown throw an error, it might be ignored
 		if [ "${__folder}" = "1" ]; then
 			if [ ! -d "${__path}" ]; then
-				__msg=$(docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} --network ${TANGO_APP_NETWORK_NAME} -v "${__root}":"/foo" ${TANGO_SHELL_IMAGE} bash -c 'mkdir -p /foo/'${p}' && chown '${TANGO_USER_ID}':'${TANGO_GROUP_ID}' /foo/'${p})
+				__msg=$(docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} -v "${__root}":"/foo" ${TANGO_SHELL_IMAGE} bash -c 'mkdir -p /foo/'${p}' && chown '${TANGO_USER_ID}':'${TANGO_GROUP_ID}' /foo/'${p})
 				[ ! "${__msg}" = "" ] && __tango_log "DEBUG" "tango" "__create_path() msg : ${__msg}"
+				# wait more time if not created yet
+				__tango_log "DEBUG" "tango" "__create_path() Wait for folder $__path exists"
+				while [ ! -d "$__path" ]
+				do
+					printf "."
+					#__tango_log "DEBUG" "tango" "__create_path() Wait for folder $__path exists"
+					sleep 1
+				done
+				echo
+				__tango_log "DEBUG" "tango" "done"
 			fi
 		fi
 		if [ "${__file}" = "1" ]; then
 			if [ ! -f "${__path}" ]; then
-				__msg=$(docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} --network ${TANGO_APP_NETWORK_NAME} -v "${__root}":"/foo" ${TANGO_SHELL_IMAGE} bash -c 'touch /foo/'${p}' && chown '${TANGO_USER_ID}':'${TANGO_GROUP_ID}' /foo/'${p})
+				__msg=$(docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} -v "${__root}":"/foo" ${TANGO_SHELL_IMAGE} bash -c 'touch /foo/'${p}' && chown '${TANGO_USER_ID}':'${TANGO_GROUP_ID}' /foo/'${p})
 				[ ! "${__msg}" = "" ] && __tango_log "DEBUG" "tango" "__create_path() msg : ${__msg}"
+				# wait more time if not created yet
+				__tango_log "DEBUG" "tango" "__create_path() Wait for file $__path exists"
+				while [ ! -f "$__path" ]
+				do
+					printf "."
+					#__tango_log "DEBUG" "tango" "__create_path() Wait for file $__path exists"
+					sleep 1
+				done
+				echo
+				__tango_log "DEBUG" "tango" "done"
 			fi
 		fi
 	done

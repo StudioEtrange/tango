@@ -13,11 +13,11 @@ services:
       - "traefik.http.services.cloud9.loadbalancer.server.scheme=http"
       - "traefik.http.services.cloud9.loadbalancer.passhostheader=true"
       # service router : cloud9
-      - "traefik.http.routers.cloud9.entrypoints=${CLOUD9_ENTRYPOINTS:-web_main}"
+      - "traefik.http.routers.cloud9.entrypoints=${CLOUD9_ENTRYPOINTS:-entry_main_http}"
       - "traefik.http.routers.cloud9.rule=HostRegexp(`{subdomain:cloud9}.{domain:${TANGO_DOMAIN:-.*}}`)"
       - "traefik.http.routers.cloud9.priority=${CLOUD9_PRIORITY}"
       - "traefik.http.routers.cloud9.service=cloud9"
-      - "traefik.http.routers.cloud9-secure.entrypoints=${CLOUD9_ENTRYPOINTS_SECURE:-web_main_secure}"
+      - "traefik.http.routers.cloud9-secure.entrypoints=${CLOUD9_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
       - "traefik.http.routers.cloud9-secure.rule=HostRegexp(`{subdomain:cloud9}.{domain:${TANGO_DOMAIN:-.*}}`)"
       - "traefik.http.routers.cloud9-secure.priority=${CLOUD9_PRIORITY}"
       - "traefik.http.routers.cloud9-secure.service=cloud9"

@@ -82,7 +82,7 @@ for service in ${TANGO_SERVICES_AVAILABLE}; do
         __urls_api_get=
         __urls_api_data=
         __urls_api_rest=
-        for u in $(compgen -A variable | grep -Ev DEFAULT | grep ^${service}_HTTP_URL_); do
+        for u in $(compgen -A variable | grep -Ev DEFAULT | grep ^${service}_URI_); do
             __urls="${__urls} ${!u}"
             __urls_api_get="${__urls_api_get} ${!u}/api"
             __urls_api_data="${__urls_api_data} ${!u}/api/rawdata"
@@ -193,18 +193,30 @@ echo L-- Host name : $TANGO_HOSTNAME
 echo L-- Host default local IP : $TANGO_HOST_DEFAULT_IP
 echo L-- Host local IPs : $TANGO_HOST_IP
 echo L-- Random free ports mode :  $([ "${TANGO_FREEPORT_MODE}" = "1" ] && echo "ON [$GENERATED_ENV_FILE_FREEPORT]" || echo "OFF")
-echo "* MAIN AREA"
-echo L-- services : $NETWORK_SERVICES_AREA_MAIN
-echo L-- HTTP entrypoint [web_main] - port : $NETWORK_PORT_MAIN reachable from internet : $([ "${NETWORK_PORT_MAIN_REACHABLE}" = "1" ] && echo YES || echo dont know)
-echo L-- HTTPS entrypoint [web_main_secure] - port : $NETWORK_PORT_MAIN_SECURE reachable from internet : $([ "${NETWORK_PORT_MAIN_SECURE_REACHABLE}" = "1" ] && echo YES || echo dont know)
-echo "* SECONDARY AREA"
-echo L-- services : $NETWORK_SERVICES_AREA_SECONDARY
-echo L-- HTTP entrypoint [web_secondary] - port : $NETWORK_PORT_SECONDARY reachable from internet : $([ "${NETWORK_PORT_SECONDARY_REACHABLE}" = "1" ] && echo YES || echo dont know)
-echo L-- HTTPS entrypoint [web_secondary_secure] - port : $NETWORK_PORT_SECONDARY_SECURE reachable from internet : $([ "${NETWORK_PORT_SECONDARY_SECURE_REACHABLE}" = "1" ] && echo YES || echo dont know)
-echo "* ADMIN AREA"
-echo L-- services : $NETWORK_SERVICES_AREA_ADMIN
-echo L-- HTTP entrypoint [web_admin] - port : $NETWORK_PORT_ADMIN reachable from internet : $([ "${NETWORK_PORT_ADMIN_REACHABLE}" = "1" ] && echo YES || echo dont know)
-echo L-- HTTPS entrypoint [web_admin_secure] - port : $NETWORK_PORT_ADMIN_SECURE reachable from internet : $([ "${NETWORK_PORT_ADMIN_SECURE_REACHABLE}" = "1" ] && echo YES || echo dont know)
+
+for area in ${NETWORK_SERVICES_AREA_LIST}; do
+    IFS="|" read -r name proto internal_port secure_port <<<$(echo ${area})
+
+    echo "* ${name^^} AREA"
+    v1="NETWORK_SERVICES_AREA_${name^^}_${proto^^}"
+    v2="NETWORK_PORT_${name^^}"
+    v3="NETWORK_PORT_${name^^}_SECURE"
+    v4="NETWORK_PORT_${name^^}_REACHABLE"
+    v5="NETWORK_PORT_${name^^}_SECURE_REACHABLE"
+    echo L-- services : ${!v1}
+    echo L-- entrypoint [entry_${name}_${proto}] - port : ${!v2} reachable from internet : $([ "${!v4}" = "1" ] && echo YES || echo dont know)
+    [ ! "$secure_port" = "" ] && echo L-- associated secure entrypoint [entry_${name}_${proto}_secure] - port : ${!v3} reachable from internet : $([ "${!v5}" = "1" ] && echo YES || echo dont know)
+done
+
+
+# echo "* SECONDARY AREA"
+# echo L-- services : $NETWORK_SERVICES_AREA_SECONDARY_TCP
+# echo L-- HTTP entrypoint [entry_secondary_tcp] - port : $NETWORK_PORT_SECONDARY reachable from internet : $([ "${NETWORK_PORT_SECONDARY_REACHABLE}" = "1" ] && echo YES || echo dont know)
+# echo L-- HTTPS entrypoint [entry_secondary_tcp_secure] - port : $NETWORK_PORT_SECONDARY_SECURE reachable from internet : $([ "${NETWORK_PORT_SECONDARY_SECURE_REACHABLE}" = "1" ] && echo YES || echo dont know)
+# echo "* ADMIN AREA"
+# echo L-- services : $NETWORK_SERVICES_AREA_ADMIN_TCP
+# echo L-- HTTP entrypoint [entry_admin_tcp] - port : $NETWORK_PORT_ADMIN reachable from internet : $([ "${NETWORK_PORT_ADMIN_REACHABLE}" = "1" ] && echo YES || echo dont know)
+# echo L-- HTTPS entrypoint [entry_admin_tcp_secure] - port : $NETWORK_PORT_ADMIN_SECURE reachable from internet : $([ "${NETWORK_PORT_ADMIN_SECURE_REACHABLE}" = "1" ] && echo YES || echo dont know)
 
 echo "---------==---- VPN ----==---------"
 echo "* VPN Service"

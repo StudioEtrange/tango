@@ -266,6 +266,13 @@ A service match a docker container.
             * `FOO_PRIORITY` and `FOO_SUBSERVICES_PRIORITY` are auto managed
 
 
+### Note on subservice
+
+
+* a sub service share with its parent service a same traefik entrypoint by default (but can be override) and a same subdomain name  but different router rule (after hostname)
+* to declare a subservice use `TANGO_SUBSERVICES_ROUTER` in priority ascending order relative to each other. Each subservices priority is higher than the previous one which belong to the same parent service
+* subservice name format must be : service_subservice and should have 2 matching traefik delcared routers in compose file (service_subservice and service_subservice-secure)
+
 
 ----
 ## Modules 

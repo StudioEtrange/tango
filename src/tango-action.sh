@@ -134,6 +134,11 @@ case ${ACTION} in
 	restart )
 		case "${TARGET}" in
 			"") 
+				if [ "${TANGO_INSTANCE_MODE}" = "shared" ]; then
+					if [ ! "${ALL}" = "1" ]; then
+						__tango_log "WARN" "tango" "This is a tango shared instance, to restart everything including shared service like traefik, use restart --all option"
+					fi
+				fi
 				#__service_down_all "NO_DELETE"
 				__service_down_all
 			;;
@@ -157,7 +162,10 @@ case ${ACTION} in
 
 	letsencrypt )
 		if [ "${TARGET}" = "rm" ]; then
-			rm -f "${TANGO_DATA_PATH/letsencrypt/acme.json}"
+			rm -f "${LETS_ENCRYPT_DATA_PATH}/acme.json"
+		fi
+		if [ "${TARGET}" = "logs" ]; then
+			docker-compose logs -f -t traefik | grep letsencrypt
 		fi
 		;;
 

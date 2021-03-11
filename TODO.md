@@ -14,3 +14,8 @@
 * [ ] remove script_init ? (scripts init are always launched with a predefined image) do we really need this as we used ansible in mambo and in init phase we often need to control docker itself and its not really easy to control it from inside a container ?
 
 * [ ] create a dynamic traefik route to a specified link : https://gist.github.com/StudioEtrange/c6bb41732063b0151adf5ef592768348
+
+* [] tango_set_context.sh : TODO CATCH >HTTP ERROR like 502
+		if [ "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
+
+			TANGO_EXTERNAL_IP="$(curl -s ipinfo.io/ip)"

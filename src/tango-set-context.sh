@@ -256,7 +256,20 @@ case ${ACTION} in
 
 		# add default services and active modules services to all available service list
 		TANGO_SERVICES_AVAILABLE="${TANGO_SERVICES_DEFAULT} ${TANGO_SERVICES_AVAILABLE} ${TANGO_SERVICES_MODULES}"
-			
+		
+		# add default subservices
+		TANGO_SUBSERVICES_ROUTER="${TANGO_SUBSERVICES_ROUTER_DEFAULT} ${TANGO_SUBSERVICES_ROUTER}"
+
+		# add default network http redirect to https
+		NETWORK_SERVICES_REDIRECT_HTTPS="${NETWORK_SERVICES_REDIRECT_HTTPS_DEFAULT} ${NETWORK_SERVICES_REDIRECT_HTTPS}"
+
+		# add default lets encrypted services list
+		LETS_ENCRYPT_SERVICES="${LETS_ENCRYPT_SERVICES_DEFAULT} ${LETS_ENCRYPT_SERVICES}"
+
+		# add default to time lists
+		TANGO_TIME_VOLUME_SERVICES="${TANGO_TIME_VOLUME_SERVICES_DEFAULT} ${TANGO_TIME_VOLUME_SERVICES}"
+		TANGO_TIME_VAR_TZ_SERVICES="${TANGO_TIME_VAR_TZ_SERVICES_DEFAULT} ${TANGO_TIME_VAR_TZ_SERVICES}"
+
 		# create a list of active services and modules
 		TANGO_SERVICES_ACTIVE="$($STELLA_API filter_list_with_list "${TANGO_SERVICES_AVAILABLE}" "${TANGO_SERVICES_DISABLED}")"
 		__add_declared_variables "TANGO_SERVICES_ACTIVE"
@@ -389,6 +402,7 @@ case ${ACTION} in
 		TANGO_HOSTNAME="$(hostname)"
 		__add_declared_variables "TANGO_HOSTNAME"
 		if [ "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
+			# TODO CATCH HTTP ERROR like 502
 			TANGO_EXTERNAL_IP="$(curl -s ipinfo.io/ip)"
 		else
 			TANGO_EXTERNAL_IP=
@@ -400,18 +414,31 @@ case ${ACTION} in
 		case ${ACTION} in
 			info|up|restart )
 				if [ "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
-					[ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${NETWORK_PORT_MAIN}")" = "TRUE" ] && NETWORK_PORT_MAIN_REACHABLE=1
-					__add_declared_variables "NETWORK_PORT_MAIN_REACHABLE"
-					[ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${NETWORK_PORT_MAIN_SECURE}")" = "TRUE" ] && NETWORK_PORT_MAIN_SECURE_REACHABLE=1
-					__add_declared_variables "NETWORK_PORT_MAIN_SECURE_REACHABLE"
-					[ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${NETWORK_PORT_SECONDARY}")" = "TRUE" ] && NETWORK_PORT_SECONDARY_REACHABLE=1
-					__add_declared_variables "NETWORK_PORT_SECONDARY_REACHABLE"
-					[ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${NETWORK_PORT_SECONDARY_SECURE}")" = "TRUE" ] && NETWORK_PORT_SECONDARY_SECURE_REACHABLE=1
-					__add_declared_variables "NETWORK_PORT_SECONDARY_SECURE_REACHABLE"
-					[ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${NETWORK_PORT_ADMIN}")" = "TRUE" ] && NETWORK_PORT_ADMIN_REACHABLE=1
-					__add_declared_variables "NETWORK_PORT_ADMIN_REACHABLE"
-					[ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${NETWORK_PORT_ADMIN_SECURE}")" = "TRUE" ] && NETWORK_PORT_ADMIN_SECURE_REACHABLE=1
-					__add_declared_variables "NETWORK_PORT_ADMIN_SECURE_REACHABLE"
+
+					for area in ${NETWORK_SERVICES_AREA_LIST}; do
+						IFS="|" read -r name proto internal_port secure_port <<<$(echo ${area})
+						v1="NETWORK_PORT_${name^^}"
+						[ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${!v1}")" = "TRUE" ] && eval NETWORK_PORT_${name^^}_REACHABLE=1
+						__add_declared_variables "NETWORK_PORT_${name^^}_REACHABLE"
+						if [ ! "$secure_port" = "" ]; then
+							v2="NETWORK_PORT_${name^^}_SECURE"
+							[ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${!v1}")" = "TRUE" ] && eval NETWORK_PORT_${name^^}_SECURE_REACHABLE=1
+							__add_declared_variables "NETWORK_PORT_${name^^}_SECURE_REACHABLE"
+						fi
+						#[ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${NETWORK_PORT_MAIN}")" = "TRUE" ] && NETWORK_PORT_MAIN_REACHABLE=1
+						#__add_declared_variables "NETWORK_PORT_MAIN_REACHABLE"
+						# [ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${NETWORK_PORT_MAIN_SECURE}")" = "TRUE" ] && NETWORK_PORT_MAIN_SECURE_REACHABLE=1
+						# __add_declared_variables "NETWORK_PORT_MAIN_SECURE_REACHABLE"
+						# [ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${NETWORK_PORT_SECONDARY}")" = "TRUE" ] && NETWORK_PORT_SECONDARY_REACHABLE=1
+						# __add_declared_variables "NETWORK_PORT_SECONDARY_REACHABLE"
+						# [ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${NETWORK_PORT_SECONDARY_SECURE}")" = "TRUE" ] && NETWORK_PORT_SECONDARY_SECURE_REACHABLE=1
+						# __add_declared_variables "NETWORK_PORT_SECONDARY_SECURE_REACHABLE"
+						# [ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${NETWORK_PORT_ADMIN}")" = "TRUE" ] && NETWORK_PORT_ADMIN_REACHABLE=1
+						# __add_declared_variables "NETWORK_PORT_ADMIN_REACHABLE"
+						# [ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${NETWORK_PORT_ADMIN_SECURE}")" = "TRUE" ] && NETWORK_PORT_ADMIN_SECURE_REACHABLE=1
+						# __add_declared_variables "NETWORK_PORT_ADMIN_SECURE_REACHABLE"
+
+					done
 				fi
 			;;
 		esac

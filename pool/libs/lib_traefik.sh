@@ -37,7 +37,7 @@
 
 __traefik_api_url() {
     TRAEFIK_INTERNAL_CONTAINER_API_URL="http://traefik/api"
-    TRAEFIK_API_URL="${TRAEFIK_HTTP_URL_DEFAULT_SECURE}/api"
+    TRAEFIK_API_URL="${TRAEFIK_URI_DEFAULT_SECURE}/api"
 }
 __traefik_api_url
 

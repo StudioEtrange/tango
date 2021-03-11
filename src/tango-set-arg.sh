@@ -19,7 +19,8 @@ usage() {
 	echo "L     scripts exec <script> : exec a script."
 	echo "o-- various commands :"
 	echo "L		cert <path> --domain=<domain> : generate self signed certificate for a domain into a current host folder."
-	echo "L		letsencrypt rm : delete generated letsencrypt cert"
+	echo "L		letsencrypt rm : delete generated letsencrypt cert [WARN : delete certs will regenerate request to letsencrypt. Too much requests and you may be banned for a time]"
+	echo "L		letsencrypt logs : follow letsencrypt actions"
 	echo "L		vendor <path> : copy tango into another path (inside a tango folder : <path>/tango), mainly to vendorize tango into another app."
 }
 
