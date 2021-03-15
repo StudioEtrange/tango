@@ -285,12 +285,12 @@ A service match a docker container.
     ./tango modules list
     ```
 
-* A module must be declared before using it
-* To declare a module into the current app 
+* A module must be declared to be activated
+* To activate a module into the current app 
     * use variable list `TANGO_SERVICES_MODULES` or `--module` command line option
     * `--module` command line option is cumulative with variable list `TANGO_SERVICES_MODULES`
     * Item format of the list is `<module>[@<network area>][%<service dependency1>][%<service dependency2>][^<vpn id>]`
-    * `main` network area is the default
+    * `main` network area is the default - to choose another area when activating it, either use `--module <module>[@<network area>]` or `TANGO_SERVICES_MODULES=<module>[@<network area>]`. Also, you can set a default network area by adding module to NETWORK_SERVICES_AREA_entrypoint list (NETWORK_SERVICES_AREA_MAIN_HTTP+=module) in dedicated module.env file.
 
     ```
     CLOUD9_USERNAME=tango CLOUD9_PASSWORD=tango ./tango --module cloud9 --module firefox@secondary --domain mydomain.org --freeport up

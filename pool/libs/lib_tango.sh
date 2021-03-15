@@ -188,7 +188,7 @@ __create_env_for_docker_compose() {
 	
 	# add app env file
 	[ -f "${TANGO_APP_ENV_FILE}" ] &&  cat <(echo \# --- PART FROM app env file ${TANGO_APP_ENV_FILE}) <(echo) <(echo) "${TANGO_APP_ENV_FILE}" <(echo) >> "${GENERATED_ENV_FILE_FOR_COMPOSE}"
-	
+
 	# add modules env file
 	for s in ${TANGO_SERVICES_MODULES}; do
 		# app modules overrides tango modules
@@ -200,7 +200,7 @@ __create_env_for_docker_compose() {
 	done
 
 	# add user env file
-	[ -f "${TANGO_USER_ENV_FILE}" ] &&  cat <(echo \# --- PART FROM user env file ${TANGO_USER_ENV_FILE}) <(echo) <(echo) "${TANGO_USER_ENV_FILE}" <(echo) >> "${GENERATED_ENV_FILE_FOR_COMPOSE}"
+	[ -f "${TANGO_USER_ENV_FILE}" ] && cat <(echo \# --- PART FROM user env file ${TANGO_USER_ENV_FILE}) <(echo) <(echo) "${TANGO_USER_ENV_FILE}" <(echo) >> "${GENERATED_ENV_FILE_FOR_COMPOSE}"
 
 	__parse_env_file "${GENERATED_ENV_FILE_FOR_COMPOSE}"
 }
@@ -226,14 +226,13 @@ __create_env_for_bash() {
 	done
 
 	# add user env file
-	[ -f "${TANGO_USER_ENV_FILE}" ] &&  cat <(echo \# --- PART FROM user env file ${TANGO_USER_ENV_FILE}) <(echo) <(echo) "${TANGO_USER_ENV_FILE}" <(echo) >> "${GENERATED_ENV_FILE_FOR_BASH}"
+	[ -f "${TANGO_USER_ENV_FILE}" ] && cat <(echo \# --- PART FROM user env file ${TANGO_USER_ENV_FILE}) <(echo) <(echo) "${TANGO_USER_ENV_FILE}" <(echo) >> "${GENERATED_ENV_FILE_FOR_BASH}"
 
 	__parse_env_file "${GENERATED_ENV_FILE_FOR_BASH}"
 
 	# add quote for variable bash support
 	sed -i -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\$/\\$/g' "${GENERATED_ENV_FILE_FOR_BASH}"
 	sed -i 's/^\([a-zA-Z0-9_-]*\)=\(.*\)$/\1=\"\2\"/g' "${GENERATED_ENV_FILE_FOR_BASH}"
-
 }
 
 
@@ -275,7 +274,45 @@ __parse_env_file() {
 	cat "${_temp}" > "${_file}"
 	rm -f "${_temp}"
 	
+	__parse_env_file2 "$1"
 }
+
+# manage {{var}} substitution
+# TODO work only non recursive
+#	This do not work : 
+#	A=1
+#	B={{A}}
+#	C={{B}}
+__parse_env_file2() {
+	local _file="$1"
+
+	local _temp=$(mktmp)
+
+	awk -F= '
+	/^[^=#]*=/ {
+		if (FNR==NR) {
+		
+			arr[$1]=$2;
+			next;
+		}
+	}
+	/.*/ {
+		if (FNR==NR) {
+			next;
+		}
+	}
+
+	{
+		for (a in arr) gsub("{{"a"}}", arr[a]);
+		print;
+	} 
+
+	' "${_file}" "${_file}" > "${_temp}"
+	cat "${_temp}" > "${_file}"
+	rm -f "${_temp}"
+	
+}
+
 
 
 # generate docker compose file
@@ -660,7 +697,7 @@ __add_entrypoints_all() {
 		__add_declared_variables "NETWORK_SERVICES_AREA_${name^^}_${proto^^}"
 	done
 
-	# add by default the main network area if not defined
+	# add by default the definition of main network area if not defined in list
 	if [ ! "$__area_main_done" = "1" ]; then
 		__add_entrypoint "main" "http" "80" "443"
 		NETWORK_SERVICES_AREA_LIST="main|http|80|443 $NETWORK_SERVICES_AREA_LIST"
@@ -738,15 +775,12 @@ __set_entrypoints_service_all() {
 
 		# assign each declared service or subservice attached to this area
 		for s in ${!var}; do
-			if __check_docker_compose_service_exist "${s}"; then
-				if [ "$secure_port" = "" ]; then
-					__set_entrypoint_service "${s}"  "entry_${name}_${proto}"
-				else
-					__set_entrypoint_service "${s}"  "entry_${name}_${proto}"
-					__set_entrypoint_service "${s}"  "entry_${name}_${proto}" "secure"
-				fi
+			__tango_log "DEBUG" "tango" "assign service ${s} to $var"
+			if [ "$secure_port" = "" ]; then
+				__set_entrypoint_service "${s}"  "entry_${name}_${proto}"
 			else
-				__tango_log "WARN" "tango" "unknow service ${s} declared in $var"
+				__set_entrypoint_service "${s}"  "entry_${name}_${proto}"
+				__set_entrypoint_service "${s}"  "entry_${name}_${proto}" "secure"
 			fi
 		done
 	done
@@ -944,6 +978,7 @@ __set_module_all() {
 __set_module() {
 	local __module="$1"
 
+	__tango_log "DEBUG" "tango" "__set_module : process module ${__module}"
 	__parse_item "module" "${__module}" "MODULE"
 
 	# add yml to docker compose file
@@ -961,12 +996,29 @@ __set_module() {
 	esac
 
 	# entrypoint
-	# default area is 'main_http'
-	local __area="main_http"
 	# MODULE_NETWORK_AREA is setted by __parse_item()
-	[ ! "${MODULE_NETWORK_AREA}" = "" ] && __area="${MODULE_NETWORK_AREA}"
-	__area="NETWORK_SERVICES_AREA_${__area^^}"
-	eval "export ${__area}=\"${!__area} ${MODULE_NAME}\""
+	local __area=
+	if [ ! "${MODULE_NETWORK_AREA}" = "" ]; then
+		__area="${MODULE_NETWORK_AREA}"
+		__tango_log "DEBUG" "tango" "__set_module ${__module} entrypoint affected : $__area"
+		__area="NETWORK_SERVICES_AREA_${__area^^}"
+		eval "export ${__area}=\"${!__area} ${MODULE_NAME}\""
+	else
+		# define a default value only if module name have an associated traefik router
+		if ! __check_traefik_router_exist ${__module}; then
+			__tango_log "DEBUG" "tango" "__set_module ${__module} do not have a router with the same name, we do not affect a default entrypoint"
+		else
+			__area="$(__get_service_entrypoint "${__module}")"
+			if [ "$__area" = "" ]; then
+				__area="main_http"
+				__tango_log "DEBUG" "tango" "__set_module ${__module} default entrypoint affected : $__area"
+			else
+				__tango_log "DEBUG" "tango" "__set_module ${__module} entrypoint affected : $__area"
+			fi
+			__area="NETWORK_SERVICES_AREA_${__area^^}"
+			eval "export ${__area}=\"${!__area} ${MODULE_NAME}\""
+		fi
+	fi	
 
 	# dependencies
 	local __dep_disabled="$($STELLA_API filter_list_with_list "${MODULE_LINKS}" "${TANGO_SERVICES_DISABLED}" "FILTER_KEEP")"
@@ -1480,6 +1532,31 @@ __get_subservice_parent() {
 			esac
 		done
 	fi
+}
+
+# get associated entrypoint name to a service/subservice
+# return "main_http"
+__get_service_entrypoint() {
+	local __service="$1"
+	for area in ${NETWORK_SERVICES_AREA_LIST}; do
+		IFS="|" read -r name proto internal_port secure_port <<<$(echo ${area})				
+		__area_services="NETWORK_SERVICES_AREA_${name^^}_${proto^^}"
+		for s in ${!__area_services}; do
+			if [ "${s}" = "${__service}" ]; then
+				echo "${name}"_"${proto}"
+				return;
+			fi
+		done
+	done
+}
+
+# a service (aka a docker compose service) may exist but may not have a default traefik associated router with the same name
+# i.e a service may have only associated subservice with router for them but no router for the service name itself
+__check_traefik_router_exist() {
+	local __service="$1"
+
+	[ ! -z "$(sed -n 's/traefik\.[^.]*\.routers\.'${__service}'\.service=/\0/p' "${GENERATED_DOCKER_COMPOSE_FILE}")" ]
+	return $?
 }
 
 

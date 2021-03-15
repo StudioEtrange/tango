@@ -100,41 +100,65 @@ case ${ACTION} in
 
 		# STEP 1 ------ init modules, plugins and create first env files
 
-		# generate bash env files
+		# modules -----
+		# test if some modules are declared by command line and add them
+		# so --module option is cumulative with TANGO_SERVICES_MODULES
+		[ "${TANGO_SERVICES_MODULES}" = "" ] && tango_services_modules_env_var_empty=1
+		if [ ! "${MODULE}" = "" ]; then
+			TANGO_SERVICES_MODULES="${TANGO_SERVICES_MODULES} ${MODULE//:/ }"
+		fi
+
+		# generate bash env file
 		# bash env files priority :
 		# 	- user env file
 		# 	- app env file
 		# 	- default env file
+		# if TANGO_SERVICES_MODULES exists as env var or --module option was used then modules env files are processed whith __create_env_for_bash call and the order is instead
+		# 			- user env file
+		# 			- modules env file
+		# 			- app env file
+		# 			- default env file
 		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __create_env_for_bash
 
-		# modules -----
-		# retrieve TANGO_SERVICES_MODULES defined in env files if no shell env var exist
-		if [ "${TANGO_SERVICES_MODULES}" = "" ]; then
-			TANGO_SERVICES_MODULES="$(env -i bash --noprofile --norc -c ". ${GENERATED_ENV_FILE_FOR_BASH}; echo \$TANGO_SERVICES_MODULES")"
-			[ ! "${TANGO_SERVICES_MODULES}" = "" ] && extracted_modules_list_from_files=1
+		# if TANGO_SERVICES_MODULES exist in any env files but not as env var we need to recreate __create_env_for_bash 
+		# because TANGO_SERVICES_MODULES value in env files was not used when we first call __create_env_for_bash
+		if [ "${tango_services_modules_env_var_empty}" = "1" ]; then
+			# reinit value of TANGO_SERVICES_MODULES with value from env files
+			__tmp_services_modules="$(env -i bash --noprofile --norc -c ". ${GENERATED_ENV_FILE_FOR_BASH}; echo \$TANGO_SERVICES_MODULES")"
+			# did we found any TANGO_SERVICES_MODULES value in any env files
+			if [ ! "${__tmp_services_modules}" = "" ]; then
+				rebuild_env_for_bash=1
+				TANGO_SERVICES_MODULES="${__tmp_services_modules}"
+				# dont forget to update TANGO_SERVICES_MODULES value with --module option
+				if [ ! "${MODULE}" = "" ]; then
+					TANGO_SERVICES_MODULES="${TANGO_SERVICES_MODULES} ${MODULE//:/ }"
+				fi
+			fi
 		fi
-		# some modules have been defined in env files, so we need to rebuild env files by adding modules env files
+		# some modules have been defined in one of env files but not as env var
+		# so we need to rebuild bash env file
 		# 			- user env file
 		# 			- modules env file
 		# 			- app env file
 		# 			- default env file
 		if [ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ]; then
-			[ "${extracted_modules_list_from_files}" = "1" ] && __create_env_for_bash
+			if [ "${rebuild_env_for_bash}" = "1" ]; then
+				__create_env_for_bash
+			fi
 		fi
-		# test if some modules are declared by command line and add them
-		if [ ! "${MODULE}" = "" ]; then
-			TANGO_SERVICES_MODULES="${TANGO_SERVICES_MODULES} ${MODULE//:/ }"
-		fi
+
 		# filter exising modules
 		[ ! "${TANGO_SERVICES_MODULES}" = "" ] && __filter_items_exists "module"
 
 
 		# plugins -----
-		# retrieve TANGO_PLUGINS defined in env files if no shell env var exist
+		# retrieve TANGO_PLUGINS defined among all env files
+		# but only if no shell env var exist because TANGO_PLUGINS declared as env var override any TANGO_PLUGINS declared in any env files
 		if [ "${TANGO_PLUGINS}" = "" ]; then
 			TANGO_PLUGINS="$(env -i bash --noprofile --norc -c ". ${GENERATED_ENV_FILE_FOR_BASH}; echo \$TANGO_PLUGINS")"
 		fi
 		# test if some plugins are declared by command line and add them
+		# so --plugin option is cumulative with TANGO_PLUGINS
 		if [ ! "${PLUGIN}" = "" ]; then
 			TANGO_PLUGINS="${TANGO_PLUGINS} ${PLUGIN//:/ }"
 		fi
