@@ -93,8 +93,19 @@ __service_down() {
 
 # load all declared variables (including associative arrays)
 __load_env_vars() {
+	
+	# preserve some current variables
+	local __d="$DEBUG"
+	local __t1="$TANGO_LOG_LEVEL"
+	local __t2="$TANGO_LOG_STATE"
+
 	. "${GENERATED_ENV_FILE_FOR_BASH}"
 	__load_env_associative_arrays
+
+	export DEBUG="$__d"
+	export TANGO_LOG_LEVEL="$__t1"
+	export TANGO_LOG_STATE="$__t2"
+	
 }
 
 
@@ -1954,8 +1965,6 @@ __create_path_all() {
 			[ ! "${!__root}" = "" ] && __create_path "${!__root}" "${__create_path_instructions}"
 		fi
 	done
-
-
 }
 
 # create various sub folder and files if not exist
@@ -1969,6 +1978,9 @@ __create_path() {
 	 
 	local __folder=
 	local __file=
+
+	# we do not want to alter filesystem (files & folder)
+	[ "$TANGO_ALTER_GENERATED_FILES" = "OFF" ] && return
 
 	if [ ! -d "${__root}" ]; then
 		__tango_log "ERROR" "tango" "root path ${__root} do not exist"
@@ -1989,7 +2001,7 @@ __create_path() {
 				__tango_log "DEBUG" "tango" "__create_path() Wait for folder $__path exists"
 				while [ ! -d "$__path" ]
 				do
-					printf "."
+					printf "[waiting root:$__root list:$__list path:$__path]."
 					#__tango_log "DEBUG" "tango" "__create_path() Wait for folder $__path exists"
 					sleep 1
 				done

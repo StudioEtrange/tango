@@ -10,7 +10,8 @@ case ${ACTION} in
 		;;
 	
 	* )
-		__create_path_all
+		# if we want to alter files and folder we need to at least create needed folder for actions
+		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __create_path_all
 		__check_mandatory_path "WARN"
 		__check_lets_encrypt_settings "WARN"
 		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __set_certificates_all

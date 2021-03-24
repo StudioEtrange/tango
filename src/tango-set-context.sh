@@ -24,7 +24,6 @@ TANGO_APP_WORK_ROOT="${TANGO_APP_ROOT}/workspace/${TANGO_APP_NAME}"
 mkdir -p "${TANGO_APP_WORK_ROOT}"
 
 
-
 # available modules from tango
 TANGO_MODULES_AVAILABLE="$(__list_items "module" "tango")"
 # available plugins from tango
@@ -337,9 +336,10 @@ case ${ACTION} in
 		# TANGO_DATA_PATH_SUBPATH_LIST		N/A (hardcoded TANGO_DATA_PATH_SUBPATH_CREATE)
 		# TANGO_DATA_PATH_SUBPATH_CREATE 	instructions to create subpath relative to tango data (internal variable) 
 		TANGO_DATA_PATH_SUBPATH_CREATE=
-		
+
 		# manage generic path
 		__tango_log "DEBUG" "tango" "path management -- list of path to manage : TANGO_PATH_LIST=${TANGO_PATH_LIST}"
+
 		for p in ${TANGO_PATH_LIST}; do
 			__tango_log "DEBUG" "tango" "       -L manage $p"
 			# if xxx_PATH not setted, will create TANGO_APP_WORK_ROOT/xxx_PATH_DEFAULT
@@ -351,18 +351,36 @@ case ${ACTION} in
 				eval "export ${p}=\"${TANGO_APP_WORK_ROOT}/${__path}\""
 				TANGO_APP_WORK_ROOT_SUBPATH_CREATE="${TANGO_APP_WORK_ROOT_SUBPATH_CREATE} FOLDER ${__path}"
 			fi
-			
-			# manage subpath list
+
+			# manage subpath lists
 			__subpath_list="${p}_SUBPATH_LIST"
 			__tango_log "DEBUG" "tango" "                -L manage subpath list of $p : ${__subpath_list}=${!__subpath_list}"
 			if [ ! "${!__subpath_list}" = "" ]; then
 				__create_path_instructions=
 				for s in ${!__subpath_list}; do
 					if [ ! "${!s}" = "" ]; then
-						# create subpath instruction to create subpath later in create_path_all
-						__create_path_instructions="${__create_path_instructions} ${!s}"
-						# export this path will update its value inside env files
-						eval "export ${s}=\"${!p}/${!s}\""
+						case ${!s} in
+							/*)
+								# absolute path but shoud be relative path
+								# check if it is an absolute path which is relative to root
+								if [ "$($STELLA_API is_logical_subpath "${!p}" "${!s}")" = "TRUE" ]; then
+									__new_rel_path="$($STELLA_API abs_to_rel_path "${!s}" "${!p}")"
+									# reconvert to a relative path 
+									# NOTE : we need this because we have not updated generated files AND load its value 
+									#		 then all relative path have been converted to absoluve values INSTEAD of being relative values
+									eval "export ${s}=\"${__new_rel_path}\""
+								fi
+								# if not ignore this subpath creation
+								__ignore="1"
+							;;
+						esac
+						if [ ! "$__ignore" = "1" ]; then
+							# create subpath instruction to create subpath later in create_path_all
+							__create_path_instructions="${__create_path_instructions} ${!s}"
+							# export this path will update its value inside env files
+							eval "export ${s}=\"${!p}/${!s}\""
+						fi
+						__ignore=""
 					fi
 				done
 				# all subpath are FOLDER type
@@ -500,6 +518,7 @@ case ${ACTION} in
 		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __update_env_files "ingest created/modified/translated variables"
 		# load env var
 		# even if files have not been modified, we want to load previously saved variables
+		# but preserving DEBUG flag
 		__load_env_vars
 	;;
 esac
