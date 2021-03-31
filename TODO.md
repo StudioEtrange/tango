@@ -23,3 +23,5 @@
 * [ ] add possibility to add external link as a router
 
 * [ ] error service : exclude non HTTP router in entrypoints list TRAEFIK_ENTRYPOINTS_LIST : "traefik.http.routers.error.entrypoints=${TRAEFIK_ENTRYPOINTS_LIST}"
+
+* [ ] cloudflare support ? https://github.com/tiredofit/docker-traefik-cloudflare-companion

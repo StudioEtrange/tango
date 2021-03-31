@@ -518,7 +518,6 @@ case ${ACTION} in
 		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __update_env_files "ingest created/modified/translated variables"
 		# load env var
 		# even if files have not been modified, we want to load previously saved variables
-		# but preserving DEBUG flag
 		__load_env_vars
 	;;
 esac

@@ -1988,6 +1988,7 @@ __create_path() {
 	fi
 
 	__tango_log "DEBUG" "tango" "__create_path() ROOT=${__root} INSTRUCTIONS=${__list}"
+	local cpt=0
 	for p in ${__list}; do
 		[ "${p}" = "FOLDER" ] && __folder=1 && __file= && continue
 		[ "${p}" = "FILE" ] && __folder= && __file=1 && continue
@@ -1999,11 +2000,17 @@ __create_path() {
 				[ ! "${__msg}" = "" ] && __tango_log "DEBUG" "tango" "__create_path() msg : ${__msg}"
 				# wait more time if not created yet
 				__tango_log "DEBUG" "tango" "__create_path() Wait for folder $__path exists"
+				cpt=0
 				while [ ! -d "$__path" ]
 				do
-					printf "[waiting root:$__root list:$__list path:$__path]."
-					#__tango_log "DEBUG" "tango" "__create_path() Wait for folder $__path exists"
+					printf "."
+					__tango_log "DEBUG" "tango" "__create_path() Wait for folder $__path exists"
 					sleep 1
+					(( cpt++ ))
+					if [ $cpt -gt 10 ]; then
+						__tango_log "ERROR" "tango" "__create_path() Error while creating folder $__path"
+						exit 1
+					fi
 				done
 				echo
 				__tango_log "DEBUG" "tango" "done"
@@ -2015,11 +2022,17 @@ __create_path() {
 				[ ! "${__msg}" = "" ] && __tango_log "DEBUG" "tango" "__create_path() msg : ${__msg}"
 				# wait more time if not created yet
 				__tango_log "DEBUG" "tango" "__create_path() Wait for file $__path exists"
+				cpt=0
 				while [ ! -f "$__path" ]
 				do
 					printf "."
-					#__tango_log "DEBUG" "tango" "__create_path() Wait for file $__path exists"
+					__tango_log "DEBUG" "tango" "__create_path() Wait for file $__path exists"
 					sleep 1
+					(( cpt++ ))
+					if [ $cpt -gt 10 ]; then
+						__tango_log "ERROR" "tango" "__create_path() Error while creating file $__path"
+						exit 1
+					fi
 				done
 				echo
 				__tango_log "DEBUG" "tango" "done"
