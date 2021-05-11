@@ -31,12 +31,20 @@ NOTE : tango will auto install other tools like docker-compose inside of its tre
     ./tango install
     ```
 
-### Minimal standalone usage
+### Minimal standalone sample usage
 
 * Launch an instance with a firefox predefined service (aka a tango module)
 
     ```
     ./tango --module firefox --domain mydomain.org --freeport up
+    ./tango --module firefox --domain mydomain.org info
+    ```
+
+* NOTE : Tango organize services with subdomain name with the service name as default value. Here : `https://firefox.mydomain.org:port`
+
+* If you do not have any domain setted, you could test the previous command by adding a mapping to `/etc/hosts` and use `localhost` as domain option value to get `https://firefox.localhost:port` running
+    ```
+    127.0.0.1 localhost firefox.localhost
     ```
 
 ### Minimal application

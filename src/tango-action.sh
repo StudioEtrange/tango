@@ -80,13 +80,12 @@ case ${ACTION} in
 
 	update )
 		if [ "${TARGET}" = "" ]; then
-			echo "** ERROR : specify a service to update its docker image"
+			__tango_log "ERROR" "tango" "Specify a service to update its docker image"
 			exit 1
 		else
-
-			echo "** Will get last docker image version of ${TARGET}"
+			__tango_log "INFO" "tango" "Will get last docker image version of ${TARGET}"
 			docker-compose pull ${TARGET}
-			echo "** NOTE : you have to restart ${TARGET} service to run the updated version"
+			__tango_log "WARN" "tango" "You have to restart ${TARGET} service to run the updated version"
 		fi
 	;;
 
