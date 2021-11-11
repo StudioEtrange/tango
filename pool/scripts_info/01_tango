@@ -1,0 +1,273 @@
+#!/usr/bin/env bash
+
+
+echo "---------==---- INFO  ----==---------"
+echo "* Tango current app name : ${TANGO_APP_NAME}"
+echo "L-- standalone app : $([ "${TANGO_NOT_IN_APP}" = "1" ] && echo NO || echo YES)"
+echo "L-- instance mode : ${TANGO_INSTANCE_MODE}"
+echo "L-- tango root : ${TANGO_ROOT}"
+echo "L-- tango env file : ${TANGO_ENV_FILE}"
+echo "L-- tango compose file : ${TANGO_COMPOSE_FILE}"
+echo "L-- app root : ${TANGO_APP_ROOT}"
+echo "L-- app env file : ${TANGO_APP_ENV_FILE}"
+echo "L-- app compose file : ${TANGO_APP_COMPOSE_FILE}"
+echo "L-- user env file : ${TANGO_USER_ENV_FILE}"
+echo "L-- user compose file : ${TANGO_USER_COMPOSE_FILE}"
+echo "---------==---- INFO SERVICES ----==---------"
+echo "* Available services : ${TANGO_SERVICES_AVAILABLE}"
+echo "* Active services : ${TANGO_SERVICES_ACTIVE}"
+echo "* Available subservices : ${TANGO_SUBSERVICES_ROUTER}"
+echo "* Active subservices : ${TANGO_SUBSERVICES_ROUTER_ACTIVE}"
+# precompute service attached to vpn service
+for v in ${VPN_SERVICES_LIST}; do
+    _tmp="${v^^}_SERVICES"
+    _id="${v/#*_}"
+    for s in ${!_tmp}; do
+        eval $(echo VPN_SERVICE_${s^^}="$v")
+    done
+done
+# service loop
+for service in ${TANGO_SERVICES_AVAILABLE}; do
+    #[ ! "$1" = "" ] && [ ! "$service" = "$1" ] && continue
+    service="${service^^}"
+    version="${service}_VERSION"
+    version="${!version}"
+    
+    echo "* ${service}"
+    if [[ " ${TANGO_SERVICES_DISABLED} " =~ .*\ ${service,,}\ .* ]]; then
+        echo "L-- service status : DISABLED"
+    else
+        echo "L-- service status : DECLARED"
+    fi
+   
+    # filter information to show
+    case ${service} in
+        VPN ) info_extended=0; info_variables=0;;
+        ERROR ) info_extended=0; info_variables=1;;
+        * ) info_extended=1; info_variables=0;
+            if [ "$DEBUG" = "1" ]; then
+                info_variables=1
+            fi
+            ;;
+    esac
+    echo "L-- service version : ${version}"
+
+    if [ "${info_extended}" = "1" ]; then
+        
+        __direct_access="${service}_DIRECT_ACCESS_PORT"; __direct_access="${!__direct_access}";
+        [ ! "${__direct_access}" = "" ] && echo "L-- direct access port (bypass traefik) : ${__direct_access}"
+
+        __connected_vpn="VPN_SERVICE_${service}"; __connected_vpn="${!__connected_vpn}"
+        echo "L-- connected to vpn : ${__connected_vpn}"
+
+        rlist="${service}_ROUTERS_LIST"
+        echo "L-- service routers list : ${!rlist}"
+
+        __letsencrypt=
+        for r in ${!rlist}; do
+            [[ "${LETS_ENCRYPT_SERVICES}" =~ (^|[[:space:]])"$r"($|[[:space:]]) ]] && __letsencrypt=1 && break
+        done
+        
+        echo -n "L-- use letsencrypt : " 
+        [ "${__letsencrypt}" = "1" ] && echo "YES (at least one router declare to use letsencrypt)" || echo NO
+
+
+        for r in ${!rlist}; do
+
+            echo "L-- router : $r"
+            __var="${r^^}_ENTRYPOINTS"; __entrypoints="${!__var}"; 
+            __var="${r^^}_ENTRYPOINTS_SECURE"; __entrypoints="${__entrypoints} ${!__var}";
+            __entrypoints="${__entrypoints#"${e%%[![:space:]]*}"}"   # remove leading whitespace characters
+            __entrypoints="${__entrypoints%"${var##*[![:space:]]}"}" # remove trailing whitespace characters
+            if [ ! "${__entrypoints}" = "" ]; then
+                echo "  + traefik entrypoints : ${__entrypoints}"
+            fi
+            
+
+            
+
+            echo -n "  + redirect HTTP to HTTPS : "
+            __redirected=
+            [[ "${NETWORK_SERVICES_REDIRECT_HTTPS}" =~ (^|[[:space:]])"$r"($|[[:space:]]) ]] && __redirected=1
+            [ "${__redirected}" = "1" ] && echo YES || echo NO
+
+
+            __var="${r^^}_HOSTNAME"
+            __hostname="${!__var}"
+            echo "  + hostname : ${__hostname}"
+
+            if [ ! "${__hostname}" = "" ]; then
+                # NOTE crt.sh do not need domain to be reacheable from internet : it is a search engine for certificate
+                echo "  + certificate status : https://crt.sh/?q=${__hostname}"
+                if [ "$DEBUG" = "1" ]; then
+                    if [ "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
+                        echo "  L-- diagnostic dns, cert, content : https://check-your-website.server-daten.de/?q=${__hostname}"
+                        echo "  L-- ssl analysis : https://www.ssllabs.com/ssltest/analyze.html?d=${__hostname}"
+                    fi
+                fi
+            fi
+
+            __urls=
+            __urls_default=
+            __urls_api_get=
+            __urls_api_data=
+            __urls_api_rest=
+            for u in $(compgen -A variable | grep -Ev DEFAULT | grep ^${r^^}_URI_); do
+                __urls="${__urls} ${!u}"   
+            done
+            for u in $(compgen -A variable | grep -E DEFAULT | grep ^${r^^}_URI); do
+                __urls_default="${__urls_default} ${!u}"
+                __urls_api_get="${__urls_api_get} ${!u}/api"
+                __urls_api_data="${__urls_api_data} ${!u}/api/rawdata"
+                __urls_api_rest="${__urls_api_rest} ${!u}/api/providers/rest"
+            done
+            echo "  + all available uri : ${__urls}"
+            echo "  + default uri : ${__urls_default}"
+            if [ "${r^^}" = "TRAEFIK_API" ]; then
+                echo "  L-- API GET default endpoints : ${__urls_api_get}"
+                echo "  L-- API GET all data : ${__urls_api_data}"
+            fi
+            if [ "${r^^}" = "TRAEFIK_API_REST" ]; then
+                echo "  L-- API PUT (REST API) : ${__urls_api_rest}"
+
+            fi
+
+        done
+    
+
+       
+       
+    fi
+    if [ "${info_variables}" = "1" ]; then
+        echo "L-- variables list :"
+        for variables in $(compgen -A variable | grep ^${service}_); do
+            case ${variables} in
+                *PASSWORD|*AUTH ) echo "  + ${variables}=*****";;
+                * ) echo "  + ${variables}=${!variables}";;
+            esac
+        done
+    fi
+
+done
+
+echo "---------==---- MODULES ----==---------"
+echo "* Active modules as a service "
+echo "L-- a module is a predefined service"
+echo "L-- format : <module>[@<network area>][%<service dependency1>][%<service dependency2>][~<vpn id>][^<nb instances>]"
+echo "L-- list : ${TANGO_SERVICES_MODULES_FULL}"
+echo "L-- modules scaled : ${TANGO_SERVICES_MODULES_SCALED}"
+echo "* Available Tango Modules"
+echo "L-- tango modules root : [${TANGO_MODULES_ROOT}]"
+echo "L-- tango modules list : ${TANGO_MODULES_AVAILABLE}"
+echo "* Available App Modules"
+echo "L-- app modules root : [${TANGO_APP_MODULES_ROOT}]"
+echo "L-- app modules list : ${TANGO_APP_MODULES_AVAILABLE}"
+
+
+
+echo "---------==---- PLUGINS ----==---------"
+echo "* Active plugins infos"
+echo "L-- a plugin execute code into a running service"
+echo "L-- format : <plugin>[%<auto exec at launch into service1>][%!<manual exec into service2>][#arg1][#arg2]"
+echo "L-- list : ${TANGO_PLUGINS_FULL}"
+echo "* Available Tango plugins"
+echo "L-- tango plugins root : [${TANGO_PLUGINS_ROOT}] {/pool/tango/plugins}"
+echo "L-- tango plugins list : ${TANGO_PLUGINS_AVAILABLE}"
+echo "* Available App plugins"
+echo "L-- app plugins root : [${TANGO_APP_PLUGINS_ROOT}] {/pool/${TANGO_APP_NAME}/plugins}"
+echo "L-- app plugins list : ${TANGO_APP_PLUGINS_AVAILABLE}"
+
+
+echo "---------==---- SCRIPTS ----==---------"
+echo "* Scripts infos"
+echo "L-- a script is executed on host"
+echo "* Available Tango scripts"
+echo "L-- tango scripts root : [${TANGO_SCRIPTS_ROOT}] {/pool/tango/scripts}"
+echo "L-- tango scripts list : ${TANGO_SCRIPTS_AVAILABLE}"
+echo "* Available App scripts"
+echo "L-- app scripts root : [${TANGO_APP_SCRIPTS_ROOT}] {/pool/${TANGO_APP_NAME}/scripts}"
+echo "L-- app scripts list : ${TANGO_APP_SCRIPTS_AVAILABLE}"
+
+
+
+
+echo "---------==---- HTTPS REDIRECTION and SSL CERTIFICATES ----==---------"
+echo "* global HTTP to HTTPS redirection engine"
+echo -n "L-- status : "
+case ${NETWORK_REDIRECT_HTTPS} in
+    enable ) t="ENABLED"; echo $t;;
+    * ) t="DISABLED"; echo $t;;
+esac
+echo "L-- HTTP to HTTPS $t on : ${NETWORK_SERVICES_REDIRECT_HTTPS}"
+echo "* Let's encrypt"
+echo -n "L-- status : "
+case ${LETS_ENCRYPT} in
+    enable ) echo ENABLED;;
+    debug ) echo ENABLED with DEBUG lets encrypt server;;
+    * ) echo DISABLED;;
+esac
+
+echo "L-- email used : $LETS_ENCRYPT_MAIL"
+echo "L-- certificates generated for : $LETS_ENCRYPT_SERVICES"
+echo "L-- challenge method : $LETS_ENCRYPT_CHALLENGE"
+echo "* Provided certificates"
+echo "L-- traefik tls conf : ${GENERATED_TLS_FILE}"
+echo "L-- cert files : ${TANGO_CERT_FILES}"
+echo "L-- key files : ${TANGO_KEY_FILES}"
+
+
+echo "---------==---- NETWORK ----==---------"
+echo "* IP & Domain"
+echo L-- Declared domain : "$TANGO_DOMAIN"
+echo -n "L-- Should be reached from internet : "
+[ "${NETWORK_INTERNET_EXPOSED}" = "1" ] && echo YES || echo NO
+echo L-- External IP from internet : $TANGO_EXTERNAL_IP
+echo L-- Host name : $TANGO_HOSTNAME
+echo L-- Host default local IP : $TANGO_HOST_DEFAULT_IP
+echo L-- Host local IPs : $TANGO_HOST_IP
+echo L-- Random free ports mode :  $([ "${TANGO_FREEPORT}" = "1" ] && echo "ON [$GENERATED_ENV_FILE_FREEPORT]" || echo "OFF")
+echo "* NETWORK AREA declaration : ${NETWORK_SERVICES_AREA_LIST}"
+for area in ${NETWORK_SERVICES_AREA_LIST}; do
+    IFS="|" read -r name proto internal_port secure_port <<<$(echo ${area})
+
+    echo "* ${name^^} AREA"
+    v1="NETWORK_SERVICES_AREA_${name^^}"
+    v2="NETWORK_PORT_${name^^}"
+    v3="NETWORK_PORT_${name^^}_SECURE"
+    v4="NETWORK_PORT_${name^^}_REACHABLE"
+    v5="NETWORK_PORT_${name^^}_SECURE_REACHABLE"
+    v6="NETWORK_SERVICES_AREA_${name^^}_PROTO"
+    v7="NETWORK_SERVICES_AREA_${name^^}_INTERNAL_PORT"
+    v8="NETWORK_SERVICES_AREA_${name^^}_INTERNAL_SECURE_PORT"
+    echo L-- services : ${!v1}
+    echo L-- entrypoint [entry_${name}_${proto}] - protocol : ${!v6}  - port : ${!v2} [internal port : ${!v7}] - reachable from internet : $([ "${!v4}" = "1" ] && echo YES || echo dont know)
+    [ ! "$secure_port" = "" ] && echo L-- associated secure entrypoint [entry_${name}_${proto}_secure] - port : ${!v3} [internal port : ${!v8}] - reachable from internet : $([ "${!v5}" = "1" ] && echo YES || echo dont know)
+done
+
+
+echo "---------==---- VPN ----==---------"
+echo "* VPN Service"
+echo "L-- vpn list : ${VPN_SERVICES_LIST}"
+echo "L-- check dns leaks :  https://dnsleaktest.com/"
+echo "* VPN Infos"
+for v in ${VPN_SERVICES_LIST}; do
+    echo "L-- vpn id : ${v}"
+    for var in $(compgen -A variable | grep ^${v^^}_); do
+        case ${var} in
+            *PASSWORD*|*AUTH* ) echo "  + ${var}=*****";;
+            * ) echo "  + ${var}=${!var}";;
+        esac
+    done
+done
+
+
+
+
+echo "---------==---- PATHS ----==---------"
+echo Format : [host path] is mapped to {inside container path}
+echo App data path : [$APP_DATA_PATH] is mapped to {/data}
+echo Plugins data path : [$PLUGINS_DATA_PATH] is mapped to {/plugins_data}
+echo Data path of internal tango data : [$TANGO_DATA_PATH] is mapped to {/internal_data}
+echo Artefact folders : [$TANGO_ARTEFACT_FOLDERS] are mapped to {${TANGO_ARTEFACT_MOUNT_POINT:-/artefact}} subfolders
+echo Lets encrypt store file : [$TANGO_DATA_PATH/letsencrypt/acme.json] {/internal_data/letsencrypt/acme.json}
+echo Traefik dynamic conf files directory [$TANGO_DATA_PATH/traefikconfig] {/internal_data/traefikconfig}

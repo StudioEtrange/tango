@@ -1,0 +1,37 @@
+volumes:
+  jdownloader2headless_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${JDOWNLOADER2HEADLESS_DATA_PATH}
+    name: ${TANGO_APP_NAME}_jdownloader2headless_data
+  jdownloader2headless_download:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${JDOWNLOADER2HEADLESS_DOWNLOAD_PATH}
+    name: ${TANGO_APP_NAME}_jdownloader2headless_download
+
+services:
+  jdownloader2headless:
+    image: ${JDOWNLOADER2HEADLESS_IMAGE}:${JDOWNLOADER2HEADLESS_VERSION:-latest}
+    container_name: ${TANGO_APP_NAME}_jdownloader2headless
+    depends_on:
+      - service_init
+    restart: unless-stopped
+    volumes:
+      - jdownloader2headless_download:/opt/JDownloader/Downloads
+      - jdownloader2headless_data:/opt/JDownloader/cfg
+    environment:
+      - UID=${TANGO_USER_ID:-0}
+      - GID=${TANGO_GROUP_ID:-0}
+      # myjdownloader account
+      - EMAIL=${MYJDOWNLOADER_EMAIL:-}
+      - PASSWORD=${MYJDOWNLOADER_PASSWORD:-}
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=false"
+    networks:
+      - default

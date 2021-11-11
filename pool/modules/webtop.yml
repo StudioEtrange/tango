@@ -1,0 +1,54 @@
+volumes:
+  webtop_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${WEBTOP_DATA_PATH}
+    name: ${TANGO_APP_NAME}_webtop_data
+
+
+services:
+  webtop:
+    image: ${WEBTOP_IMAGE_FIXED_VAR}:${WEBTOP_VERSION_FIXED_VAR:-latest}
+    container_name: ${TANGO_APP_NAME}_webtop
+    depends_on: 
+      - service_init
+    restart: unless-stopped
+    shm_size: 2gb
+    security_opt:
+      # For Docker Engine only, many modern gui apps need this to function as syscalls are not implemented into Docker (if not enough try priviliged instead)
+      - seccomp:unconfined
+    # The KDE Ubuntu container needs to be run in privileged mode to function properly
+    #privileged: true
+    volumes:
+      # /config is the home directory
+      - webtop_data:/config
+    environment:
+      - PUID=${TANGO_USER_ID:-0}
+      - PGID=${TANGO_GROUP_ID:-0}
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      # service : webtop -------------------------
+      - "traefik.http.services.webtop.loadbalancer.server.port=3000"
+      - "traefik.http.services.webtop.loadbalancer.server.scheme=http"
+      - "traefik.http.services.webtop.loadbalancer.passhostheader=true"
+      # service router : webtop
+      - "traefik.http.routers.webtop.entrypoints=${WEBTOP_ENTRYPOINTS:-entry_main_http}"
+      - "traefik.http.routers.webtop.rule=HostRegexp(`{subdomain:${WEBTOP_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.webtop.priority=${WEBTOP_PRIORITY}"
+      - "traefik.http.routers.webtop.service=webtop"
+      - "traefik.http.routers.webtop-secure.entrypoints=${WEBTOP_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
+      - "traefik.http.routers.webtop-secure.rule=HostRegexp(`{subdomain:${WEBTOP_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.webtop-secure.priority=${WEBTOP_PRIORITY}"
+      - "traefik.http.routers.webtop-secure.service=webtop"
+      - "traefik.http.routers.webtop-secure.tls=true"
+      - "traefik.http.routers.webtop-secure.tls.domains[0].main=${WEBTOP_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      # service router middlewares : webtop
+      - "traefik.http.routers.webtop.middlewares=error-middleware"
+      - "traefik.http.routers.webtop-secure.middlewares=error-middleware"
+    networks:
+      - default
+    expose:
+      - 3000/tcp

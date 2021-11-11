@@ -1,0 +1,41 @@
+#!/bin/bash
+_CURRENT_FILE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+_CURRENT_RUNNING_DIR="$( cd "$( dirname "." )" && pwd )"
+
+TANGO_ROOT="${_CURRENT_FILE_DIR}"
+
+STELLA_LOG_STATE="OFF"
+. "${TANGO_ROOT}/stella-link.sh" include
+
+
+# INIT TANGO -------------------
+. "${TANGO_ROOT}/src/tango-init.sh" $@
+
+# SET ARG ------------------------
+# set command line
+. "${TANGO_ROOT}/src/tango-set-arg.sh" $@
+
+# PARSE ARG ------------------------
+# parse command line
+. "${TANGO_ROOT}/src/tango-parse-arg.sh" $@
+
+# SET CONTEXT ------------------------
+# init and generate files, variables, folders and everything for the framework to work
+. "${TANGO_ROOT}/src/tango-set-context.sh" $@
+
+# BEFORE ACTION ------------------------
+# before action hook
+. "${TANGO_ROOT}/src/tango-before-action.sh" $@
+
+# ACTION ------------------------
+# execute requested action
+. "${TANGO_ROOT}/src/tango-action.sh" $@
+
+# AFTER ACTION ------------------------
+# after action hook
+. "${TANGO_ROOT}/src/tango-after-action.sh" $@
+
+# END ------------------------
+# clean and last hook
+# NOTE must be always executed
+. "${TANGO_ROOT}/src/tango-end.sh" $@

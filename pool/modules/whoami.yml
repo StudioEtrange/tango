@@ -1,0 +1,32 @@
+services:
+  whoami:
+    image: ${WHOAMI_IMAGE_FIXED_VAR}:${WHOAMI_VERSION_FIXED_VAR:-latest}
+    container_name: ${TANGO_APP_NAME}_whoami
+    depends_on: 
+      - service_init
+    restart: unless-stopped
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      # service : whoami -------------------------
+      - "traefik.http.services.whoami.loadbalancer.server.port=80"
+      - "traefik.http.services.whoami.loadbalancer.server.scheme=http"
+      - "traefik.http.services.whoami.loadbalancer.passhostheader=true"
+      # service router : whoami
+      - "traefik.http.routers.whoami.entrypoints=${WHOAMI_ENTRYPOINTS:-entry_main_http}"
+      - "traefik.http.routers.whoami.rule=HostRegexp(`{subdomain:${WHOAMI_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.whoami.priority=${WHOAMI_PRIORITY}"
+      - "traefik.http.routers.whoami.service=whoami"
+      - "traefik.http.routers.whoami-secure.entrypoints=${WHOAMI_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
+      - "traefik.http.routers.whoami-secure.rule=HostRegexp(`{subdomain:${WHOAMI_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.whoami-secure.priority=${WHOAMI_PRIORITY}"
+      - "traefik.http.routers.whoami-secure.service=whoami"
+      - "traefik.http.routers.whoami-secure.tls=true"
+      - "traefik.http.routers.whoami-secure.tls.domains[0].main=${WHOAMI_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      # service router middlewares : whoami
+      - "traefik.http.routers.whoami.middlewares=error-middleware"
+      - "traefik.http.routers.whoami-secure.middlewares=error-middleware"
+    networks:
+      - default
+    expose:
+      - 80/tcp

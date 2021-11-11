@@ -1,0 +1,26 @@
+#!/usr/bin/env sh
+
+# load tango libs
+for f in /pool/tango/libs/*; do
+	[ -f "${f}" ] && . ${f}
+done
+# load app libs
+[ ! "${TANGO_NOT_IN_APP}" = "1" ] && for f in /pool/${TANGO_APP_NAME}/libs/*.sh; do [ -f "${f}" ] && . ${f}; done
+
+
+
+PLUGIN="uname"
+DATA="/plugins_data/${PLUGIN}"
+
+echo "* Plugin : ${PLUGIN}"
+
+echo "L-- STEP : install plugin"
+echo "  -"
+
+echo "L-- STEP : setup plugin"
+echo "  -"
+
+echo "L-- STEP : run plugin"
+uname -a
+
+echo "L-- STEP : end plugin"

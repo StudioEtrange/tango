@@ -1,0 +1,5 @@
+
+#!/bin/bash
+
+# parse command line
+$STELLA_API argparse "$0" "$OPTIONS" "$PARAMETERS" "$STELLA_APP_NAME" "$(usage)" "EXTRA_PARAMETER ARG EXTRA_ARG OTHER_ARG EXTRA_ARG_EVAL OTHER_ARG_EVAL" "$@"
