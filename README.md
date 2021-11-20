@@ -203,7 +203,7 @@ For full list see `tango.internal.env` file
     # At this position while reading file B value is "1"
     ```
 
-* External environnment variable can be used with `{{$var}}` as value
+* External and exported environnment variable can be used with `{{$var}}` as value
     ```
     H={{$HOME}}
     PWD={{$WORKING_DIR}}

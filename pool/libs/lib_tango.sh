@@ -377,43 +377,113 @@ __parse_env_file() {
 	cat "${_temp}" > "${_file}"
 	rm -f "${_temp}"
 	
-	__parse_env_file2 "$1"
+	__substitute_env_var_in_file "$1"
+	__substitute_key_in_file "$1"
 }
 
-# manage {{var}} substitution
-# TODO work only non recursive
-#	This do not work : 
-#	A=1
-#	B={{A}}
-#	C={{B}}
-__parse_env_file2() {
+
+# https://gist.github.com/StudioEtrange/152e7bd0ac278b175663d11ab5db5d81
+
+# In any text or configuration file substitute a key with its own value, if its value is assigned earlier in the file and the key is referenced with {{key}}
+# This could be used on any text file, i.e an .ini file or a docker-compose env file
+# The mechanism works like in shell script variable syntax in some ways : assignation, declaration, resolution order and comment symbol (#)
+#   Usage : substitute_var_env_file "<file_path>"
+#   Input file content:
+#			FOO=10
+#			The number is {{N}}
+#			# FOO={{N}}
+#			A=1
+#			B={{A}}
+#			C={{B}}
+#			X={{Y}}
+#			Y=4
+#			X={{Y}}
+#   Result file content:
+#			FOO=10
+#			# The number is 10
+#			# FOO=10
+#			A=1
+#			B=1
+#			C=1
+#			X={{Y}}
+#			Y=4
+#			X=4
+__substitute_key_in_file() {
+
 	local _file="$1"
 
 	local _temp=$(mktmp)
 
 	awk -F= '
-	/^[^=#]*=/ {
-		if (FNR==NR) {
-		
-			arr[$1]=$2;
-			next;
-		}
-	}
-	/.*/ {
-		if (FNR==NR) {
-			next;
-		}
-	}
 
-	{
-		for (a in arr) gsub("{{"a"}}", arr[a]);
-		print;
-	} 
+ 		function parsekey(str) {
+			# if there is a value assignation to a key into this string
+			# update val array
+			if (match(str,/^([^=#]*)=(.*)/,tmp)) {
+				val[tmp[1]]=tmp[2];
+			}
+		}
 
-	' "${_file}" "${_file}" > "${_temp}"
+		# fill the key array which contains all existing key
+		/^[^=#]*=/ {
+			# FNR=NR only when reading first file
+			if (FNR==NR) {
+				key[$1]=1;
+				next;
+			}
+		}
+		/.*/ {
+			# FNR=NR only when reading first file
+			if (FNR==NR) {
+				next;
+			}
+		}
+	
+		# this block is triggered at each line only if not bypassed by next
+		# so this block is really triggered only when reading second file
+		{
+			for (k in key) {
+				# transform any reference to the keyy in current line into its value, if it has a known value
+				# key[] list all existing keys in file
+				# val[] list only key which have a known value
+				if (k in val) {
+					# we replace any reference to the key with its value with gsub in current line
+					gsub("{{"k"}}", val[k]);			
+				}
+			}
+			# re-parse the current line to find any value assignation to a key
+			parsekey($0);
+			print $0;
+		} 
+
+		' "${_file}" "${_file}" > "${_temp}"
+		cat "${_temp}" > "${_file}"
+		rm -f "${_temp}"
+}
+
+# replace in a file exported environnement variable in the form {{$variable}}
+# NOTE : authorized char as shell variable name : [a-zA-Z_]+[a-zA-Z0-9_]* https://stackoverflow.com/a/2821201
+# WARN : env var must have been exported to be used here
+__substitute_env_var_in_file() {
+
+	local _file="$1"
+
+	local _temp=$(mktmp)
+
+	awk '
+		/{{\$[a-zA-Z_]+[a-zA-Z0-9_]*}}/ {
+				if (match($0,/{{\$([a-zA-Z_]+[a-zA-Z0-9_]*)/,tmp)) {
+						if (tmp[1] in ENVIRON) gsub("{{\\$"tmp[1]"}}", ENVIRON[tmp[1]],$0);
+						else gsub("{{\\$"tmp[1]"}}","{{MISSING_"tmp[1]"}}",$0)
+				}
+		}
+
+		/.*/ {
+				print $0;
+		}
+	'  "${_file}" > "${_temp}"
 	cat "${_temp}" > "${_file}"
 	rm -f "${_temp}"
-	
 }
 
 
@@ -501,7 +571,7 @@ __create_docker_compose_file() {
 # translate all relative path to absolute
 __translate_path() {
 
-
+	
 	if [ ! "${TANGO_ARTEFACT_FOLDERS}" = "" ]; then
 		__tmp=
 		for f in ${TANGO_ARTEFACT_FOLDERS}; do
@@ -2988,15 +3058,14 @@ __manage_path() {
 			# if setted xxx_PATH is a relative path
 			*)
 				# just create folder relative to __default_root
-					__tmp="${__default_root}_SUBPATH_CREATE"
-					eval "${__tmp}=\"${!__tmp} FOLDER $(echo ${!__var_path} | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\$/\\$/g') \""
-					# export this path will update its value inside env files
-					eval "export ${__var_path}=\"${!__default_root}/${!__var_path}\""
-					__tango_log "DEBUG" "tango" "manage_path : ${__var_path} will be created under ${__default_root} [${!__var_path}]"
+				__tmp="${__default_root}_SUBPATH_CREATE"
+				eval "${__tmp}=\"${!__tmp} FOLDER $(echo ${!__var_path} | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\$/\\$/g') \""
+				# export this path will update its value inside env files
+				eval "export ${__var_path}=\"${!__default_root}/${!__var_path}\""
+				__tango_log "DEBUG" "tango" "manage_path : ${__var_path} will be created under ${__default_root} [${!__var_path}]"
 			;;
 		esac
 	fi
-
 
 	# manage subpath lists
 	__subpath_list="${__var_path}_SUBPATH_LIST"
