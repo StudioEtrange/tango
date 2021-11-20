@@ -1,6 +1,7 @@
 #!/bin/bash
 TANGO_CURRENT_FILE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 TANGO_CURRENT_RUNNING_DIR="$( cd "$( dirname "." )" && pwd )"
+WORKING_DIR="${TANGO_CURRENT_RUNNING_DIR}"
 
 # TANGO
 [ "${TANGO_ROOT}" = "" ] && TANGO_ROOT="${TANGO_CURRENT_FILE_DIR}/.."

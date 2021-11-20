@@ -1,5 +1,6 @@
 #  TODO 
 
+* [ ] implementation of __set_priority_router_all force TANGO_SUBSERVICES_ROUTER to have same family subrouter following each other in the list - REVIEW implementation
 
 * [X] add by default traefik service ? its is added because traefik is a depency of all compose service
     * [ ] each time we relaunch a single service, traefik is recreated --- is this a problem ? --- use --no-recreate ?

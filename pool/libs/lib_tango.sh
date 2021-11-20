@@ -499,20 +499,13 @@ __create_docker_compose_file() {
 
 
 # translate all relative path to absolute
-# translate all declared variables which end with _PATH
-__translate_all_path() {
+__translate_path() {
 
-	for __variable in ${VARIABLES_LIST}; do
-		case ${__variable} in
-			*_PATH) [ ! "${!__variable}" = "" ] && export ${__variable}="$($STELLA_API rel_to_abs_path "${!__variable}" "${TANGO_APP_ROOT}")"
-			;;
-		esac
-	done
 
 	if [ ! "${TANGO_ARTEFACT_FOLDERS}" = "" ]; then
 		__tmp=
 		for f in ${TANGO_ARTEFACT_FOLDERS}; do
-			f="$($STELLA_API rel_to_abs_path "${f}" "${TANGO_APP_ROOT}")"
+			f="$($STELLA_API rel_to_abs_path "${f}" "${TANGO_APP_WORK_ROOT}")"
 			__tmp="${__tmp} ${f}"
 		done
 		export TANGO_ARTEFACT_FOLDERS="$($STELLA_API trim "${__tmp}")"
@@ -521,7 +514,7 @@ __translate_all_path() {
 	if [ ! "${TANGO_CERT_FILES}" = "" ]; then
 		__tmp=
 		for f in ${TANGO_CERT_FILES}; do
-			f="$($STELLA_API rel_to_abs_path "${f}" "${TANGO_APP_ROOT}")"
+			f="$($STELLA_API rel_to_abs_path "${f}" "${TANGO_APP_WORK_ROOT}")"
 			__tmp="${__tmp} ${f}"
 		done
 		export TANGO_CERT_FILES="$($STELLA_API trim "${__tmp}")"
@@ -530,11 +523,32 @@ __translate_all_path() {
 	if [ ! "${TANGO_KEY_FILES}" = "" ]; then
 		__tmp=
 		for f in ${TANGO_KEY_FILES}; do
-			f="$($STELLA_API rel_to_abs_path "${f}" "${TANGO_APP_ROOT}")"
+			f="$($STELLA_API rel_to_abs_path "${f}" "${TANGO_APP_WORK_ROOT}")"
 			__tmp="${__tmp} ${f}"
 		done
 		export TANGO_KEY_FILES="$($STELLA_API trim "${__tmp}")"
 	fi
+
+	# TODO REMOVE THIS USELESS
+	# at this step all path variable managed by tango through TANGO_PATH_LIST (and sublist) should be already absolute
+	for __variable in ${VARIABLES_LIST}; do
+		case ${__variable} in
+			*_PATH) 
+				#if [ ! "${!__variable}" = "" ]; then
+					case ${!__variable} in
+						/*);;
+						*)
+							__tango_log "WARN" "tango" "not absolute path variable found : ${__variable} [${!__variable}]. Maybe not managed by tango ? If you want to, add it to TANGO_PATH_LIST"
+						;;
+					esac
+					
+					# convert to absolute USELESS ?
+					#export ${__variable}="$($STELLA_API rel_to_abs_path "${!__variable}" "${TANGO_APP_ROOT}")"
+				#fi
+			;;
+		esac
+	done
+
 }
 
 
@@ -2886,7 +2900,6 @@ __ini_get_key_value() {
 
 # parse path variables and instruct creation order
 #   						xxx_PATH =           		provided path
-#   						xxx_PATH_DEFAULT 	  =   	default path (should be relative)
 #   						xxx_PATH_SUBPATH_LIST = 	list of subpath variables relative to path
 # 							xxx_PATH_SUBPATH_CREATE = 	instructions to create subpath relative to path (internal variable)
 __manage_path() {
@@ -2905,79 +2918,55 @@ __manage_path() {
 	local __tmp=
 
 	__tango_log "DEBUG" "tango" "manage_path : ${__var_path} var path"
-	[ ! "${__relative_root}" = "" ] && __tango_log "DEBUG" "tango" "manage_path : ${__var_path} should be a subfolder of var path ${__relative_root}"
-
 
 	__add_declared_variables "${__var_path}"
 
 	# if xxx_PATH not setted
 	if [ "${!__var_path}" = "" ]; then
-		__default_path="${__var_path}_DEFAULT"
-		__path="${!__default_path}"
-		# if xxx_PATH_DEFAULT is empty, take lower case name
-		if [ "${__path}" = "" ]; then
 			__path="${__var_path,,}"
-			__tango_log "WARN" "tango" "manage_path : ${__var_path} do not have any default value setted, use ${__path} as default value"
-		fi
-		if [ ! "${__relative_root}" = "" ]; then
-			__tmp="${__relative_root}_SUBPATH_CREATE"
-			eval "${__tmp}=\"${!__tmp} FOLDER $(echo ${__path} | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\$/\\$/g') \""
-			# export this path will update its value inside env files
-			eval "export ${__var_path}=\"${!__relative_root}/${__path}\""
-			__tango_log "DEBUG" "tango" "manage_path : ${__var_path} not setted : will create folder defined with default name \""${__path}\"" under ${__relative_root} [${!__var_path}]"
-		else
+			__tango_log "WARN" "tango" "manage_path : ${__var_path} do not have any value setted, use ${__path} as default value"
 			__tmp="${__default_root}_SUBPATH_CREATE"
 			eval "${__tmp}=\"${!__tmp} FOLDER $(echo ${__path} | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\$/\\$/g') \""
 			# export this path will update its value inside env files
 			eval "export ${__var_path}=\"${!__default_root}/${__path}\""
 			__tango_log "DEBUG" "tango" "manage_path : ${__var_path} not setted : will create folder defined with default name \""${__path}\"" under ${__default_root} [${!__var_path}]"
-		fi
-		
 	else
 
 		
 		case ${!__var_path} in
-			# if setted xxx_PATH is absolute path
+			# if setted xxx_PATH is absolute path => NOTHING TO DO, but an absolute path must exist as it will not be created
 			/*)
-				# a relative root and absolute path ==> check path ti relative to intended root and create it if so
-				if [ ! "${__relative_root}" = "" ]; then
-					# absolute path but shoud be relative path of $__relative_root
-					# check if it is an absolute path which is relative to root
-					if [ "$($STELLA_API is_logical_subpath "${!__relative_root}" "${!__var_path}")" = "TRUE" ]; then
-						__new_rel_path="$($STELLA_API abs_to_rel_path "${!__var_path}" "${!__relative_root}")"
-						# reconvert to a relative path 
-						# NOTE : we need this because we have not updated generated files AND load its value 
-						#		 then all relative path have been converted to absolute values INSTEAD of staying relative values
-						__tmp="${__relative_root}_SUBPATH_CREATE"
-						eval "${__tmp}=\"${!__tmp} FOLDER $(echo ${__new_rel_path} | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\$/\\$/g') \""
-						eval "export ${__var_path}=\"${!__relative_root}/${__new_rel_path}\""
-						__tango_log "DEBUG" "tango" "manage_path : ${__var_path} will be created under ${__relative_root} as [${!__var_path}]"
-					else
-						# if not ignore this subpath creation
-						__tango_log "WARN" "tango" "manage_path : ${__var_path} should be a subfolder of ${__relative_root} but is not, ignoring it"
-					fi
-				else
-					# no relative root and absolute path ==> it is just an absolute path not beeing a declared subfolder ==> do nothing ! we do not create random folder anywhere. This fodler MUST exist
-					__tango_log "DEBUG" "tango" "manage_path : ${__var_path} is an absolute path, [${!__var_path}] must exists."
-				fi
+				TANGO_MANDATORY_PATH_LIST="${TANGO_MANDATORY_PATH_LIST} ${__var_path}"
+				__tango_log "DEBUG" "tango" "manage_path : ${__var_path} [${!__var_path}] is an absolute path and must exists"
+							# and may be or not a subfolder of parent path ${__default_root} [${__default_root}]"
+				# # a declared parent path BUT an absolute path as value ==> check path is relative to intended root and create it if so
+				# __tango_log "DEBUG" "WARN" "manage_path : ${__var_path} have an absolute path form : [${!__var_path}] but should have a relativce path form, relative to ${__default_root}"
+				# # absolute path but shoud be relative path of $__default_root
+				# # check if it is an absolute path which is relative to root
+				# if [ "$($STELLA_API is_logical_subpath "${!__default_root}" "${!__var_path}")" = "TRUE" ]; then
+				# 	__new_rel_path="$($STELLA_API abs_to_rel_path "${!__var_path}" "${!__default_root}")"
+				# 	# reconvert to a relative path 
+				# 	# NOTE : we need this because we have not updated generated files AND load its value 
+				# 	#		 then all relative path MAY have been converted to absolute values with __translate_all_path INSTEAD of staying relative values
+				# 	__tmp="${__default_root}_SUBPATH_CREATE"
+				# 	eval "${__tmp}=\"${!__tmp} FOLDER $(echo ${__new_rel_path} | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\$/\\$/g') \""
+				# 	eval "export ${__var_path}=\"${!__default_root}/${__new_rel_path}\""
+				# 	__tango_log "DEBUG" "tango" "manage_path : ${__var_path} will be created under ${__default_root} as [${!__var_path}]"
+				# else
+				# 	# if not ignore this subpath creation
+				# 	__tango_log "ERROR" "tango" "manage_path : ${__var_path} should be a subfolder of ${__default_root} but is not, will not manage this absolute path."
+				# fi
+			
 			;;
+
 			# if setted xxx_PATH is a relative path
 			*)
-				# no relative root and relative path ==> just create folder relative to __default_root instead of __relative_root
-				if [ "${__relative_root}" = "" ]; then
+				# just create folder relative to __default_root
 					__tmp="${__default_root}_SUBPATH_CREATE"
 					eval "${__tmp}=\"${!__tmp} FOLDER $(echo ${!__var_path} | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\$/\\$/g') \""
 					# export this path will update its value inside env files
 					eval "export ${__var_path}=\"${!__default_root}/${!__var_path}\""
 					__tango_log "DEBUG" "tango" "manage_path : ${__var_path} will be created under ${__default_root} [${!__var_path}]"
-				else
-					# a relative root and relative path ==> just create folder relative to __relative_root
-					__tmp="${__relative_root}_SUBPATH_CREATE"
-					eval "${__tmp}=\"${!__tmp} FOLDER $(echo ${!__var_path} | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\$/\\$/g') \""
-					# export this path will update its value inside env files
-					eval "export ${__var_path}=\"${!__relative_root}/${!__var_path}\""
-					__tango_log "DEBUG" "tango" "manage_path : ${__var_path} will be created under ${__relative_root} [${!__var_path}]"
-				fi
 			;;
 		esac
 	fi
@@ -2986,7 +2975,7 @@ __manage_path() {
 	# manage subpath lists
 	__subpath_list="${__var_path}_SUBPATH_LIST"
 	for s in ${!__subpath_list}; do
-		__manage_path "$s" "$__var_path" "$__var_path"
+		__manage_path "$s" "$__var_path"
 	done
 	
 
@@ -3110,8 +3099,8 @@ __check_mandatory_path() {
 	local __mode="$1"
 	__log="ERROR"
 	[ "${__mode}" = "NON_BLOCKING" ] && __log="WARN"
-	__tango_log "DEBUG" "tango" "check_mandatory_path TANGO_PATH_LIST : $TANGO_PATH_LIST"
-	for p in ${TANGO_PATH_LIST}; do
+	__tango_log "DEBUG" "tango" "check_mandatory_path TANGO_MANDATORY_PATH_LIST : $TANGO_MANDATORY_PATH_LIST"
+	for p in ${TANGO_MANDATORY_PATH_LIST}; do
 		if [ ! -d "${!p}" ]; then
 			__tango_log "$__log" "tango" "Mandatory path ${p} [${!p}] do not exist"
 			[ ! "${__mode}" = "NON_BLOCKING" ] && exit 1

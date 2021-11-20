@@ -205,13 +205,15 @@ case ${ACTION} in
 		
 		# add variables created at runtime or computed from command line
 		__add_declared_variables "DEBUG"
+		
 		__add_declared_variables "TANGO_APP_NAME"
 		__add_declared_variables "TANGO_APP_NAME_CAPS"
 
 		__add_declared_variables "TANGO_ROOT"
 		__add_declared_variables "TANGO_APP_ROOT"
 		__add_declared_variables "TANGO_APP_WORK_ROOT"
-
+		__add_declared_variables "WORKING_DIR"
+		
 		__add_declared_variables "TANGO_ENV_FILE"
 		__add_declared_variables "TANGO_APP_ENV_FILE"
 		__add_declared_variables "TANGO_USER_ENV_FILE"
@@ -288,10 +290,8 @@ case ${ACTION} in
 
 		# add default services and active modules services to all available service list
 		TANGO_SERVICES_AVAILABLE="$($STELLA_API list_filter_duplicate "${TANGO_SERVICES_DEFAULT} ${TANGO_SERVICES_AVAILABLE} ${TANGO_SERVICES_MODULES}")"
-		
 		# add default subservices
 		TANGO_SUBSERVICES_ROUTER="$($STELLA_API list_filter_duplicate "${TANGO_SUBSERVICES_ROUTER_DEFAULT} ${TANGO_SUBSERVICES_ROUTER}")"
-
 		# add default network http redirect to https
 		NETWORK_SERVICES_REDIRECT_HTTPS="$($STELLA_API list_filter_duplicate "${NETWORK_SERVICES_REDIRECT_HTTPS_DEFAULT} ${NETWORK_SERVICES_REDIRECT_HTTPS}")"
 
@@ -412,6 +412,10 @@ case ${ACTION} in
 		__tango_log "DEBUG" "tango" "    L TANGO_DATA_PATH_SUBPATH_CREATE=$TANGO_DATA_PATH_SUBPATH_CREATE"
 		__tango_log "DEBUG" "tango" "    L APP_DATA_PATH_SUBPATH_CREATE=$APP_DATA_PATH_SUBPATH_CREATE"
 
+
+		# check and turn to absolute path some path variable
+		__translate_path
+
 		# path pointing where the tango cross-app data will be stored
 		__add_declared_variables "TANGO_DATA_PATH"
 		__add_declared_variables "TANGO_INSTANCE_NAME"
@@ -498,8 +502,6 @@ case ${ACTION} in
 
 		# STEP 4 ------ create/transform some values and create docker compose file
 
-		# update path
-		__translate_all_path
 		# generate compose file (this also add some new variables to VARIABLES_LIST)
 		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __create_docker_compose_file
 		

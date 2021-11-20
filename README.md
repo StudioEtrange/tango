@@ -21,7 +21,7 @@ Tango is a command line tool that generate and manage a docker-compose file0
 * bash 4
 * git
 * docker engine
-* a wildcard domain name that point to your host (*..domain.org)
+* a wildcard domain name that point to your host (*.domain.org)
 
 
 ## Usage
@@ -195,14 +195,23 @@ For full list see `tango.internal.env` file
     # At this position while reading file FOO value is "foo"
     ```
 
-* Some declared env can be reused with `{{var}}` as value.
+* env variable declared within one file can be reused with `{{var}}` as value later in the file.
     ```
     A=1
     B={{A}}
 
     # At this position while reading file B value is "1"
     ```
-    Recursive parsing do not work : `C={{B}}` will not work
+
+* External environnment variable can be used with `{{$var}}` as value
+    ```
+    H={{$HOME}}
+    PWD={{$WORKING_DIR}}
+
+    # At this position while reading file H value is "/home/john" 
+    and PWD value is $WORKING_DIR value which is the current working directory from where tango was launched.
+    ```
+
 
 ### Using command line variables
 
@@ -231,20 +240,38 @@ For full list see `tango.internal.env` file
 ### Variables of type "PATH"
 
 
-* All variables ending with `_PATH` are a path variable. Any relatives values are converted to absolute path relative to app root folder at tango launch
+* Variables ending with `_PATH` are path variables.
 
-* List of some static path variables
+* Tango can manage a list of paths on host. Each managed path is fully evaluated into absolute path and can be created if not existing. `TANGO_PATH_LIST` list variable path name to manage, each of them can have their own subfolder list in the form of `<parent_name>_SUBPATH_LIST`
+    ```
+    TANGO_PATH_LIST=FOO_PATH BAR_PATH
+    BAR_PATH_SUBPATH_LIST=VAR_PATH
+    ```
 
-    |VARIABLE|DESC|FORMAT|
-    |-|-|-|
-    |`TANGO_APP_ROOT`|current app full path. Without a current app, tango is viewed as an app itself|
-    |`TANGO_APP_WORK_ROOT`|current app workspace full path.| `$TANGO_APP_ROOT/workspace/$TANGO_APP_NAME`|
+* Each declared path variable in those kind of lists 
+    * can have as value an absolute path, a relative path or be empty
+    * can have a known parent path (if listed in `PARENT_PATH_SUBPATH_LIST`) or an unknow parent (if listed in `TANGO_PATH_LIST`)
 
-* Tango can manage/create some path on host. `TANGO_PATH_LIST` list path to be managed by tango. For each path variable in this list (i.e `VAR_PATH`) :
-    * if the variable value is setted, path is checked and throw an error if it does not exist when trying to start a service
-    * if the variable value is empty then the value defined by `_PATH_DEFAULT` ending variable (i.e `VAR_PATH_DEFAULT`) will be used as a relative subfolder name to app workspace folder (i.e `TANGO_APP_WORK_ROOT/VAR_PATH_DEFAULT`).
-        * if the variable value is setted, path is checked and throw an error if it does not exist when trying to start a service
-        * if `_PATH_DEFAULT` (i.e `VAR_PATH_DEFAULT`) is empty, the lower cased variable name will be setted as value  (i.e `VAR_PATH_DEFAULT=var_path`)
+* Each declared path variable with an absolute path value must exists before launching tango
+* Each declared path variable with a relative path value will be auto created if missiung
+
+* Each declared path variable are turned into absolute path at runtime following these path evaluation rules
+    * if variable path is an absolute path, then this absoluted path is used as is
+    * if variable path is a relative path, it will be relative to its parent path. If parent is unknown, `$TANGO_APP_WORK_ROOT` is used as default parent path
+    * if variable path have an unknow parenthave an empty value,  its value will be the lower cased name of <variable_name> (`foo_path` for `FOO_PATH`)
+        
+        
+
+* Path rules matrix
+
+    |-|UNKNOWN PARENT|KNOWN PARENT|MISSING PATH BLOCKING|MISSING PATH CREATED|
+    |-|-|-|-|-|
+    |**`FOO_PATH` is an absolute path**|absolute host path : `$FOO_PATH`|*should not be possible, a subfolder must be a relative path to its parent*|YES|NO|
+    |**`FOO_PATH` is a relative path**|relative to app workspace : `$TANGO_APP_WORK_ROOT/$VAR_PATH`|relative to parent path : `$PARENT_PATH/$FOO_PATH`|NO|YES|
+
+
+
+* Samples
 
         ```
         export TANGO_PATH_LIST="FOO_PATH"
@@ -254,69 +281,58 @@ For full list see `tango.internal.env` file
 
         export TANGO_PATH_LIST="FOO_PATH"
         export FOO_PATH=
-        export FOO_PATH_DEFAULT="foo"
         ./tango up --freeport
-        # a subfolder `$(pwd)/workspace/tango/foo` will be created if not already exists
+        # a subfolder `$(pwd)/workspace/tango/foo_path` will be created if not already exists
 
         export TANGO_PATH_LIST="FOO_PATH"
         export FOO_PATH=
-        export FOO_PATH_DEFAULT=
-        ./tango up --freeport
-        # a subfolder `$(pwd)/workspace/foo_path` will be created
-        ```
-
-* Each path variable can have subfolders declared within a list `_SUBPATH_LIST` (i.e `VAR_PATH_SUBPATH_LIST`). For each path variable in this list (i.e `FOO_PATH`) :
-        * if the variable value is setted in a relative way, it will be created as a subfolder of parent (i.e `VAR_PATH`)
-        * if the variable value is empty will also used `_PATH_DEFAULT` as name to create a subfolder of parent list  (i.e `VAR_PATH`)
-
-        ```
-        export TANGO_PATH_LIST="FOO_PATH"
-        export FOO_PATH=
-        export FOO_PATH_DEFAULT="foo"
         export FOO_PATH_SUBPATH_LIST="BAR_PATH"
         export BAR_PATH="bar"
         ./tango up --freeport
         
-        # a subfolder `$(pwd)/workspace/foo` will be created and a subfolder `$(pwd)/workspace/foo/bar`
+        # a subfolder `$(pwd)/workspace/foo_path` will be created and a subfolder `$(pwd)/workspace/foo/bar`
 
         export TANGO_PATH_LIST="FOO_PATH"
         export FOO_PATH=
-        export FOO_PATH_DEFAULT="foo"
         export FOO_PATH_SUBPATH_LIST="BAR_PATH"
         export BAR_PATH=
-        export BAR_PATH_DEFAULT="fix"
         ./tango up --freeport
-        # a subfolder `$(pwd)/workspace/foo` will be created and a subfolder `$(pwd)/workspace/foo/fix`
+        # a subfolder `$(pwd)/workspace/foo_path` will be created and a subfolder `$(pwd)/workspace/foo/bar_path`
 
-
-        export TANGO_PATH_LIST="FOO_PATH"
-        export FOO_PATH=
-        export FOO_PATH_DEFAULT="foo"
-        export FOO_PATH_SUBPATH_LIST="BAR_PATH"
-        export BAR_PATH=
-        export BAR_PATH_DEFAULT=
-        ./tango up --freeport
-        # a subfolder `$(pwd)/workspace/foo` will be created and a subfolder `$(pwd)/workspace/foo/bar_path
         ```
 
-        
 
-* `APP_DATA_PATH` is a special path variable with a purpose to store and share data of services app in one unique location. It s added to TANGO_PATH_LIST if not already done
+* List of some default computed path variables at runtime
+
+    |VARIABLE|DESC|DEFAULT VALUE|
+    |-|-|-|
+    |`TANGO_APP_ROOT`|current app full path. Without a current app, tango is viewed as an app itself|-|
+    |`TANGO_APP_WORK_ROOT`|current app workspace full path.| `$TANGO_APP_ROOT/workspace/$TANGO_APP_NAME`|
+    |`APP_DATA_PATH`|current app data path.| `$TANGO_APP_WORK_ROOT/data`|
+    |`TANGO_DATA_PATH`|tango internal data path.| `$APP_DATA_PATH`|
+    |`WORKING_DIR`|dir from where tango have been launched.| `equals $(pwd) before launching command`|
+
+
+
+
+* `APP_DATA_PATH` is a special path variable with a purpose to store and share data of services app in one unique location. It s added to TANGO_PATH_LIST if not already done. Its default definition is
     ```
     TANGO_PATH_LIST=APP_DATA_PATH
     APP_DATA_PATH=
     APP_DATA_PATH_DEFAULT=data
     ```
 
-* Tango generic data like letsencrypt data or traefik conf are stored in a special way depending of the app instance mode (`isolated` or `shared`). `TANGO_DATA_PATH` contains the path of these data
-    * if `isolated` `TANGO_DATA_PATH` equal `APP_DATA_PATH` - they are stored as subfolder of `APP_DATA_PATH`
+* `TANGO_DATA_PATH` is a special path variable wich store generic tango data like letsencrypt data or traefik conf. Its value depends of tango instance mode (`isolated` or `shared`)
+    * if `isolated` (the default mode) `TANGO_DATA_PATH` equals `APP_DATA_PATH` - they are stored as subfolder of `APP_DATA_PATH`
     * if `shared` `TANGO_DATA_PATH` is a subfolder of tango `workspace` itself
 
-* *TIPS* : before changing path variables or instance mode (`shared` or `isolated`) attached to a volume (like `APP_DATA_PATH`) use `tango down` command to delete volume to avoid some docker warning and error.
 
-### Special variable : artefacts
 
-* `TANGO_ARTEFACT_FOLDERS` is a list of artefact path. All listed artefact folders are attached to services listed in `TANGO_ARTEFACT_SERVICES` to a specified mount point in `TANGO_ARTEFACT_MOUNT_POINT`
+
+* `TANGO_ARTEFACT_FOLDERS` is a special list of folder path named `artefacts`. Those listed folders are all absolute. Listed artefacts are attached to each service listed in `TANGO_ARTEFACT_SERVICES`. The mount point into service is defined by `TANGO_ARTEFACT_MOUNT_POINT` (`/artefact` by default) concatened to the deepest tree folder name.
+Artefact folder is an easy way to quick unite several folders into the same root inside a container
+    * `TANGO_ARTEFACT_FOLDERS=/mnt/media/movies /foo/bar/tv /flu/bar/music` will be mounted under `/artefact/movies`, `/artefact/tv` and `/artefact/music` into each service
+
 
 
 ### For Your Information about env files and tango internal mechanisms
@@ -687,6 +703,24 @@ i.e with HTTPS redirection engine disabled
     * If your Docker host also has a dedicated graphics card, the video encoding acceleration of Intel Quick Sync Video may become unavailable when the GPU is in use. 
 
 
+## Optional DNS Configuration
+
+* As requirements you have a wildcard domain name that point to your host (*.domain.org). But you can optimize this by configuring the wildcard domain to be solved 
+    * as your external public IP when requested from outside
+    * and as your local machine IP hosting tango when requested from local network
+
+* You can do this in your internet box or any software that manage your local network DNS server
+    * sample for OpenWrt configuration using dnsmasq to resolve any *.domain.org or domain.org as a unique 192.168.0.50 host inside localhost
+        ```
+        uci add_list dhcp.@dnsmasq[0].address="/domain.org/192.168.0.50"
+        uci changes firewall
+        uci commit
+        /etc/init.d/firewall reload
+        ```
+    * sample for pfsense to resolve any *.domain.org or domain.org as a unique 192.168.0.50 host inside localhost
+        * Go to Services / DNS Forwarder
+        * Pick Custom options and set `address=/domain.org/192.168.0.50`
+        
 ## Troubleshooting
 
 
