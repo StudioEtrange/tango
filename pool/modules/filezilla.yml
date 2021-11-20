@@ -1,0 +1,63 @@
+volumes:
+  filezilla_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${FILEZILLA_DATA_PATH}
+    name: ${TANGO_APP_NAME}_filezilla_data
+  filezilla_hostfiles:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${FILEZILLA_HOSTFILES_PATH}
+    name: ${TANGO_APP_NAME}_filezilla_hostfiles
+
+services:
+  filezilla:
+    image: ${FILEZILLA_IMAGE_FIXED_VAR}:${FILEZILLA_VERSION_FIXED_VAR:-latest}
+    container_name: ${TANGO_APP_NAME}_filezilla
+    depends_on: 
+      - service_init
+    restart: unless-stopped
+    volumes:
+      # configuration
+      - filezilla_data:/config
+      # host files
+      - filezilla_hostfiles:/storage
+    environment:
+      - USER_ID=${TANGO_USER_ID:-0}
+      - GROUP_ID=${TANGO_GROUP_ID:-0}
+      - KEEP_APP_RUNNING=1
+      - DISPLAY_WIDTH=${FILEZILLA_WIDTH:-1280}
+      - DISPLAY_HEIGHT=${FILEZILLA_HEIGHT:-768}
+      - SECURE_CONNECTION=0
+      - CLEAN_TMP_DIR=1
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      # service : filezilla -------------------------
+      - "traefik.http.services.filezilla.loadbalancer.server.port=5800"
+      - "traefik.http.services.filezilla.loadbalancer.server.scheme=http"
+      - "traefik.http.services.filezilla.loadbalancer.passhostheader=true"
+      # service router : filezilla
+      - "traefik.http.routers.filezilla.entrypoints=${FILEZILLA_ENTRYPOINTS:-entry_main_http}"
+      - "traefik.http.routers.filezilla.rule=HostRegexp(`{subdomain:${FILEZILLA_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.filezilla.priority=${FILEZILLA_PRIORITY}"
+      - "traefik.http.routers.filezilla.service=filezilla"
+      - "traefik.http.routers.filezilla-secure.entrypoints=${FILEZILLA_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
+      - "traefik.http.routers.filezilla-secure.rule=HostRegexp(`{subdomain:${FILEZILLA_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.filezilla-secure.priority=${FILEZILLA_PRIORITY}"
+      - "traefik.http.routers.filezilla-secure.service=filezilla"
+      - "traefik.http.routers.filezilla-secure.tls=true"
+      - "traefik.http.routers.filezilla-secure.tls.domains[0].main=${FILEZILLA_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      # service router middlewares : filezilla
+      - "traefik.http.routers.filezilla.middlewares=error-middleware"
+      - "traefik.http.routers.filezilla-secure.middlewares=error-middleware"
+    networks:
+      - default
+    expose:
+      - 5800/tcp
+      # VNC port
+      - 5900
