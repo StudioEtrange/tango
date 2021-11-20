@@ -39,3 +39,5 @@ services:
       - default
     expose:
       - 5800/tcp
+      # VNC port
+      - 5900
