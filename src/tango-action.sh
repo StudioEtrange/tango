@@ -118,28 +118,8 @@ case ${ACTION} in
 
 	info )
 		case "${TARGET}" in
-			vpn_* )			
-				echo "---------==---- VPN ----==---------"
-				echo "* VPN Service"
-				echo "L-- vpn list : ${VPN_SERVICES_LIST}"
-				echo "L-- check dns leaks :  https://dnsleaktest.com/"
-				
-				for v in ${VPN_SERVICES_LIST}; do
-					if [ "$v" = "${TARGET}" ]; then
-						echo "* VPN Infos"
-						echo "L-- vpn id : ${v}"
-						for var in $(compgen -A variable | grep ^${v^^}_); do
-							case ${var} in
-								*PASSWORD*|*AUTH* ) echo "  + ${var}=*****";;
-								* ) echo "  + ${var}=${!var}";;
-							esac
-						done
-						printf "  * external ip : "
-						__compose_exec "${TARGET}" "set -- curl -s ipinfo.io/ip"
-						echo ""
-					fi
-				done
-
+			vpn* )
+				__print_info_services_vpn "${TARGET}"
 			;;
 			"" )
 				docker-compose up service_info
@@ -154,19 +134,29 @@ case ${ACTION} in
 		[ "${BUILD}" = "1" ] && BUILD="BUILD"
 		__service_up "${TARGET}" "${BUILD}"
 
-		if [ ! "${TARGET}" = "" ]; then
-			__list="${TARGET}"
-		else
-			__list="${TANGO_SERVICES_ACTIVE}"
-		fi
-		__print_info_services "$__list"
-	
+		[ "${TARGET}" = "vpn" ] && __tango_log "INFO" "tango" "Will start all vpn services"]
+
+		case ${TARGET} in
+			vpn*)
+				__print_info_services_vpn "${TARGET}"
+			;;
+			"")
+				__print_info_services "${TANGO_SERVICES_ACTIVE}"
+			;;
+			*)
+				__print_info_services "${TARGET}"
+			;;
+		esac
 	;;
 
 	down )
 		case "${TARGET}" in
 			"") 
 				__service_down_all
+			;;
+			vpn)
+				__tango_log "INFO" "tango" "Will stop all vpn services"
+				__service_down "vpn $VPN_SERVICES_LIST"
 			;;
 			*) 
 				__service_down "${TARGET}"
@@ -185,6 +175,10 @@ case ${ACTION} in
 				#__service_down_all "NO_DELETE"
 				__service_down_all
 			;;
+			vpn)
+				__tango_log "INFO" "tango" "Will restart all vpn services"
+				__service_down "vpn $VPN_SERVICES_LIST"
+			;;
 			*) 
 				#__service_down "${TARGET}" "NO_DELETE"
 				__service_down "${TARGET}"
@@ -193,12 +187,19 @@ case ${ACTION} in
 		
 		[ "${BUILD}" = "1" ] && BUILD="BUILD"
 		__service_up "${TARGET}" "${BUILD}"
-		if [ ! "${TARGET}" = "" ]; then
-			__list="${TARGET}"
-		else
-			__list="${TANGO_SERVICES_ACTIVE}"
-		fi
-		__print_info_services "$__list"
+
+		case ${TARGET} in
+			vpn*)
+				__print_info_services_vpn "${TARGET}"
+			;;
+			"")
+				__print_info_services "${TANGO_SERVICES_ACTIVE}"
+			;;
+			*)
+				__print_info_services "${TARGET}"
+			;;
+		esac
+
 	;;
 
 	status )

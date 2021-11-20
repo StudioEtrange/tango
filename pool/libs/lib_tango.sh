@@ -2080,6 +2080,32 @@ __print_info_services() {
 	fi
 }
 
+__print_info_services_vpn() {
+	local __vpn_list="$1"
+
+	# "vpn" means all vpn services
+	[ "${__vpn_list}" = "vpn" ] && __vpn_list="${VPN_SERVICES_LIST}"
+
+	echo "---------==---- VPN ----==---------"
+	echo "* VPN Services"
+	echo "L-- vpn list : ${VPN_SERVICES_LIST}"
+	echo "L-- check dns leaks :  https://dnsleaktest.com/"
+	
+	for v in ${__vpn_list}; do
+		echo "* VPN Infos"
+		echo "L-- vpn id : ${v}"
+		for var in $(compgen -A variable | grep ^${v^^}_); do
+			case ${var} in
+				*PASSWORD*|*AUTH* ) echo "  + ${var}=*****";;
+				* ) echo "  + ${var}=${!var}";;
+			esac
+		done
+		printf "  * external ip : "
+		__compose_exec "${v}" "set -- curl -s ipinfo.io/ip"
+		echo ""
+	done
+}
+
 __set_error_engine() {
 
 	__tango_log "DEBUG" "tango" "set_error_engine"
