@@ -1,14 +1,6 @@
 # NOTES
 
 
-## Docker images
-
-* linuxserver.io server images : https://fleet.linuxserver.io/
-* jlesage images :
-    * https://jlesage.github.io/docker-apps/
-    * https://github.com/jlesage?tab=repositories
-* hotio images :
-    * https://hotio.dev/containers/apprise/
 
 ## VPN
 
@@ -86,6 +78,7 @@
 
 * Borg (backup tool)
     * https://www.borgbackup.org/
+    * dockerfile version : https://github.com/BaptisteBdn/docker-selfhosted-apps/tree/main/borg-backup
 
 * Duplicacy
     * https://duplicacy.com/

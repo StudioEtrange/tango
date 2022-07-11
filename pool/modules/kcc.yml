@@ -48,5 +48,3 @@ services:
       - default
     expose:
       - 8080/tcp
-    build:
-      context: https://github.com/StudioEtrange/docker-kcc.git

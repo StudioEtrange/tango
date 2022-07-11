@@ -150,6 +150,16 @@ for service in ${TANGO_SERVICES_AVAILABLE}; do
 
 done
 
+if [ "${info_variables}" = "1" ]; then
+    echo "L-- variables shared by all instances of a service :"
+    for variables in $(compgen -A variable | grep ^SHARED_VAR_); do
+        case ${variables} in
+            *PASSWORD|*AUTH ) echo "  + ${variables}=*****";;
+            * ) echo "  + ${variables}=${!variables}";;
+        esac
+    done
+fi
+
 echo "---------==---- MODULES ----==---------"
 echo "* Active modules as a service "
 echo "L-- a module is a predefined service"
@@ -199,7 +209,7 @@ case ${NETWORK_REDIRECT_HTTPS} in
     * ) t="DISABLED"; echo $t;;
 esac
 echo "L-- HTTP to HTTPS $t on : ${NETWORK_SERVICES_REDIRECT_HTTPS}"
-echo "* Let's encrypt"
+echo "* Let's encrypt certificate authority and ACME protocol"
 echo -n "L-- status : "
 case ${LETS_ENCRYPT} in
     enable ) echo ENABLED;;
@@ -209,8 +219,13 @@ esac
 
 echo "L-- email used : $LETS_ENCRYPT_MAIL"
 echo "L-- certificates generated for : $LETS_ENCRYPT_SERVICES"
-echo "L-- challenge method : $LETS_ENCRYPT_CHALLENGE"
-echo "* Provided certificates"
+echo "L-- ACME protocol challenge method : $ACME_CHALLENGE"
+echo "L-- ACME protocol DNS provider for DNS challenge : $ACME_DNS_PROVIDER"
+echo "L-- ACME certificate generation protocol variables"
+for var in $(compgen -A variable | grep ^ACME_VAR_); do
+    echo "  + ${var}=${!var}"
+done
+echo "* Provided certificates by configuration"
 echo "L-- traefik tls conf : ${GENERATED_TLS_FILE}"
 echo "L-- cert files : ${TANGO_CERT_FILES}"
 echo "L-- key files : ${TANGO_KEY_FILES}"
@@ -264,10 +279,10 @@ done
 
 
 echo "---------==---- PATHS ----==---------"
-echo Format : [host path] is mapped to {inside container path}
-echo App data path : [$APP_DATA_PATH] is mapped to {/data}
-echo Plugins data path : [$PLUGINS_DATA_PATH] is mapped to {/plugins_data}
-echo Data path of internal tango data : [$TANGO_DATA_PATH] is mapped to {/internal_data}
-echo Artefact folders : [$TANGO_ARTEFACT_FOLDERS] are mapped to {${TANGO_ARTEFACT_MOUNT_POINT:-/artefact}} subfolders
-echo Lets encrypt store file : [$TANGO_DATA_PATH/letsencrypt/acme.json] {/internal_data/letsencrypt/acme.json}
-echo Traefik dynamic conf files directory [$TANGO_DATA_PATH/traefikconfig] {/internal_data/traefikconfig}
+echo "Format : [host path] is mapped to {inside container path}"
+echo "App data path : [$APP_DATA_PATH] is mapped to {/data}"
+echo "Plugins data path : [$PLUGINS_DATA_PATH] is mapped to {/plugins_data}"
+echo "Data path of internal tango data : [$TANGO_DATA_PATH] is mapped to {/internal_data}"
+echo "Artefact folders : [$TANGO_ARTEFACT_FOLDERS] are mapped to {${TANGO_ARTEFACT_MOUNT_POINT:-/artefact}} subfolders"
+echo "Lets encrypt store file : [$TANGO_DATA_PATH/letsencrypt/acme.json] {/internal_data/letsencrypt/acme.json}"
+echo "Traefik dynamic conf files directory [$TANGO_DATA_PATH/traefikconfig] {/internal_data/traefikconfig}"

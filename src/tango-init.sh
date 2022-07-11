@@ -3,6 +3,25 @@ TANGO_CURRENT_FILE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 TANGO_CURRENT_RUNNING_DIR="$( cd "$( dirname "." )" && pwd )"
 export WORKING_DIR="${TANGO_CURRENT_RUNNING_DIR}"
 
+# TANGO system requirements
+TANGO_REQUIREMENTS_LIST="awk sed docker"
+for t in ${TANGO_REQUIREMENTS_LIST}; do
+	if ! type $t &>/dev/null; then
+		echo "** ERROR : $t not found. Please install it."
+		exit 1
+	fi
+done
+if ! awk 'BEGIN{ if(ENVIRON["HOME"]) exit 0; else exit 1;}'; then
+	echo "** ERROR : Your current version of awk do not support ENVIRON. Please install a compatible awk flavour like GNU awk."
+	exit 1
+fi
+if [ "${BASH_VERSINFO:-0}" -lt 4 ]; then
+	echo "** ERROR : You need at least bash version 4. Current version is ${BASH_VERSINFO:-0}."
+	exit 1
+fi
+
+
+
 # TANGO
 [ "${TANGO_ROOT}" = "" ] && TANGO_ROOT="${TANGO_CURRENT_FILE_DIR}/.."
 TANGO_ROOT="$($STELLA_API rel_to_abs_path "${TANGO_ROOT}" "${TANGO_CURRENT_RUNNING_DIR}")"
@@ -18,10 +37,7 @@ TANGO_SCRIPTS_ROOT="${TANGO_ROOT}/pool/scripts"
 TANGO_LOG_STATE="ON"
 TANGO_LOG_LEVEL="INFO"
 
-# controls modification of generated conf files on these tango run
-# usefull to make test run or 
-# or some fonctionalities which need an uptodate context from a previsous run 
-# 	but without modification of generated files
+# switch to control modification of generated files and alteration of filesystem (files & folder)
 TANGO_ALTER_GENERATED_FILES="ON"
 
 # associative array for mapping plugins by service that are atteched to

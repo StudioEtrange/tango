@@ -155,7 +155,7 @@ __update_env_files() {
 	echo "# ------ UPDATE : update_env_files : $(date) -- ${__text}" >> "${GENERATED_ENV_FILE_FOR_BASH}"
 	for __variable in ${VARIABLES_LIST}; do
 		[ -z ${!__variable+x} ] || echo "${__variable}=${!__variable}" >> "${GENERATED_ENV_FILE_FOR_COMPOSE}"
-		# NOTE : we need to export variables because some software like ansible need to access them
+		# NOTE : we need to explicitly use "export" for variables in GENERATED_ENV_FILE_FOR_BASH because some software like ansible need to access their values
 		# 		 we export variables only when update file (__update_env_files) not when file is created (__create_env_files "bash") because it easier
 		[ -z ${!__variable+x} ] || echo "export ${__variable}=\"$(echo ${!__variable} | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\$/\\$/g')\"" >> "${GENERATED_ENV_FILE_FOR_BASH}"	
 	done
@@ -208,8 +208,8 @@ __add_declared_associative_array() {
 
 
 # generate an env file from various env files (tango, app, modules and user env files) 
-# 		__target bash : to be used as env-file in environment section of docker compose file (GENERATED_ENV_FILE_FOR_COMPOSE)
-# 		__target docker_compose : to be sourced (GENERATED_ENV_FILE_FOR_BASH)
+# 		__target bash : generate a bash file to be sourced (GENERATED_ENV_FILE_FOR_BASH)
+# 		__target docker_compose : generate an env file to be used as env-file in environment section of docker compose file (GENERATED_ENV_FILE_FOR_COMPOSE)
 # __target : bash | docker_compose
 # __source_list : user, modules, app, default -- will create env file by adding in order thoses source file (ascending priority order)
 #				default ascending priority order is 'default app modules user', so default env var have lowest priority
@@ -261,7 +261,7 @@ __create_env_files() {
 				__modules_list="${TANGO_SERVICES_MODULES}"
 				__scaled_modules_processed=
 				if [ ! "$TANGO_SERVICES_MODULES_SCALED" = "" ]; then
-					__tango_log "DEBUG" "tango" "create_env_files for $__target : create env files and add modules env files for *scaled* modules : $TANGO_SERVICES_MODULES_SCALED"
+					__tango_log "DEBUG" "tango" "create_env_files for $__target : add modules env files for scaled modules : $TANGO_SERVICES_MODULES_SCALED"
 					for m in ${TANGO_SERVICES_MODULES_SCALED}; do
 						__instances_list="${m^^}_INSTANCES_LIST"
 
@@ -269,17 +269,23 @@ __create_env_files() {
 							# app modules overrides tango modules
 							if [ -f "${TANGO_APP_MODULES_ROOT}/${m}.env" ]; then
 								__tango_log "DEBUG" "tango" "create_env_files for $__target : app module ${m} instance ${i} : add env file : ${TANGO_APP_MODULES_ROOT}/${m}.env"
-								# we replace all ocurrence of module name with instance name
-								# except lines containing FIXED_VAR
-								sed -e "/FIXED_VAR/!s/${m}\([^a-zA-Z0-9]*\)/${i}\1/" -e "/FIXED_VAR/!s/${m^^}\([^a-zA-Z0-9]*\)/${i^^}\1/g" <(echo \# --- PART FROM modules env file ${TANGO_APP_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_APP_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
+								# we replace all ocurrence of module name with an instance name
+								# except into lines containing FIXED_VAR expression anywhere
+								# except expression beginngin with SHARED_VAR_
+								# use sed implementation of negative lookbehind https://stackoverflow.com/a/26110465
+								#sed -e "/FIXED_VAR/!s/${m}\([^a-zA-Z0-9]*\)/${i}\1/g" -e "/FIXED_VAR/!s/${m^^}\([^a-zA-Z0-9]*\)/${i^^}\1/g" <(echo \# --- PART FROM modules env file ${TANGO_APP_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_APP_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
+								sed -E "{/FIXED_VAR/! {s/#/##/g; s/(SHARED_VAR_)(${m})/\1_#_/g; s/(SHARED_VAR_)(${m^^})/\1-#-/g; s/${m}([^a-zA-Z0-9]*)/${i}\1/g; s/${m^^}([^a-zA-Z0-9]*)/${i^^}\1/g; s/(SHARED_VAR_)_#_/\1${m}/g; s/(SHARED_VAR_)-#-/\1${m^^}/g; s/##/#/g} }" <(echo \# --- PART FROM modules env file ${TANGO_APP_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_APP_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
 							else
 								if [ -f "${TANGO_MODULES_ROOT}/${m}.env" ]; then
 									__tango_log "DEBUG" "tango" "create_env_files for $__target : tango module ${m} instance ${i} : add env file : ${TANGO_MODULES_ROOT}/${m}.env"
 									# we replace all ocurrence of module name with instance name
-									# except lines containing FIXED_VAR
-									sed -e "/FIXED_VAR/!s/${m}\([^a-zA-Z0-9]*\)/${i}\1/" -e "/FIXED_VAR/!s/${m^^}\([^a-zA-Z0-9]*\)/${i^^}\1/g" <(echo \# --- PART FROM modules env file ${TANGO_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
+									# except into lines containing FIXED_VAR expression anywhere
+									# except expression beginngin with SHARED_VAR_
+									# use sed implementation of negative lookbehind https://stackoverflow.com/a/26110465
+									#sed -e "/FIXED_VAR/!s/${m}\([^a-zA-Z0-9]*\)/${i}\1/g" -e "/FIXED_VAR/!s/${m^^}\([^a-zA-Z0-9]*\)/${i^^}\1/g" <(echo \# --- PART FROM modules env file ${TANGO_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
+									sed -E "{/FIXED_VAR/! {s/#/##/g; s/(SHARED_VAR_)(${m})/\1_#_/g; s/(SHARED_VAR_)(${m^^})/\1-#-/g; s/${m}([^a-zA-Z0-9]*)/${i}\1/g; s/${m^^}([^a-zA-Z0-9]*)/${i^^}\1/g; s/(SHARED_VAR_)_#_/\1${m}/g; s/(SHARED_VAR_)-#-/\1${m^^}/g; s/##/#/g} }"  <(echo \# --- PART FROM modules env file ${TANGO_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
 								else
-									__tango_log "DEBUG" "tango" "create_env_files for $__target : *scaled* module $m do not have an env file (${TANGO_APP_MODULES_ROOT}/${m}.env nor ${TANGO_MODULES_ROOT}/${m}.env do not exists) might be an error"
+									__tango_log "DEBUG" "tango" "create_env_files for $__target : scaled module $m do not have an env file (${TANGO_APP_MODULES_ROOT}/${m}.env nor ${TANGO_MODULES_ROOT}/${m}.env do not exists) might be an error"
 								fi
 							fi
 							__scaled_modules_processed="${__scaled_modules_processed} ${i}"
@@ -301,7 +307,7 @@ __create_env_files() {
 							__tango_log "DEBUG" "tango" "create_env_files for $__target : tango module ${s} : add env file : ${TANGO_MODULES_ROOT}/${s}.env"
 							cat <(echo \# --- PART FROM modules env file ${TANGO_MODULES_ROOT}/${s}.env) <(echo) <(echo) "${TANGO_MODULES_ROOT}/${s}.env" <(echo) >> "${__file}"
 						else
-							__tango_log "DEBUG" "tango" "create_env_files for $__target : module $s do not have an env file (${TANGO_APP_MODULES_ROOT}/${s}.env nor ${TANGO_MODULES_ROOT}/${s}.env do not exists) maybe anormal or not"
+							__tango_log "DEBUG" "tango" "create_env_files for $__target : module $s do not have an env file (${TANGO_APP_MODULES_ROOT}/${s}.env nor ${TANGO_MODULES_ROOT}/${s}.env do not exists) maybe abnormal or not"
 						fi
 					fi
 				done
@@ -330,7 +336,10 @@ __create_env_files() {
 
 
 
-# remove commentary and manage cumulative assignation with += and default assignation with ?=
+# remove commentary 
+# manage += : cumulative assignation
+# manage ?= : init value of not already assigned variable (within file or in env var) with a value 
+# manage != : erase value of an already assigned variable (within file or in env var) with another value
 __parse_env_file() {
 	local _file="$1"
 
@@ -341,10 +350,21 @@ __parse_env_file() {
 	BEGIN {
 	}
 
+	# catch !=
+	/^[^=#]*!=/ {
+		key=substr($1, 1, length($1)-1);
+		if (arr[key]) arr[key]=$2;
+		else if(ENVIRON[key]) arr[key]=$2;
+		
+		print key"="arr[key];
+		next;
+	}
+
 	# catch ?=
 	/^[^=#]*\?=/ {
 		key=substr($1, 1, length($1)-1);
 		if (arr[key]) arr[key]=arr[key];
+		else if(ENVIRON[key]) arr[key]=ENVIRON[key];
 		else arr[key]=$2;
 		print key"="arr[key];
 		next;
@@ -354,6 +374,7 @@ __parse_env_file() {
 	/^[^=#]*\+=/ {
 		key=substr($1, 1, length($1)-1);
 		if (arr[key]) arr[key]=arr[key] " " $2;
+		else if(ENVIRON[key]) arr[key]=ENVIRON[key] " " $2;
 		else arr[key]=$2;
 		print key"="arr[key];
 		next;
@@ -463,7 +484,7 @@ __substitute_key_in_file() {
 
 # replace in a file exported environnement variable in the form {{$variable}}
 # NOTE : authorized char as shell variable name : [a-zA-Z_]+[a-zA-Z0-9_]* https://stackoverflow.com/a/2821201
-# WARN : env var must have been exported to be used here
+# WARN : env var must have been exported (with export command) to be used here
 __substitute_env_var_in_file() {
 
 	local _file="$1"
@@ -698,24 +719,35 @@ __set_certificates_all() {
 
 
 # attach existing volumes to compose service
-# use <SERVICE>_ADDITIONAL_VOLUMES variable <named volume|path><:path|#variable path name>
+# use <SERVICE>_ADDITIONAL_VOLUMES variable <named volume|path|#variable path name>:<path|#variable path name>
 __add_volume_service_all() {
 	local _t=
+	local _mapping_service=
 	for _s in $(compgen -A variable | grep _ADDITIONAL_VOLUMES$); do
 		_s="${_s%_ADDITIONAL_VOLUMES}"
 		if __check_docker_compose_service_exist "${_s,,}"; then
 			_t="${_s}_ADDITIONAL_VOLUMES"
 			for _v in ${!_t}; do
 				__parse_item "volume" "${_v}" "_VOLUME"
-				if [ ! "${_VOLUME_PATH}" = "" ]; then
-					__add_volume_mapping_service "${_s,,}" "${_VOLUME_NAME}:${_VOLUME_PATH}"
-				else
-					if [ ! "${_VOLUME_PATH_VARIABLE}" = "" ]; then
-						# add variable name to variables list passed in env file, because it can be initialized out of tango
-						__add_declared_variables "${_VOLUME_PATH_VARIABLE}"
-						__add_volume_mapping_service "${_s,,}" "${_VOLUME_NAME}:\$${_VOLUME_PATH_VARIABLE}"
-					fi
+
+				[ ! "${_VOLUME_OUTSIDE_PATH}" = "" ] && _mapping_service="${_VOLUME_OUTSIDE_PATH}:"
+				if [ ! "${_VOLUME_OUTSIDE_PATH_VARIABLE}" = "" ]; then
+					#_mapping_service="${!_VOLUME_OUTSIDE_PATH_VARIABLE}:"
+					_mapping_service="\${${_VOLUME_OUTSIDE_PATH_VARIABLE}}:"
+					# add variable name to variables list passed in env file, because it can be initialized out of tango
+					__add_declared_variables "${_VOLUME_OUTSIDE_PATH_VARIABLE}"
 				fi
+
+				[ ! "${_VOLUME_INSIDE_PATH}" = "" ] && _mapping_service="${_mapping_service}${_VOLUME_INSIDE_PATH}"
+				if [ ! "${_VOLUME_INSIDE_PATH_VARIABLE}" = "" ]; then
+					#_mapping_service="${_mapping_service}${!_VOLUME_INSIDE_PATH_VARIABLE}"
+					_mapping_service="${_mapping_service}\${${_VOLUME_INSIDE_PATH_VARIABLE}}"
+					# add variable name to variables list passed in env file, because it can be initialized out of tango
+					__add_declared_variables "${_VOLUME_INSIDE_PATH_VARIABLE}"
+				fi
+				
+				__add_volume_mapping_service "${_s,,}" "${_mapping_service}"
+
 				__tango_log "DEBUG" "tango" "add_volume_service_all : attach volume : ${_v} to compose service : ${_s,,}."
 			done
 		else
@@ -726,19 +758,26 @@ __add_volume_service_all() {
 
 
 
+
+
 # create named volumes. path is defined by a variable name
-# use TANGO_VOLUMES=<named volume><:path|#variable path name>
+# use TANGO_VOLUMES=<named volume>:<path|#variable path name>
 __add_volume_definition_all() {
 	local _t=
 	for _v in ${TANGO_VOLUMES}; do
 		__parse_item "volume" "${_v}" "_VOLUME"
 		__tango_log "DEBUG" "tango" "add_volume_definition_all : create volume : ${_v}"
 		
-		if [ ! "${_VOLUME_PATH}" = "" ]; then
-			__add_volume_definition_by_value "${_VOLUME_NAME}" "${_VOLUME_PATH}"
+		if [ ! "${_VOLUME_OUTSIDE_PATH_VARIABLE}" = "" ]; then
+			__tango_log "ERROR" "tango" "add_volume_definition_all : error in TANGO_VOLUMES ${_v}. Syntax is  TANGO_VOLUMES=<named volume>:<path|#variable path name>"
+			exit 1
+		fi
+
+		if [ ! "${_VOLUME_INSIDE_PATH}" = "" ]; then
+			__add_volume_definition_by_value "${_VOLUME_OUTSIDE_PATH}" "${_VOLUME_INSIDE_PATH}"
 		else 
-			if [ ! "${_VOLUME_PATH_VARIABLE}" = "" ]; then
-				__add_volume_definition_by_variable "${_VOLUME_NAME}" "${_VOLUME_PATH_VARIABLE}"
+			if [ ! "${_VOLUME_INSIDE_PATH_VARIABLE}" = "" ]; then
+				__add_volume_definition_by_variable "${_VOLUME_OUTSIDE_PATH}" "${_VOLUME_INSIDE_PATH_VARIABLE}"
 			fi
 		fi
 	done
@@ -880,8 +919,9 @@ __set_time_all() {
 
 
 
+# https://doc.traefik.io/traefik/https/acme/
 __set_letsencrypt_service_all() {
-
+	local __cloudflare_ip
 	
 	case ${LETS_ENCRYPT} in
 		enable|debug )
@@ -889,22 +929,58 @@ __set_letsencrypt_service_all() {
 				__add_letsencrypt_service "${serv}"
 			done
 
-			case ${LETS_ENCRYPT_CHALLENGE} in
+			if [ "${LETS_ENCRYPT}" = "debug" ]; then
+				__tango_log "INFO" "tango" "Letsencrypt certificate generation is in debug mode to avoid ban"
+				__tango_log "INFO" "tango" "check generated certificates in $LETS_ENCRYPT_DATA_PATH"
+
+				# set letsencrypt debug server if needed
+				yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.caserver=${LETS_ENCRYPT_SERVER_DEBUG}"
+			fi
+			__tango_log "INFO" "tango" "ACME protocol use ${ACME_CHALLENGE} challenge to valid letsencrypt certificates"
+
+			case ${ACME_CHALLENGE} in
 				HTTP )
+					
 					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.httpchallenge=true"
+					# The entrypoint MUST use the default 'main' network area
 					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.httpchallenge.entrypoint=entry_main_http"
 				;;
 				DNS )
+					__tango_log "INFO" "tango" "ACME protocol ask ${ACME_DNS_PROVIDER} dns provider to valid letsencrypt certificates"
 					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.dnschallenge=true"
-					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.dnschallenge.provider=${LETS_ENCRYPT_CHALLENGE_DNS_PROVIDER}"
+					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.dnschallenge.provider=${ACME_DNS_PROVIDER}"
+					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53"
+					
+							
+					case ${ACME_DNS_PROVIDER} in
+						
+						cloudflare)
+							
+							# get ipv4 cloudflare ip - TODO do we need to get ipv6 ip and allow them ?
+							__cloudflare_ip=$(__tango_curl -fkSLs "https://www.cloudflare.com/ips-v4" | tr '\n' ',')
+
+							# To delay DNS check and reduce LE hitrate
+							yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.dnschallenge.delayBeforeCheck=90"
+							
+							for e in ${TRAEFIK_ENTRYPOINTS_HTTP_LIST//,/ }; do
+								case $e in
+									*_secure)
+										# Allow these IPs to set the X-Forwarded-* headers - Cloudflare IPs: https://www.cloudflare.com/ips/
+										yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--entrypoints.$e.forwardedHeaders.trustedIPs=${__cloudflare_ip}"
+									;;
+								esac
+							done 
+						;;
+
+						* )
+						 	# To delay DNS check and reduce LE hitrate
+							yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.dnschallenge.delayBeforeCheck=10"
+						;;
+					esac
 				;;
 			esac
-			
 		;;
 	esac
-
-	# set letsencrypt debug server if needed
-	[ "${LETS_ENCRYPT}" = "debug" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.caserver=${LETS_ENCRYPT_SERVER_DEBUG}"
 }
 
 
@@ -984,22 +1060,19 @@ __set_routers_info_service_all() {
 					__subdomain="${__service}"
 				fi
 				if [ ! "${TANGO_SUBDOMAIN_SUFFIX}" = "" ]; then
-					__subdomain="${__subdomain}-${TANGO_SUBDOMAIN_SUFFIX}"
+					__subdomain="${__subdomain}${TANGO_SUBDOMAIN_SUFFIX_SEPARATOR}${TANGO_SUBDOMAIN_SUFFIX}"
 				fi
-				__subdomain="${__subdomain}."
 
 				eval "export ${__service^^}_SUBDOMAIN=${__subdomain}"
 				__add_declared_variables "${__service^^}_SUBDOMAIN"
 			else
 				__subdomain="${!__var}"
-				__subdomain="${__subdomain//./}"
 				if [ ! "${TANGO_SUBDOMAIN_SUFFIX}" = "" ]; then
-					__subdomain="${__subdomain}-${TANGO_SUBDOMAIN_SUFFIX}"
+					__subdomain="${__subdomain}${TANGO_SUBDOMAIN_SUFFIX_SEPARATOR}${TANGO_SUBDOMAIN_SUFFIX}"
 				fi
-				__subdomain="${__subdomain}."
 			fi
 
-			[ "${TANGO_DOMAIN}" = '.*' ] && __hostname="${__subdomain//./}" || __hostname="${__subdomain}${TANGO_DOMAIN}"
+			[ "${TANGO_DOMAIN}" = '.*' ] && __hostname="${__subdomain}" || __hostname="${__subdomain}${TANGO_SUBDOMAIN_SEPARATOR}${TANGO_DOMAIN}"
 			eval "export ${__service^^}_HOSTNAME=${__hostname}"
 			__add_declared_variables "${__service^^}_HOSTNAME"
 
@@ -1119,7 +1192,7 @@ __add_entrypoint() {
 	local __name="$1"
 	local __proto="$2"
 	local __internal_port="$3"
-	local __assiocated_entrypoint="$4" # optional
+	local __associated_entrypoint="$4" # optional
 	
 	local __real_proto
 	
@@ -1142,13 +1215,13 @@ __add_entrypoint() {
 	case ${__proto} in
 		http )
 			export TRAEFIK_ENTRYPOINTS_HTTP_LIST="$TRAEFIK_ENTRYPOINTS_HTTP_LIST entry_${__name}_${__proto}"
-			if [ ! "$__assiocated_entrypoint" = "" ]; then
+			if [ ! "$__associated_entrypoint" = "" ]; then
 				yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--entrypoints.entry_${__name}_${__proto}_secure=true"
-				yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--entrypoints.entry_${__name}_${__proto}_secure.address=:${__assiocated_entrypoint}/${__real_proto}"
+				yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--entrypoints.entry_${__name}_${__proto}_secure.address=:${__associated_entrypoint}/${__real_proto}"
 				export TRAEFIK_ENTRYPOINTS_LIST="$TRAEFIK_ENTRYPOINTS_LIST entry_${__name}_${__proto}_secure"
 				export TRAEFIK_ENTRYPOINTS_HTTP_LIST="$TRAEFIK_ENTRYPOINTS_HTTP_LIST entry_${__name}_${__proto}_secure"
 				# add port mapping to traefik
-				yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.ports[+]" "\${NETWORK_PORT_${__name^^}_SECURE}:$__assiocated_entrypoint/${__real_proto}"
+				yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.ports[+]" "\${NETWORK_PORT_${__name^^}_SECURE}:$__associated_entrypoint/${__real_proto}"
 				__add_declared_variables "NETWORK_PORT_${__name^^}_SECURE"
 			fi
 		;;
@@ -1449,10 +1522,13 @@ __set_module() {
 			if [ "$__original_module_scaled" = "" ]; then
 				yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_APP_MODULES_ROOT}/${_MODULE_NAME}.yml")
 			else
-				# we replace all ocurrence of module name with instance name
-				# except lines containing FIXED_VAR
+				# we replace all ocurrence of module name with an instance name
+				# except into lines containing FIXED_VAR expression anywhere
+				# except expression beginngin with SHARED_VAR_
+				# use sed implementation of negative lookbehind https://stackoverflow.com/a/26110465
 				__tango_log "DEBUG" "tango" "set_module : ${__module} is an instance of scaled module : $_ORIGINAL_NAME"
-				yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_APP_MODULES_ROOT}/${_ORIGINAL_NAME}.yml" | sed -e "/FIXED_VAR/!s/${_ORIGINAL_NAME}\([^a-zA-Z0-9]*\)/${_MODULE_NAME}\1/g" -e "/FIXED_VAR/!s/${_ORIGINAL_NAME^^}\([^a-zA-Z0-9]*\)/${_MODULE_NAME^^}\1/g")
+				#yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_APP_MODULES_ROOT}/${_ORIGINAL_NAME}.yml" | sed -e "/FIXED_VAR/!s/${_ORIGINAL_NAME}\([^a-zA-Z0-9]*\)/${_MODULE_NAME}\1/g" -e "/FIXED_VAR/!s/${_ORIGINAL_NAME^^}\([^a-zA-Z0-9]*\)/${_MODULE_NAME^^}\1/g")
+				yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_APP_MODULES_ROOT}/${_ORIGINAL_NAME}.yml" | sed -E "{/FIXED_VAR/! {s/#/##/g; s/(SHARED_VAR_)(${_ORIGINAL_NAME})/\1_#_/g; s/(SHARED_VAR_)(${_ORIGINAL_NAME^^})/\1-#-/g; s/${_ORIGINAL_NAME}([^a-zA-Z0-9]*)/${_MODULE_NAME}\1/g; s/${_ORIGINAL_NAME^^}([^a-zA-Z0-9]*)/${_MODULE_NAME^^}\1/g; s/(SHARED_VAR_)_#_/\1${_ORIGINAL_NAME}/g; s/(SHARED_VAR_)-#-/\1${_ORIGINAL_NAME^^}/g; s/##/#/g} }")
 			fi
 		;;
 		TANGO )
@@ -1460,10 +1536,13 @@ __set_module() {
 			if [ "$__original_module_scaled" = "" ]; then
 				yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_MODULES_ROOT}/${_MODULE_NAME}.yml")
 			else
-				# we replace all ocurrence of module name with instance name
-				# except lines containing FIXED_VAR
+				# we replace all ocurrence of module name with an instance name
+				# except into lines containing FIXED_VAR expression anywhere
+				# except expression beginngin with SHARED_VAR_
+				# use sed implementation of negative lookbehind https://stackoverflow.com/a/26110465
 				__tango_log "DEBUG" "tango" "set_module : ${__module} is an instance of scaled module : $_ORIGINAL_NAME"
-				yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_MODULES_ROOT}/${_ORIGINAL_NAME}.yml" | sed -e "/FIXED_VAR/!s/${_ORIGINAL_NAME}\([^a-zA-Z0-9]*\)/${_MODULE_NAME}\1/g" -e "/FIXED_VAR/!s/${_ORIGINAL_NAME^^}\([^a-zA-Z0-9]*\)/${_MODULE_NAME^^}\1/g")
+				#yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_MODULES_ROOT}/${_ORIGINAL_NAME}.yml" | sed -e "/FIXED_VAR/!s/${_ORIGINAL_NAME}\([^a-zA-Z0-9]*\)/${_MODULE_NAME}\1/g" -e "/FIXED_VAR/!s/${_ORIGINAL_NAME^^}\([^a-zA-Z0-9]*\)/${_MODULE_NAME^^}\1/g")
+				yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_MODULES_ROOT}/${_ORIGINAL_NAME}.yml" | sed -E "{/FIXED_VAR/! {s/#/##/g; s/(SHARED_VAR_)(${_ORIGINAL_NAME})/\1_#_/g; s/(SHARED_VAR_)(${_ORIGINAL_NAME^^})/\1-#-/g; s/${_ORIGINAL_NAME}([^a-zA-Z0-9]*)/${_MODULE_NAME}\1/g; s/${_ORIGINAL_NAME^^}([^a-zA-Z0-9]*)/${_MODULE_NAME^^}\1/g; s/(SHARED_VAR_)_#_/\1${_ORIGINAL_NAME}/g; s/(SHARED_VAR_)-#-/\1${_ORIGINAL_NAME^^}/g; s/##/#/g} }")
 			fi
 		;;
 	esac
@@ -1845,14 +1924,15 @@ __filter_and_scale_items() {
 
 }
 
-# type : module | plugin | middleware | volume
+# type : module | plugin | middleware | volume | ports
 # item format :
 #	 	<module>[@<network area>][%<service dependency1>][%<service dependency2>][^nb instance][~<vpn id>]
 #		<plugin>[%<auto exec at launch into service1>][%!<manual exec into service2>][#arg1][#arg2]
 #		<middleware_name>[:<position>:[<position number>]]
-#		<named volume|path><:path|#variable path name>
-#				ex : FOO_ADDITIONAL_VOLUMES=calibredb_books:/books /foo#INTERNAL_PRESS_PATH
-#					 TANGO_VOLUMES=calibredb_press#PRESS_PATH volume#VOLUME_PATH
+#		<network area>@<port>[@<secure port>]
+#		<named volume|path|#variable path name>:<path|#variable path name>
+#				ex : FOO_ADDITIONAL_VOLUMES=calibredb_books:/books /foo:#INTERNAL_PRESS_PATH
+#					 TANGO_VOLUMES=calibredb_press:#PRESS_PATH volume:#VOLUME_PATH
 # __result_prefix : variable prefix to store result
 __parse_item() {
 	local __type="$1"
@@ -1869,10 +1949,11 @@ __parse_item() {
 
 	# name
 	eval ${__result_prefix}_NAME=
-	# extended part of module definition (everything except name)
+	# extended part of item definition (everything except name)
 	eval ${__result_prefix}_EXTENDED_DEF=
 
-	case ${__type} in 
+	case ${__type} in
+
 		plugin)
 			# item is in APP or TANGO folder
 			eval ${__result_prefix}_OWNER=
@@ -1895,6 +1976,11 @@ __parse_item() {
 			# vpn id to bind item to
 			eval ${__result_prefix}_VPN_ID=
 		;;
+		port)
+			# ports
+			eval ${__result_prefix}_PORT=
+			eval ${__result_prefix}_SECURE_PORT=
+		;;
 		middleware)
 			# middleware relative position
 			eval ${__result_prefix}_POSITION=
@@ -1902,16 +1988,15 @@ __parse_item() {
 			eval ${__result_prefix}_POS_NUMBER=
 		;;
 		volume)
-			# volume path
-			eval ${__result_prefix}_PATH=
-			# volume path variable name
-			eval ${__result_prefix}_PATH_VARIABLE=
+			# volume paths
+			eval ${__result_prefix}_OUTSIDE_PATH=
+			eval ${__result_prefix}_INSIDE_PATH=
+			# volume paths variables names
+			eval ${__result_prefix}_OUTSIDE_PATH_VARIABLE=
+			eval ${__result_prefix}_INSIDE_PATH_VARIABLE=
 		;;
 
 	esac
-
-
-
 
 
 
@@ -1931,10 +2016,45 @@ __parse_item() {
 			;;
 
 		volume)
-			__name="$(echo $__item | sed 's,^\([^:#]*\).*$,\1,')"
+
+			if [ ! -z "${__item##*:*}" ]; then
+				__tango_log "ERROR" "tango" "parse_item : error while parsing volume definition ${__item}. Syntax : <named volume|path|#variable path name>:<path|#variable path name>"
+				exit 1
+			fi
+			__item=(${__item//:/ })
+			#eval ${__result_prefix}_NAME="${__item[0]}"
+			#eval ${__result_prefix}_EXTENDED_DEF="${__item[1]}"
+
+			# volume path variable name
+			# symbol : #
+			local __variable_path_name=
+		
+			if [ -z "${__item[0]##*#*}" ]; then
+				__variable_path_name="${__item[0]//#/}"
+				eval ${__result_prefix}_OUTSIDE_PATH_VARIABLE="${__variable_path_name}"
+			else
+				eval ${__result_prefix}_OUTSIDE_PATH="${__item[0]}"
+			fi
+			if [ -z "${__item[1]##*#*}" ]; then
+				__variable_path_name="${__item[1]//#/}"
+				eval ${__result_prefix}_INSIDE_PATH_VARIABLE="${__variable_path_name}"
+			else
+				eval ${__result_prefix}_INSIDE_PATH="${__item[1]}"
+			fi
+
+		
+			;;
+
+		port)
+			__item=(${__item//@/ })
+			__name="${__item[0]}"
 			eval ${__result_prefix}_NAME="${__name}"
-			__ext="$(echo $__item | sed 's,^\([^:#]*\)\(.*\)$,\2,')"
+			__ext="${__item[1]}"
+			[ ! "${__item[2]}" = "" ] && __ext="${__ext}@${__item[2]}"
 			eval ${__result_prefix}_EXTENDED_DEF="${__ext}"
+
+			eval ${__result_prefix}_PORT="${__item[1]}"
+			eval ${__result_prefix}_SECURE_PORT="${__item[2]}"
 			;;
 
 		middleware)
@@ -1942,7 +2062,7 @@ __parse_item() {
 			__name="${__item[0]}"
 			eval ${__result_prefix}_NAME="${__name}"
 			__ext="${__item[1]}"
-			[ ! "${__item[2]}" = "" ] && __ext=":${__midd[2]}"
+			[ ! "${__item[2]}" = "" ] && __ext="${__ext}:${__item[2]}"
 			eval ${__result_prefix}_EXTENDED_DEF="${__ext}"
 			
 			eval ${__result_prefix}_POSITION="${__item[1]}"
@@ -1953,23 +2073,23 @@ __parse_item() {
 
 	case ${__type} in
 
-		volume)
-			# volume path variable name
-			# symbol : #
-			if [ -z "${__item##*#*}" ]; then
-				local __variable_path_name="$(echo $__item | sed 's,^.*#\([^:\^]*\).*$,\1,')"
-				eval ${__result_prefix}_PATH_VARIABLE="${__variable_path_name}"
-			fi
+		# volume)
+		# 	# volume path variable name
+		# 	# symbol : #
+		# 	if [ -z "${__item##*#*}" ]; then
+		# 		local __variable_path_name="$(echo $__item | sed 's,^.*#\([^:\^]*\).*$,\1,')"
+		# 		eval ${__result_prefix}_PATH_VARIABLE="${__variable_path_name}"
+		# 	fi
 
-			# volume path
-			# symbol : :
-			if [ -z "${__item##*:*}" ]; then
-				local __path="$(echo $__item | sed 's,^.*:\([^#\^]*\).*$,\1,')"
-				eval ${__result_prefix}_PATH="${__path}"
-			fi
+		# 	# volume path
+		# 	# symbol : :
+		# 	if [ -z "${__item##*:*}" ]; then
+		# 		local __path="$(echo $__item | sed 's,^.*:\([^#\^]*\).*$,\1,')"
+		# 		eval ${__result_prefix}_PATH="${__path}"
+		# 	fi
 
 			
-		;;
+		# ;;
 
 		plugin|module)
 			
@@ -2188,22 +2308,26 @@ __set_error_engine() {
 			;;
 	esac
 
-	# activate a widlcard registred domain for match "unknow.domain.com" url
-	# wild card "*.domain" certificate generation is attached to error router
-	# if we use HTTP challenge we cannot generate a wild card domain, it must be in DNS challenge
-	case ${LETS_ENCRYPT} in
-		enable|debug )
-			case ${LETS_ENCRYPT_CHALLENGE} in
-				HTTP )
-					__tango_log "DEBUG" "tango" "do not generate a *.domain.com certificate because we use HTTP challenge"
-				;;
-				DNS )
-					__tango_log "DEBUG" "tango" "generate a *.domain.com certificate because we use DNS challenge"
-					__add_letsencrypt_service "error"
-				;;
-			esac
-		;;
-	esac
+
+	
+	# a wild card domain is by default attached to https error router (error-secure.tls.domains[0].main=*.${TANGO_DOMAIN:-.*}")
+	# the code below add a certificate generation for this wild card domain
+	# But if we use HTTP challenge we cannot generate a wild card domain, it must be in DNS challenge only
+	# NOTE that all dns provider do not support wild card domain, so dnschallenge shall fail
+	# TODO : disable this because useless ?
+	# case ${LETS_ENCRYPT} in
+	# 	enable|debug )
+	# 		case ${ACME_CHALLENGE} in
+	# 			HTTP )
+	# 				__tango_log "DEBUG" "tango" "do not generate a *.domain.org certificate because we use HTTP challenge"
+	# 			;;
+	# 			DNS )
+	# 				__tango_log "DEBUG" "tango" "generate a *.domain.org certificate because we use DNS challenge"
+	# 				__add_letsencrypt_service "error"
+	# 			;;
+	# 		esac
+	# 	;;
+	# esac
 	
 
 }
@@ -2779,7 +2903,6 @@ __set_network_as_external() {
 # docker client available
 __is_docker_client_available() {
 	type docker &>/dev/null
-	#which docker 2>/dev/null 1>&2
 	return $?
 }
 
@@ -2931,13 +3054,19 @@ __base64_basic_authentification() {
 }
 
 # launch a curl command from a docker image in priority if docker is available or from curl from host if not
+# within the current tango network context
 __tango_curl() {
 	if __is_docker_client_available; then
 		local __id="$TANGO_APP_NAME_$($STELLA_API md5 "$@")"
-		docker stop $__id 1>&2 2>/dev/null
-		docker rm $__id 1>&2 2>/dev/null
-		docker run --name $__id --user "${TANGO_USER_ID}:${TANGO_GROUP_ID}" --network "${TANGO_APP_NETWORK_NAME}" --rm curlimages/curl:7.70.0 "$@"
-		docker rm $__id 1>&2 2>/dev/null
+		docker stop ${__id} 1>&2 2>/dev/null
+		docker rm ${__id} 1>&2 2>/dev/null
+		# At this point network TANGO_APP_NETWORK_NAME may not exists yet
+		if docker run --name ${__id} --user "${TANGO_USER_ID}:${TANGO_GROUP_ID}" --network "${TANGO_APP_NETWORK_NAME}" --rm curlimages/curl:7.70.0 "$@"; then
+			docker rm ${__id} 1>&2 2>/dev/null
+		else
+			docker rm ${__id} 1>&2 2>/dev/null
+			type curl &>/dev/null && curl "$@"
+		fi
 	else
 		type curl &>/dev/null && curl "$@"
 	fi
@@ -3082,14 +3211,17 @@ __create_path_all() {
 	local __create_path_instructions=
 	local __root=
 
+	__tango_log "INFO" "tango" "Managing paths creation"
 	# force to create first these root folders before all other that might be subfolders
 	if [ ! "${TANGO_APP_WORK_ROOT_SUBPATH_CREATE}" = "" ]; then
 		__tango_log "DEBUG" "tango" "create_path_all : parse TANGO_APP_WORK_ROOT_SUBPATH_CREATE instructions"
 		__create_path "${TANGO_APP_WORK_ROOT}" "${TANGO_APP_WORK_ROOT_SUBPATH_CREATE}"
+		__tango_log "DEBUG_NO_HEADER_BEGINNING_NEWLINE" "" ""
 	fi
 	if [ ! "${TANGO_DATA_PATH_SUBPATH_CREATE}" = "" ]; then
 		__tango_log "DEBUG" "tango" "create_path_all : parse TANGO_DATA_PATH_SUBPATH_CREATE instructions"
 		__create_path "${TANGO_DATA_PATH}" "${TANGO_DATA_PATH_SUBPATH_CREATE}"
+		__tango_log "DEBUG_NO_HEADER_BEGINNING_NEWLINE" "" ""
 	fi
 
 	# create others folders
@@ -3101,9 +3233,12 @@ __create_path_all() {
 
 		if [ ! "${__create_path_instructions}" = "" ]; then
 			__root="${p%_SUBPATH_CREATE}"
-			[ ! "${!__root}" = "" ] && __create_path "${!__root}" "${__create_path_instructions}"
+			[ ! "${!__root}" = "" ] && __create_path "${!__root}" "${__create_path_instructions}" && __tango_log "DEBUG_BEGINNING_NEWLINE_NO_HEADER" "" ""
 		fi
 	done
+	if [ ! "${DEBUG}" = "1" ]; then
+		__tango_log "INFO_BEGINNING_NEWLINE_NO_HEADER" "" ""
+	fi
 }
 
 # create various sub folder and files if not exist
@@ -3120,7 +3255,7 @@ __create_path() {
 
 	# we do not want to alter filesystem (files & folder)
 	[ "$TANGO_ALTER_GENERATED_FILES" = "OFF" ] && return
-
+	
 	if [ ! -d "${__root}" ]; then
 		__tango_log "ERROR" "tango" "create_path : root path ${__root} do not exist"
 		return
@@ -3136,52 +3271,48 @@ __create_path() {
 		__path="${__root}/${p}"
 		# NOTE : on some case chown throw an error, it might be ignored
 		if [ "${__folder}" = "1" ]; then
+			printf '.'
 			if [ ! -d "${__path}" ]; then
 				__msg=$(docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} -v "${__root}":"/foo" ${TANGO_SHELL_IMAGE} bash -c "mkdir -p \"/foo/${p}\" && chown ${TANGO_USER_ID}:${TANGO_GROUP_ID} \"/foo/${p}\"")
-				[ ! "${__msg}" = "" ] && __tango_log "DEBUG" "tango" "create_path : msg : ${__msg}"
+				[ ! "${__msg}" = "" ] && __tango_log "DEBUG_BEGINNING_NEWLINE" "tango" "create_path : docker run msg : ${__msg}"
 				# wait more time if not created yet
-				__tango_log "DEBUG" "tango" "create_path : wait for folder $__path exists"
 				cpt=0
+				printf '.'
 				while [ ! -d "$__path" ]
 				do
-					echo -n "."
-					__tango_log "DEBUG" "tango" "create_path : wait for folder $__path exists"
+					printf '.'
 					sleep 1
 					(( cpt++ ))
 					if [ $cpt -gt 10 ]; then
-						__tango_log "ERROR" "tango" "Error while creating folder $__path"
+						__tango_log "ERROR_BEGINNING_NEWLINE" "tango" "Error while creating folder $__path"
 						exit 1
 					fi
 				done
-				echo
-				__tango_log "DEBUG" "tango" "create_path : done"
 			fi
+			printf '\b*'
 		fi
 		if [ "${__file}" = "1" ]; then
+			printf '.'
 			if [ ! -f "${__path}" ]; then
 				__msg=$(docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} -v "${__root}":"/foo" ${TANGO_SHELL_IMAGE} bash -c "touch \"/foo/${p}\" && chown ${TANGO_USER_ID}:${TANGO_GROUP_ID} \"/foo/${p}\"")
-				[ ! "${__msg}" = "" ] && __tango_log "DEBUG" "tango" "create_path : msg : ${__msg}"
+				[ ! "${__msg}" = "" ] && __tango_log "DEBUG_BEGINNING_NEWLINE" "tango" "create_path : docker run msg : ${__msg}"
 				# wait more time if not created yet
-				__tango_log "DEBUG" "tango" "create_path : wait for file $__path exists"
 				cpt=0
+				printf '.'
 				while [ ! -f "$__path" ]
 				do
-					echo -n "."
-					__tango_log "DEBUG" "tango" "create_path : wait for file $__path exists"
+					printf '.'
 					sleep 1
 					(( cpt++ ))
 					if [ $cpt -gt 10 ]; then
-						__tango_log "ERROR" "tango" "create_path : error while creating file $__path"
+						__tango_log "ERROR_BEGINNING_NEWLINE" "tango" "create_path : error while creating file $__path"
 						exit 1
 					fi
 				done
-				echo
-				__tango_log "DEBUG" "tango" "create_path : done"
 			fi
+			printf '\b*'
 		fi
 	done
-
-
 }
 
 
@@ -3228,8 +3359,13 @@ __check_lets_encrypt_settings() {
 			[ "${LETS_ENCRYPT_MAIL}" = "" ] && __tango_log "$__log" "tango" "You have to specify a mail as identity into LETS_ENCRYPT_MAIL variable when using let's encrypt." && __exit=1
 			[ "${TANGO_DOMAIN}" = '.*' ] && __tango_log "$__log" "tango" "You cannot use a generic domain (.*) setted by TANGO_DOMAIN when using let's encrypt. Set TANGO_DOMAIN variables or --domain comand line option with other value." && __exit=1
 			[ "${TANGO_DOMAIN}" = "" ] && __tango_log "$__log" "tango" "You have to set a domain with TANGO_DOMAIN variable or --domain comand line option when using let's encrypt." && __exit=1
-			[ ! "${NETWORK_PORT_MAIN}" = "80" ] && __tango_log "$__log" "tango" "main area network HTTP port is not 80 but ${NETWORK_PORT_MAIN}. You need to use DNS challenge for let's encrypt. Set LETS_ENCRYPT_CHALLENGE* variables." && __exit=1
-			[ ! "${NETWORK_PORT_MAIN_SECURE}" = "443" ] && __tango_log "$__log" "tango" "main area network HTTPS port is not 443 but ${NETWORK_PORT_MAIN_SECURE}. You need to use DNS challenge for let's encrypt. Set LETS_ENCRYPT_CHALLENGE* variables" && __exit=1
+
+			case ${ACME_CHALLENGE} in
+				HTTP )
+					[ ! "${NETWORK_PORT_MAIN}" = "80" ] && __tango_log "$__log" "tango" "main area network HTTP port is not 80 but ${NETWORK_PORT_MAIN}. You need to use DNS challenge for let's encrypt. Set ACME_CHALLENGE variable." && __exit=1
+					[ ! "${NETWORK_PORT_MAIN_SECURE}" = "443" ] && __tango_log "$__log" "tango" "main area network HTTPS port is not 443 but ${NETWORK_PORT_MAIN_SECURE}. You need to use DNS challenge for let's encrypt. Set ACME_CHALLENGE variables" && __exit=1
+				;;
+			esac	
 		;;
 	esac
 
@@ -3237,17 +3373,41 @@ __check_lets_encrypt_settings() {
 }
 
 
+# this function protect tango for variable used in __tango_log_internal
 __tango_log() {
+	( LOG_STATE=$TANGO_LOG_STATE; __log_internal "$@" )
+}
+
+# level of log (INFO, WARN, ERROR, ASK)
+#		the level can have suffices to modify the printing of log
+#			_NO_HEADER : disable print of domain and level
+#			_BEGINNING_NEWLINE : start by printing a new line before the message
+#		i.e 
+#			__log_internal "DEBUG_NO_HEADER_BEGINNING_NEWLINE" "" "" # will print only a new line
+#			__log_internal "DEBUG_BEGINNING_NEWLINE" "category" "test" # will print a new line then "category@level" then "test" message
+# domain is a string to indicate some sort of "category"
+# remaning parameters are the message to print
+__log_internal() {
 	local __level="$1"
 	local __domain="$2"
 	shift 2
 	local __msg="$@"
 
-	if [ "$TANGO_LOG_STATE" = "ON" ]; then
+	if [ "$LOG_STATE" = "ON" ]; then
 		_print="0"
 
+		
+		local _beginning_new_line="0"
+		local _no_header="0"
+		while [[ "${__level}" =~ _BEGINNING_NEWLINE|_NO_HEADER ]]; do
+			case ${__level} in
+				*_BEGINNING_NEWLINE* ) _beginning_new_line="1"; __level="${__level//_BEGINNING_NEWLINE}";;
+				*_NO_HEADER* ) _no_header="1"; __level="${__level//_NO_HEADER}";;
+			esac
+		done
+
 		local _color=
-		local _reset_color_for_msg="1"
+		local _no_color_for_msg="1"
 		case ${__level} in
 				INFO )
 					_color="clr_bold clr_green"
@@ -3257,10 +3417,10 @@ __tango_log() {
 				;;
 				ERROR )
 					_color="clr_bold clr_red"
-					_reset_color_for_msg="0"
+					_no_color_for_msg="0"
 				;;
 				DEBUG )
-					_color=
+					_color="clr_bold clr_cyan"
 				;;
 				ASK )
 					_color="clr_bold clr_blue"
@@ -3295,18 +3455,45 @@ __tango_log() {
 		esac
 
 		if [ "${_print}" = "1" ]; then
+			# start by printing a newline
+			if [ "${_beginning_new_line}" = "1" ]; then
+				printf "\n";
+			fi
+
+			# nothing to print more
+			if [ "${_no_header}" = "1" ]; then
+				if [ "${__msg}" = "" ]; then
+					return
+				fi
+			fi
+
+
 			case ${__level} in
 				# add spaces for tab alignment
 				INFO|WARN ) __level="${__level} ";;
 				ASK ) __level="${__level}  ";;
 			esac
+			
+
 			if [ "${_color}" = "" ]; then
-				echo "${__level}@${__domain}> ${__msg}"
-			else
-				if [ "${_reset_color_for_msg}" = "1" ]; then
-					${_color} -n "${__level}@${__domain}> "; clr_reset "${__msg}"
+				if [ "${_no_header}" = "0" ]; then
+					echo "${__level}@${__domain}> ${__msg}"
 				else
-					${_color} "${__level}@${__domain}> ${__msg}"
+					echo "${__msg}"
+				fi
+			else
+				if [ "${_no_color_for_msg}" = "1" ]; then
+					if [ "${_no_header}" = "0" ]; then
+						${_color} -n "${__level}@${__domain}> "; clr_reset "${__msg}"
+					else
+						clr_reset "${__msg}"
+					fi
+				else
+					if [ "${_no_header}" = "0" ]; then
+						${_color} "${__level}@${__domain}> ${__msg}"
+					else
+						${_color} "${__msg}"
+					fi
 				fi
 			fi
 		fi

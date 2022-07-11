@@ -9,14 +9,14 @@
 ## content
 
 * Show usage of
-    * single module
-    * using only command line, without any files
+    * a single module (cloud9)
+    * using only command line and environment variable, without any extra conf file
     * create named volumes
     * add bind mount volumes 
     * inject environment variable into module
-    * auto find free ports
+    * auto find free ports for both HTTP and HTTPS endpoints
 
-* services activated using module
+* services activated using a tango module
     * cloud9
 
 

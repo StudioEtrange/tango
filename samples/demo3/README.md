@@ -5,15 +5,16 @@
 * standard linux system
 * docker engine
 * wildcard domain targeting your current host `*.domain.com`
-* auto find free ports
 
 ## content
 
 * Show usage of
-    * defining a tango app with its own folder
-    * defining an app module named whoami
+    * defining a tango app named 'demo3' within its own folder
+    * creating an app module named 'whoami' attached to this app
+    * a single module (whoami)
+    * auto find free ports for both HTTP and HTTPS endpoints
 
-* services activated
+* services activated using an app module
     * whoami
     
 ## commands
@@ -35,5 +36,5 @@ cd tango
 
 ## endpoints
 
-* traefik : http://traefik.chimere-harpie.org:44080 https://traefik.chimere-harpie.org:44443
-* whoami : http://whoami.chimere-harpie.org:44080 https://whoami.chimere-harpie.org:44443
+* traefik : check URL from ./tango info traefik --app demo3 --approot ./samples/demo3 --module whoami
+* whoami : check URL from ./tango info whoami --app demo3 --approot ./samples/demo3 --module whoami

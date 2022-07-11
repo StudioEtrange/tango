@@ -5,16 +5,17 @@
 * standard linux system
 * docker engine
 * wildcard domain targeting your current host `*.domain.com`
+* a vpn connection
 
 ## content
 
 * Show usage of
-    * single module
-    * using only command line, without any files
+    * a single module (firefox)
+    * using only command line and environment variable, without any extra conf file
     * connect a service to a vpn
-    * fixing network ports
+    * fixing network ports for both HTTP and HTTPS endpoints
 
-* services activated using module
+* services activated using a tango module
     * firefox
 
 
@@ -24,7 +25,7 @@
 
 export TANGO_DOMAIN=domain.com
 
-# using non default 80/443 ports
+# fixing ports instead of using default 80/443 ports
 export NETWORK_PORT_MAIN=44080
 export NETWORK_PORT_MAIN_SECURE=44443
 
@@ -45,5 +46,9 @@ cd tango
 
 ## endpoints
 
-* traefik : http://traefik.chimere-harpie.org:44080 https://traefik.chimere-harpie.org:44443
-* firefox : http://firefox.chimere-harpie.org:44080 https://firefox.chimere-harpie.org:44443
+* traefik : 
+    * ./tango info traefik --module firefox~vpn_1
+    * http://traefik.domain.com:44080 https://traefik.domain.com:44443
+* firefox : 
+    * ./tango info firefox --module firefox~vpn_1
+    * http://firefox.domain.com:44080 https://firefox.domain.com:44443

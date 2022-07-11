@@ -4,33 +4,38 @@
 
 * standard linux system
 * docker engine
-* wildcard domain targeting your current host `*.domain.com`
+* git
+* wildcard domain targeting your current host `*.domain.org`
+
 ## content
 
 * Show usage of
-    * single module
-    * using only command line, without any files
-    * auto find free ports
+    * a service by using a single module attached to tango context
+    * using only command line and shell environment variables
+    * auto find free ports for both HTTP and HTTPS port to access service
 
-* services activated using module
+* module attached to tango context
     * firefox
 
 
 ## commands
 
 ```
-
-export TANGO_DOMAIN=domain.com
-
+cd $HOME
+git clone https://github.com/StudioEtrange/tango
 cd tango
 ./tango install
-./tango up --module firefox --freeport
-./tango info --module firefox --freeport
-./tango down --module firefox --freeport
+
+export TANGO_DOMAIN=domain.org
+export TANGO_DOMAIN=auto-nip
+
+./tango --module firefox --freeport up 
+./tango --module firefox --freeport info
+./tango --module firefox --freeport down
 
 ```
 
 ## endpoints
 
-* traefik : check IP from ./tango info
-* firefox : check IP from ./tango info
+* traefik : check URL from ./tango info traefik --module firefox --freeport
+* firefox : check URL from ./tango info firefox --module firefox --freeport

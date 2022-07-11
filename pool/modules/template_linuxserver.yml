@@ -1,0 +1,49 @@
+volumes:
+  codeserver_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${CODESERVER_DATA_PATH}
+    name: ${TANGO_APP_NAME}_codeserver_data
+
+
+services:
+  codeserver:
+    image: ${CODESERVER_IMAGE_FIXED_VAR}:${CODESERVER_VERSION_FIXED_VAR:-latest}
+    container_name: ${TANGO_APP_NAME}_codeserver
+    depends_on: 
+      - service_init
+    restart: unless-stopped
+    volumes:
+      - codeserver_data:/config
+    environment:
+      - PUID=${TANGO_USER_ID:-0}
+      - PGID=${TANGO_GROUP_ID:-0}
+      - PASSWORD=${CODESERVER_PASSWORD:-}
+      - SUDO_PASSWORD=${CODESERVER_SUDO_PASSWORD:-}
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      # service : codeserver -------------------------
+      - "traefik.http.services.codeserver.loadbalancer.server.port=8443"
+      - "traefik.http.services.codeserver.loadbalancer.server.scheme=http"
+      - "traefik.http.services.codeserver.loadbalancer.passhostheader=true"
+      # service router : codeserver
+      - "traefik.http.routers.codeserver.entrypoints=${CODESERVER_ENTRYPOINTS:-entry_main_http}"
+      - "traefik.http.routers.codeserver.rule=HostRegexp(`{subdomain:${CODESERVER_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.codeserver.priority=${CODESERVER_PRIORITY}"
+      - "traefik.http.routers.codeserver.service=codeserver"
+      - "traefik.http.routers.codeserver-secure.entrypoints=${CODESERVER_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
+      - "traefik.http.routers.codeserver-secure.rule=HostRegexp(`{subdomain:${CODESERVER_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.codeserver-secure.priority=${CODESERVER_PRIORITY}"
+      - "traefik.http.routers.codeserver-secure.service=codeserver"
+      - "traefik.http.routers.codeserver-secure.tls=true"
+      - "traefik.http.routers.codeserver-secure.tls.domains[0].main=${CODESERVER_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      # service router middlewares : codeserver
+      - "traefik.http.routers.codeserver.middlewares=error-middleware"
+      - "traefik.http.routers.codeserver-secure.middlewares=error-middleware"
+    networks:
+      - default
+    expose:
+      - 8443/tcp
