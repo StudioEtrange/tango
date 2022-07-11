@@ -1,0 +1,58 @@
+services:
+  medusa:
+    image: ${MEDUSA_IMAGE}:${MEDUSA_VERSION:-latest}
+    container_name: ${TANGO_APP_NAME}_medusa
+    depends_on:
+      - service_init
+    restart: unless-stopped
+    volumes:
+      # data is the data named volume for the current app
+      # data/medusa will contain medusa configuration
+      - data:/data
+      # different paths used by medusa
+      - download:/download
+    environment:
+      - SERVICE_USER=${TANGO_USER_ID:-0}:${TANGO_GROUP_ID:-0}
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      # service : medusa -------------------------
+      - "traefik.http.services.medusa.loadbalancer.server.port=8081"
+      - "traefik.http.services.medusa.loadbalancer.server.scheme=http"
+      - "traefik.http.services.medusa.loadbalancer.passhostheader=true"
+      # middlewares : medusa
+      # service router : medusa
+      - "traefik.http.routers.medusa.entrypoints=${MEDUSA_ENTRYPOINTS:-entry_main_http}"
+      - "traefik.http.routers.medusa.rule=HostRegexp(`{subdomain:${MEDUSA_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.medusa.priority=${MEDUSA_PRIORITY}"
+      - "traefik.http.routers.medusa.service=medusa"
+      - "traefik.http.routers.medusa-secure.entrypoints=${MEDUSA_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
+      - "traefik.http.routers.medusa-secure.rule=HostRegexp(`{subdomain:${MEDUSA_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.medusa-secure.priority=${MEDUSA_PRIORITY}"
+      - "traefik.http.routers.medusa-secure.service=medusa"
+      - "traefik.http.routers.medusa-secure.tls=true"
+      - "traefik.http.routers.medusa-secure.tls.domains[0].main=${MEDUSA_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      # service router middlewares : medusa
+      - "traefik.http.routers.medusa.middlewares=error-middleware"
+      - "traefik.http.routers.medusa-secure.middlewares=error-middleware"
+      # sub service : medusa_api -------------------------
+      # sub service router : medusa_api
+      - "traefik.http.routers.medusa_api.entrypoints=${MEDUSA_ENTRYPOINTS:-entry_main_http}"
+      - "traefik.http.routers.medusa_api.rule=HostRegexp(`{subdomain:${MEDUSA_API_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`) && PathPrefix(`/api/${MEDUSA_API_KEY:-}/`)"
+      - "traefik.http.routers.medusa_api.priority=${MEDUSA_API_PRIORITY}"
+      - "traefik.http.routers.medusa_api.service=medusa"
+      - "traefik.http.routers.medusa_api-secure.entrypoints=${MEDUSA_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
+      - "traefik.http.routers.medusa_api-secure.rule=HostRegexp(`{subdomain:${MEDUSA_API_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`) && PathPrefix(`/api/${MEDUSA_API_KEY:-}/`)"
+      - "traefik.http.routers.medusa_api-secure.priority=${MEDUSA_API_PRIORITY}"
+      - "traefik.http.routers.medusa_api-secure.service=medusa"
+      - "traefik.http.routers.medusa_api-secure.tls=true"
+      - "traefik.http.routers.medusa_api-secure.tls.domains[0].main=${MEDUSA_API_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      # sub service router middlewares : medusa_api
+      - "traefik.http.routers.medusa_api.middlewares=error-middleware"
+      - "traefik.http.routers.medusa_api-secure.middlewares=error-middleware"
+    networks:
+      - default
+    expose:
+      - 8081/tcp
+    build:
+      context: https://github.com/StudioEtrange/docker-medusa.git#:ver/${MEDUSA_VERSION:-latest}

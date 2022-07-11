@@ -38,7 +38,7 @@ services:
       - "traefik.http.services.template.loadbalancer.server.port=5800"
       - "traefik.http.services.template.loadbalancer.server.scheme=http"
       - "traefik.http.services.template.loadbalancer.passhostheader=true"
-      # middlewares : template
+      # middlewares definition : template
       # service router : template
       - "traefik.http.routers.template.entrypoints=${TEMPLATE_ENTRYPOINTS:-entry_main_http}"
       - "traefik.http.routers.template.rule=HostRegexp(`{subdomain:${TEMPLATE_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
@@ -53,16 +53,11 @@ services:
       # service router middlewares : template
       - "traefik.http.routers.template.middlewares=error-middleware"
       - "traefik.http.routers.template-secure.middlewares=error-middleware"
-      # sub service : template_subservice -------------------------
-      - "traefik.udp.services.template_subservice.loadbalancer.server.port=41000"
-      # sub service router : template_subservice
-      - "traefik.udp.routers.template_subservice.entrypoints=${TEMPLATE_SUBSERVICE_ENTRYPOINTS}"
-      - "traefik.udp.routers.template_subservice.service=template_subservice"
-      # sub service router middlewares : template_subservice
       # sub service : template_api -------------------------
       - "traefik.http.services.template_api.loadbalancer.server.port=28080"
       - "traefik.http.services.template_api.loadbalancer.server.scheme=http"
       - "traefik.http.services.template_api.loadbalancer.passhostheader=true"
+      # middlewares definition : template_api
       # sub service router : template_api
       - "traefik.http.routers.template_api.entrypoints=${TEMPLATE_API_ENTRYPOINTS:-entry_main_http}"
       - "traefik.http.routers.template_api.rule=HostRegexp(`{subdomain:${TEMPLATE_API_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`) && PathPrefix(`/api/`)"
@@ -77,12 +72,19 @@ services:
       # sub service router middlewares : template_subservice
       - "traefik.http.routers.template_api.middlewares=error-middleware"
       - "traefik.http.routers.template_api-secure.middlewares=error-middleware"
+      # sub service : template_subservice -------------------------
+      - "traefik.udp.services.template_subservice.loadbalancer.server.port=41000"
+      # middlewares definition : template_subservice
+      # sub service router : template_subservice
+      - "traefik.udp.routers.template_subservice.entrypoints=${TEMPLATE_SUBSERVICE_ENTRYPOINTS}"
+      - "traefik.udp.routers.template_subservice.service=template_subservice"
+      # sub service router middlewares : template_subservice
     networks:
       - default
     expose:
       # service template
       - 5800/tcp
-      # subservice template_subservice
-      - 41000/udp
       # subservice template_api
       - 28080/tcp
+      # subservice template_subservice
+      - 41000/udp

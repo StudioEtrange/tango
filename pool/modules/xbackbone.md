@@ -1,8 +1,11 @@
 # xbackbone
 
 
+* A lightweight file manager with full ShareX, Screencloud support and more
+
 * https://hub.docker.com/r/linuxserver/xbackbone
 * https://github.com/SergiX44/XBackBone
+
 
 # howto
 

@@ -9,17 +9,17 @@
 ## content
 
 * Show usage of
-    * defining a tango app with its own folder
-    * using its own docker compose file with one services
-    * single module
-    * defining two network area (main and admin) with fixed ports
+    * defining a tango app named 'demo4' within its own folder
+    * setting a properties file for 'demo4' app settings
+    * app will use its own docker compose file with one service
+    * several modules (web & firefox)
+    * defining two network area (named : main and admin) with fixed ports for both HTTP and HTTPS endpoint for each area
     
-* services defined by app's docker-compose file
+* services defined and actived by app's docker-compose file
     * web2
 
-* services activated
-    * web2
-    * firefox (using tango module)
+* services activated using a tango module
+    * firefox
 
 
 ## commands
@@ -41,6 +41,12 @@ cd tango
 
 ## endpoints
 
-* traefik : http://traefik.chimere-harpie.org:54080 https://traefik.chimere-harpie.org:54443
-* firefox : http://firefox.chimere-harpie.org:44080 https://firefox.chimere-harpie.org:44443
-* web2 : http://web2.chimere-harpie.org:44080 https://web2.chimere-harpie.org:44443
+* traefik : 
+    * ./tango info traefik --app demo4 --approot ./samples/demo4
+    * http://traefik.domain.com:54080 https://traefik.domain.com:54443
+* firefox : 
+    * ./tango info firefox --app demo4 --approot ./samples/demo4
+    * http://firefox.domain.com:44080 https://firefox.domain.com:44443
+* web2 : 
+    * ./tango info web2 --app demo4 --approot ./samples/demo4
+    * http://web2.domain.com:44080 https://web2.domain.com:44443

@@ -5,8 +5,7 @@
 
 case ${ACTION} in
 	# we need nothing
-	# module should be able to be launched without any condition
-	install|cert|letsencrypt|modules|services|vendor )
+	install|cert|modules|services|vendor )
 		;;
 	
 	up|restart)

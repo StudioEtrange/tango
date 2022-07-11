@@ -135,13 +135,12 @@ case ${ACTION} in
 		fi
 
 		# cumulate modules declared by --module AND variable TANGO_SERVICES_MODULES into TANGO_SERVICES_MODULES
-		# at this point TANGO_SERVICES_MODULES can come from  external environement variable OR user, app or default env files
+		# at this point TANGO_SERVICES_MODULES can come from external shell environment variable OR user, app or default env files
 		# --module option is cumulative with TANGO_SERVICES_MODULES but if a module is declared through both, command line declaration override the other
 		if [ ! "${MODULE}" = "" ]; then
 			__add_item_declaration_from_cmdline "module"
 		fi
 		
-
 		# take care of modules env files by recreating bash env file using user, app, modules and default files
 		# bash env files priority :
 		# 			- user env file
@@ -155,14 +154,13 @@ case ${ACTION} in
 			__filter_and_scale_items "module"
 			
 			[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __create_env_files "bash" "default app modules user"
-			#[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __create_env_files "bash" "default modules app user"
 		fi
 		
 
 
 		# plugins -----
 		# retrieve TANGO_PLUGINS defined among all env files
-		# but only if no shell env var exist because TANGO_PLUGINS declared as env var override any TANGO_PLUGINS declared in any env files
+		# but only if no shell environment variable exist because TANGO_PLUGINS declared as shell environment variable override any TANGO_PLUGINS declared in any env files
 		if [ "${TANGO_PLUGINS}" = "" ]; then
 			TANGO_PLUGINS="$(env -i bash --noprofile --norc -c ". ${GENERATED_ENV_FILE_FOR_BASH}; echo \$TANGO_PLUGINS")"
 		fi
@@ -174,12 +172,37 @@ case ${ACTION} in
 		fi
 		# check plugins exist and build list and map
 		[ ! "${TANGO_PLUGINS}" = "" ] && __filter_and_scale_items "plugin"
-
 		
 
+
+	
+		# ports ------
+		# test if some ports are declared by command line
+		# parse for each network area if a value is setted
+		# --port option override NETWORK_PORT_area_name variable even shell environment variable
+		if [ ! "${PORT}" = "" ]; then
+			PORT="${PORT//:/ }"
+			for p in ${PORT}; do
+				__parse_item "port" "${p}" "_port"
+				__net_area_port="NETWORK_PORT_${_port_NAME^^}"
+				if [ ! "${_port_PORT}" = "" ]; then
+					eval ${__net_area_port}="${_port_PORT}"
+					__add_declared_variables "${__net_area_port}"
+				fi
+				__net_area_port_secure="NETWORK_PORT_${_port_NAME^^}_SECURE"
+				if [ ! "${_port_SECURE_PORT}" = "" ]; then
+					eval ${__net_area_port_secure}="${_port_SECURE_PORT}"
+					__add_declared_variables "${__net_area_port_secure}"
+				fi
+			done
+		fi
+
+
+
+
+		# ----
 		# generate compose env files
 		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __create_env_files "docker_compose"
-
 
 		# add to VARIABLES_LIST all variables cumulated from default, app, modules and user env file
 		__extract_declared_variable_names "${GENERATED_ENV_FILE_FOR_COMPOSE}"
@@ -252,13 +275,15 @@ case ${ACTION} in
 		__add_declared_variables "TANGO_PLUGINS_FULL"
 
 
-
-
+		# add all variables beginning with ACME_VAR_
+		for var in $(compgen -A variable | grep ^ACME_VAR_); do
+			__add_declared_variables "${var}"
+		done
+		
 		# update env var 
 		# env var values priority order :
-		# 	- new and computed variables at runtime
-		#	- command line
 		#	- shell env variables
+		#	- command line
 		# 	- user env file
 		# 	- modules env file
 		# 	- app env file
@@ -266,6 +291,7 @@ case ${ACTION} in
 		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __update_env_files "ingest with env variables from shell and command line"
 		# load env var
 		# even if files have not been modified, we want to load previously saved variables
+		# NOTE : first load_env_vars before other steps
 		__load_env_vars
 		
 		
@@ -276,14 +302,14 @@ case ${ACTION} in
 		# STEP 3 ------ process hardcoded default values, and computed runtime variable not fixed with command line nor shell env var nor env files
 
 		# so priority here will become :
-		# 	- new and computed variables at runtime
+		# 	- computed new variables at runtime
 		#	- shell env variables
 		#	- command line
 		# 	- user env file
 		# 	- modules env file
 		# 	- app env file
 		# 	- default tango env file
-		# 	- default values hardcoded and runtume computed
+		# 	- hardcoded and runtime computed default values
 
 
 		
@@ -341,10 +367,19 @@ case ${ACTION} in
 			esac
 		fi
 
+		# letsencrypt and ACME management -----
 		# change lets encrypt behaviour
 		if [ "${DEBUG}" = "1" ]; then
 			[ "${LETS_ENCRYPT}" = "enable" ] && LETS_ENCRYPT="debug"
 		fi
+
+		# create and set variable value without ACME_ at the beginning of the name
+		# to match variable name list from https://doc.traefik.io/traefik/https/acme/
+		for var in $(compgen -A variable | grep ^ACME_VAR_); do
+			__add_declared_variables "${var/ACME_VAR_}"
+			eval "export ${var/ACME_VAR_}=\"${!var}\""
+		done
+
 
 
 		# PATH management -----
@@ -401,8 +436,9 @@ case ${ACTION} in
 
 		# hardcoded subpath relative to tango data path
 		LETS_ENCRYPT_DATA_PATH="${TANGO_DATA_PATH}/letsencrypt"
+		LETS_ENCRYPT_TEST_DATA_PATH="${TANGO_DATA_PATH}/letsencrypt-test"
 		TRAEFIK_CONFIG_DATA_PATH="${TANGO_DATA_PATH}/traefikconfig"
-		TANGO_DATA_PATH_SUBPATH_CREATE="${TANGO_DATA_PATH_SUBPATH_CREATE} FOLDER letsencrypt traefikconfig FILE letsencrypt/acme.json traefikconfig/generated.${TANGO_APP_NAME}.tls.yml"
+		TANGO_DATA_PATH_SUBPATH_CREATE="${TANGO_DATA_PATH_SUBPATH_CREATE} FOLDER letsencrypt letsencrypt-test traefikconfig FILE letsencrypt/acme.json traefikconfig/generated.${TANGO_APP_NAME}.tls.yml"
 		GENERATED_TLS_FILE_PATH="${TANGO_DATA_PATH}/traefikconfig/generated.${TANGO_APP_NAME}.tls.yml"
 		
 		PLUGINS_DATA_PATH="${APP_DATA_PATH}/plugins"
@@ -423,10 +459,11 @@ case ${ACTION} in
 		__add_declared_variables "TANGO_APP_NETWORK_NAME"
 		__add_declared_variables "PLUGINS_DATA_PATH"
 		__add_declared_variables "LETS_ENCRYPT_DATA_PATH"
+		__add_declared_variables "LETS_ENCRYPT_TEST_DATA_PATH"
 		__add_declared_variables "TRAEFIK_CONFIG_DATA_PATH"
 
 
-		# network ---------
+		# NETWORK ---------
 
 
 		export TANGO_HOST_IP="${STELLA_HOST_IP}"
@@ -436,14 +473,73 @@ case ${ACTION} in
 		TANGO_HOSTNAME="$(hostname)"
 		__add_declared_variables "TANGO_HOSTNAME"
 		if [ "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
-			# TODO CATCH HTTP ERROR like 502
-			TANGO_EXTERNAL_IP="$(__tango_curl -s ipinfo.io/ip)"
+			TANGO_EXTERNAL_IP="$(__tango_curl --connect-timeout 2 -skL ipinfo.io/ip)"
 			__tango_log "INFO" "tango" "Declared being exposed on internet, external IP detected : $TANGO_EXTERNAL_IP"
 		else
 			__tango_log "DEBUG" "tango" "Not declared as exposed on internet."
 			TANGO_EXTERNAL_IP=
 		fi
 		__add_declared_variables "TANGO_EXTERNAL_IP"
+
+
+		# override domain value
+		TANGO_DOMAIN_FEATURE=
+		__add_declared_variables "TANGO_DOMAIN_FEATURE"
+		if [ "${TANGO_DOMAIN}" = "auto-nip" ]; then
+			if [ ! "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
+				__tango_log "ERROR" "tango" "Your current tango context is declared not beeing exposed to internet. You can not use auto-nip domain name feature. To declare your current tango context exposed to internet change variable value NETWORK_INTERNET_EXPOSED to 1"
+				exit 1
+			fi
+		fi
+
+		case $TANGO_DOMAIN in
+			auto-nip)
+				__tango_log "INFO" "tango" "auto-nip feature for domain name enabled."
+				TANGO_DOMAIN_FEATURE="auto-nip"
+				if [ "${TANGO_EXTERNAL_IP}" = "" ]; then
+					__tango_log "ERROR" "tango" "Can not auto determine your external internet ip. Try to use auto-nip-lan domain name feature OR get your own domain name !."
+					exit 1
+				else
+					TANGO_DOMAIN="${TANGO_EXTERNAL_IP//./-}.nip.io"
+				fi
+				__tango_log "INFO" "tango" "Domain is auto set to $TANGO_DOMAIN"
+				TANGO_SUBDOMAIN_SEPARATOR="-"
+				_s="$($STELLA_API get_ip_from_hostname ${TANGO_DOMAIN})"
+				case ${_s} in
+					${TANGO_EXTERNAL_IP})
+						__tango_log "INFO" "tango" "$TANGO_DOMAIN is solved as your external IP address ${TANGO_EXTERNAL_IP}"
+						;;
+					"")
+						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN do not return any result. Maybe your DNS configuration is protected against DNS rebind. Try to use auto-nip-lan mode OR get your own domain name !"
+						;;
+					*)
+						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN return ${_s} which is different from your external IP address ${TANGO_EXTERNAL_IP}."
+						;;
+				esac
+				
+			;;
+
+			auto-nip-lan)
+				__tango_log "INFO" "tango" "auto-nip-lan feature for domain name enabled."
+				TANGO_DOMAIN_FEATURE="auto-nip-lan"
+				TANGO_DOMAIN="${TANGO_HOST_DEFAULT_IP//./-}.nip.io"
+				__tango_log "INFO" "tango" "Domain is auto set to $TANGO_DOMAIN"
+				TANGO_SUBDOMAIN_SEPARATOR="-"
+				_s="$($STELLA_API get_ip_from_hostname ${TANGO_DOMAIN})"
+				case ${_s} in
+					${TANGO_HOST_DEFAULT_IP})
+						__tango_log "INFO" "tango" "$TANGO_DOMAIN is solved as your local IP address ${TANGO_HOST_DEFAULT_IP}"
+						;;
+					"")
+						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN do not return any result. Maybe your DNS configuration is protected against DNS rebind. Try to use auto-ip domain name feature OR get your own domain name !"
+						;;
+					*)
+						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN return ${_s} which is different from your local IP address ${TANGO_HOST_DEFAULT_IP}."
+						;;
+				esac
+			;;
+		esac
+
 
 		NETWORK_SERVICES_AREA_LIST="$($STELLA_API list_filter_duplicate "${NETWORK_SERVICES_AREA_LIST}")"
 		__area_main_done=
@@ -460,43 +556,83 @@ case ${ACTION} in
 		# process picking free port
 		if [ "${TANGO_FREEPORT}" = "1" ]; then
 			case ${ACTION} in
-				up|restart ) __pick_free_port ;;
+				gen|up|restart ) 
+					__pick_free_port
+					;;
 				* ) # read previous reserved freeport from env file
 					[ -f "${GENERATED_ENV_FILE_FREEPORT}" ] && . "${GENERATED_ENV_FILE_FREEPORT}"
 					;;
 			esac
 		fi
 
-
 		case ${ACTION} in
-			info|up|restart )
-				if [ "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
+			gen|info|up|restart )
+				__port_list=""
+				for area in ${NETWORK_SERVICES_AREA_LIST}; do
+					IFS="|" read -r name proto internal_port secure_port <<<$(echo ${area})
+					v0="NETWORK_PORT_${name^^}"
+					if [ -n "${!v0}" ]; then
+						__tango_log "INFO" "tango" "${name} area network port for protocol $proto is : ${!v0}"
+						__port_list="${__port_list} ${!v0}"
+						[ "${NETWORK_INTERNET_EXPOSED}" = "1" ] && [ ! "${TANGO_EXTERNAL_IP}" = "" ] && [ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${!v0}")" = "TRUE" ] && eval NETWORK_PORT_${name^^}_REACHABLE=1						
+					else
+						__tango_log "WARN" "tango" "${name} area network do not have a port defined. Set it with option --port ${name}@port[@secured_port] OR variable : ${v0}"
+					fi
+					__add_declared_variables "NETWORK_PORT_${name^^}_REACHABLE"
 
-					for area in ${NETWORK_SERVICES_AREA_LIST}; do
-						IFS="|" read -r name proto internal_port secure_port <<<$(echo ${area})
-						v1="NETWORK_PORT_${name^^}"
-						[ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${!v1}")" = "TRUE" ] && eval NETWORK_PORT_${name^^}_REACHABLE=1
-						__add_declared_variables "NETWORK_PORT_${name^^}_REACHABLE"
-						if [ ! "$secure_port" = "" ]; then
-							v2="NETWORK_PORT_${name^^}_SECURE"
-							[ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${!v1}")" = "TRUE" ] && eval NETWORK_PORT_${name^^}_SECURE_REACHABLE=1
-							__add_declared_variables "NETWORK_PORT_${name^^}_SECURE_REACHABLE"
+					if [ ! "$secure_port" = "" ]; then
+						v0s="NETWORK_PORT_${name^^}_SECURE"
+						if [ -n "${!v0s}" ]; then
+							__tango_log "INFO" "tango" "${name} area network secured port for protocol $proto is : ${!v0s}"
+							__port_list="${__port_list} ${!v0s}"
+							[ "${NETWORK_INTERNET_EXPOSED}" = "1" ] && [ ! "${TANGO_EXTERNAL_IP}" = "" ] && [ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${!v0s}")" = "TRUE" ] && eval NETWORK_PORT_${name^^}_SECURE_REACHABLE=1
+						else
+							__tango_log "WARN" "tango" "${name} area network do not have a secured port defined. Set it with with option --port ${name}@port@secured_port OR variable : ${v0s}"
 						fi
-					done
+						__add_declared_variables "NETWORK_PORT_${name^^}_SECURE_REACHABLE"
+					fi
+				done
+				if [ "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
+					if [ ! "${TANGO_DOMAIN_FEATURE}" = "auto-lan-nip" ]; then
+						__port_list="$($STELLA_API trim ${__port_list})"
+						if [ ! "${__port_list}" = "" ]; then
+							__tango_log "INFO" "tango" "If you are on a local network with a router, do not forget to forward ports ${__port_list// / and } to your tango host IP ${TANGO_HOST_DEFAULT_IP}"
+							[ "${TANGO_FREEPORT}" = "1" ] && __tango_log "INFO" "tango" "When using freeport option this is a common mistake as port change at each services launch."
+						fi
+					fi
 				fi
 			;;
 		esac
 
+		# case ${ACTION} in
+		# 	gen|info|up|restart )
+		# 		if [ "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
+
+		# 			for area in ${NETWORK_SERVICES_AREA_LIST}; do
+		# 				IFS="|" read -r name proto internal_port secure_port <<<$(echo ${area})
+		# 				v1="NETWORK_PORT_${name^^}"
+		# 				[ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${!v1}")" = "TRUE" ] && eval NETWORK_PORT_${name^^}_REACHABLE=1
+		# 				__add_declared_variables "NETWORK_PORT_${name^^}_REACHABLE"
+		# 				if [ ! "$secure_port" = "" ]; then
+		# 					v2="NETWORK_PORT_${name^^}_SECURE"
+		# 					[ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${!v2}")" = "TRUE" ] && eval NETWORK_PORT_${name^^}_SECURE_REACHABLE=1
+		# 					__add_declared_variables "NETWORK_PORT_${name^^}_SECURE_REACHABLE"
+		# 				fi
+		# 			done
+		# 		fi
+		# 	;;
+		# esac
+
 		# update env var 
 		# new env var values priority order :
-		# 	- new and computed variables at runtime
+		# 	- computed new variables at runtime
 		#	- shell env variables
 		#	- command line
 		# 	- user env file
 		# 	- modules env file
 		# 	- app env file
 		# 	- default tango env file
-		# 	- default values hardcoded and runtume computed
+		# 	- hardcoded and runtime computed default values
 		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __update_env_files "ingest default hardcoded values and runtime only variables"
 
 
@@ -507,14 +643,14 @@ case ${ACTION} in
 		
 		# update env var 
 		# env var values priority order :
-		# 	- new and computed variables at runtime
+		# 	- computed new variables at runtime
 		#	- shell env variables
 		#	- command line
 		# 	- user env file
 		# 	- modules env file		
 		# 	- app env file
 		# 	- default tango env file
-		# 	- default values hardcoded and runtime computed
+		# 	- hardcoded and runtime computed default values
 		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __update_env_files "ingest created/modified/translated variables"
 		# load env var
 		# even if files have not been modified, we want to load previously saved variables

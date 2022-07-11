@@ -130,6 +130,41 @@ case ${ACTION} in
 		esac
 	;;
 
+	gen )
+		__tango_log "INFO" "tango" "Compose & env files and files & folders are generated"
+		echo "---------==---- INFO  ----==---------"
+		echo "* Tango current app name : ${TANGO_APP_NAME}"
+		echo "L-- standalone app : $([ "${TANGO_NOT_IN_APP}" = "1" ] && echo NO || echo YES)"
+		echo "L-- instance mode : ${TANGO_INSTANCE_MODE}"
+		echo "L-- tango root : ${TANGO_ROOT}"
+		echo "L-- tango env file : ${TANGO_ENV_FILE}"
+		echo "L-- tango compose file : ${TANGO_COMPOSE_FILE}"
+		echo "L-- app root : ${TANGO_APP_ROOT}"
+		echo "L-- app env file : ${TANGO_APP_ENV_FILE}"
+		echo "L-- app compose file : ${TANGO_APP_COMPOSE_FILE}"
+		echo "L-- user env file : ${TANGO_USER_ENV_FILE}"
+		echo "L-- user compose file : ${TANGO_USER_COMPOSE_FILE}"
+
+		echo "---------==---- GENERATED FILES  ----==---------"
+		echo "L-- GENERATED_DOCKER_COMPOSE_FILE : ${GENERATED_DOCKER_COMPOSE_FILE}"
+		echo "L-- GENERATED_ENV_FILE_FOR_BASH : ${GENERATED_ENV_FILE_FOR_BASH}"
+		echo "L-- GENERATED_ENV_FILE_FOR_COMPOSE : ${GENERATED_ENV_FILE_FOR_COMPOSE}"
+		echo "L-- GENERATED_ENV_FILE_FREEPORT : ${GENERATED_ENV_FILE_FREEPORT}"
+		echo "L-- GENERATED_TLS_FILE : ${GENERATED_TLS_FILE}"
+
+
+		echo "---------==---- PATHS ----==---------"
+		echo "Format : [host path] is mapped to {inside container path}"
+		echo "App data path : [$APP_DATA_PATH] is mapped to {/data}"
+		echo "Plugins data path : [$PLUGINS_DATA_PATH] is mapped to {/plugins_data}"
+		echo "Data path of internal tango data : [$TANGO_DATA_PATH] is mapped to {/internal_data}"
+		echo "Artefact folders : [$TANGO_ARTEFACT_FOLDERS] are mapped to {${TANGO_ARTEFACT_MOUNT_POINT:-/artefact}} subfolders"
+		echo "Lets encrypt store file : [$TANGO_DATA_PATH/letsencrypt/acme.json] {/internal_data/letsencrypt/acme.json}"
+		echo "Traefik dynamic conf files directory [$TANGO_DATA_PATH/traefikconfig] {/internal_data/traefikconfig}"
+
+		__print_info_services "${TANGO_SERVICES_ACTIVE}"
+	;;
+
 	up )
 		[ "${BUILD}" = "1" ] && BUILD="BUILD"
 		__service_up "${TARGET}" "${BUILD}"
@@ -226,7 +261,34 @@ case ${ACTION} in
 			rm -f "${LETS_ENCRYPT_DATA_PATH}/acme.json"
 		fi
 		if [ "${TARGET}" = "logs" ]; then
-			docker-compose logs -f -t traefik | grep letsencrypt
+			docker-compose logs --no-color -f -t traefik | grep 'acme'
+		fi
+	
+		if [ "${TARGET}" = "test" ]; then
+			case $ACME_CHALLENGE in
+
+				HTTP)
+					__tango_log "WARN" "tango" "Can only test ACME using DNS Challenge, not HTTP Challenge."
+					;;
+
+				DNS)
+					__acme_var=""
+					for var in $(compgen -A variable | grep ^ACME_VAR_); do
+						__acme_var="${__acme_var} -e ${var/ACME_VAR_}=${!var}"
+					done
+
+					# empty previous generated files
+					rm -Rf "${LETS_ENCRYPT_TEST_DATA_PATH}/*"
+
+					echo docker run --rm --user "${TANGO_USER_ID}:${TANGO_GROUP_ID}" -v "${LETS_ENCRYPT_TEST_DATA_PATH}:/data" ${__acme_var} goacme/lego:latest \
+					--server ${LETS_ENCRYPT_SERVER_DEBUG} --email ${LETS_ENCRYPT_MAIL} --dns ${ACME_DNS_PROVIDER} --domains "test.${TANGO_DOMAIN}" --path /data --accept-tos --dns.resolvers 1.1.1.1:53 --dns.resolvers 8.8.8.8:53 run
+
+					docker run --rm --user "${TANGO_USER_ID}:${TANGO_GROUP_ID}" -v "${LETS_ENCRYPT_TEST_DATA_PATH}:/data" ${__acme_var} goacme/lego:latest \
+					--server ${LETS_ENCRYPT_SERVER_DEBUG} --email ${LETS_ENCRYPT_MAIL} --dns ${ACME_DNS_PROVIDER} --domains "test.${TANGO_DOMAIN}" --path /data --accept-tos --dns.resolvers 1.1.1.1:53 --dns.resolvers 8.8.8.8:53 run
+
+					__tango_log "INFO" "tango" "Check files in $LETS_ENCRYPT_TEST_DATA_PATH"
+					;;
+			esac
 		fi
 		;;
 
