@@ -103,7 +103,7 @@ __set_current_platform_info
 # define if current app is stella itself
 STELLA_APP_IS_STELLA=0
 
-# default ctx root folder is stella root folder
+# default app root folder is stella root folder
 if [ "$STELLA_APP_ROOT" = "" ]; then
 	# STELLA_APP_ROOT is define in stella-link file
 	STELLA_APP_ROOT="$STELLA_ROOT"
