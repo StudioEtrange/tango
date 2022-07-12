@@ -255,7 +255,6 @@ services:
       - "--certificatesresolvers.tango.acme.email=${LETS_ENCRYPT_MAIL}"
       - "--certificatesresolvers.tango.acme.storage=/letsencrypt/acme.json"
 
-
   # Traefik custom error pages : https://imandrea.me/blog/traefik-custom-404/
   # Custom error pages : https://github.com/tarampampam/error-pages
   error:

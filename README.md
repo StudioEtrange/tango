@@ -17,9 +17,9 @@ Tango is a command line tool written in bash.
 * All Traefik2 settings are generated for the services.
 * Take care automaticly of HTTPS certificate generation using Let's encrypt.
 
-* Advanced pecial features :
+* Advanced special features :
     * Can isolate a specific service network into a VPN (aka attach a vpn to only one container).
-    * Context isolation into a specific folder of all configuration files needed for an application.
+    * Tango can switch between diffrent isolation context to manage them.
 
 
 
@@ -29,7 +29,7 @@ Tango is a command line tool written in bash.
 * bash 4
 * git
 * docker engine
-* a standard linux OS
+* a standard linux host OS
 * a wildcard domain name that point to your host (*.domain.org)
 
 
@@ -38,16 +38,15 @@ Tango is a command line tool written in bash.
 ## Usage
 
 
-### Install
+### Installation
 
-* Install
+* Installation on your linux host
 
     ```
     git clone https://github.com/StudioEtrange/tango
     cd tango
     ./tango install
     ```
-
 ### Quickstart for a standalone context
 
 * Launch a single firefox service
@@ -56,41 +55,41 @@ Tango is a command line tool written in bash.
     ./tango --module firefox --domain domain.org --freeport up
     ./tango --module firefox --domain domain.org --freeport info
     ```
-    * Tango generate for each services an URI with the service name as subdomain name. Here : `https://firefox.mydomain.org:port`
+* Tango generates for each services an URI with the service name as subdomain name. Here : `https://firefox.mydomain.org:port`
 
-* `--module firefox` : A ready-to-use service attached to current tango context be manageable by tango commands. (see [available modules](/pool/modules/))
+* `--module firefox` : A ready-to-use service attached to current tango context be manageable by tango commands. *(see [available modules](/pool/modules/))*
 
-* `up` : tango command to generate a docker compose file including the selected services AND launch them.
+* `up` : tango action to generate a docker compose file, configured it including the selected services AND launch them.
 
-* `--freeport` : pick for you available HTTP ports for accessing the service. If you are on a local network area, do not forget to forward these ports to your tango IP hosts.
-    * Alternative : use command line option --port main@<port>@<secured port> to choose ports by yourself (i.e --port main@80@443). Secured port is the HTTPS version of an HTTP port.
-    ```
-    ./tango --module firefox --domain domain.org --port main@80@443 up
-    ./tango --module firefox --domain domain.org --port main@80@443 info
-    ```
+* `--freeport` : pick for you available HTTP and HTTPS ports on your host to expose the service. 
+    * If you are on a local network area, do not forget to forward these ports to your tango IP hosts.
+    * *Alternative* : use command line option `--port main@<port>@<secured port>` to choose ports by yourself (i.e `--port main@80@443`). Secured port is the HTTPS version of an HTTP port.
+        ```
+        ./tango --module firefox --domain domain.org --port main@80@443 up
+        ./tango --module firefox --domain domain.org --port main@80@443 info
+        ```
 
 
-* `--domain domain.org` : Specify your wildcard domain name that point to your host
-    * Alternative `--domain auto-nip` : for testing puprose if you do not have your own domain name [domain name generation](/doc/dns.md#solution-1--using-nipio-the-simplest)
-    ```
-    ./tango --module firefox --domain auto-nip --port main@80@443 up
-    ./tango --module firefox --domain auto-nip --port main@80@443 info
-    ```
+* `--domain domain.org` : Specify your wildcard domain name that point to your host.
+    * *Alternative* : use `--domain auto-nip` for testing purpose if you do not have your own domain name [domain name generation](/doc/dns.md#solution-1--using-nipio-the-simplest).
+        ```
+        ./tango --module firefox --domain auto-nip --port main@80@443 up
+        ./tango --module firefox --domain auto-nip --port main@80@443 info
+        ```
 
-* See [samples](/samples/demo1/README.md)
 
 ### Samples usage of Tango
 
-* See [samples](/samples/)
+* *See [samples](/samples/)*
 
 
 ----
 ## Available Commands
 
+In most cases, you will have to use only tango management commands below.
 
-    ```
-    * tango management
-        install : deploy tango
+    * tango management.
+        install : deploy Tango.
         up [service [-b]] [--module module] [--plugin plugin] [--freeport] : launch services.
         down [service] [--module module] [--all] : down services.
         restart [service] [--module module] [--plugin plugin] [--freeport] : restart services.
@@ -111,10 +110,10 @@ Tango is a command line tool written in bash.
 	    letsencrypt rm : delete generated letsencrypt cert [WARN : delete certs will regenerate request to letsencrypt. Too much requests and you may be banned for a time]
 	    letsencrypt logs : follow letsencrypt actions
 	    letsencrypt test : test certificate generation using dns-challenge
-	    vendor <path> : copy tango into another path (inside a tango folder : <path>/tango), mainly to vendorize tango into another app.
-    ```     
+	    vendor <path> : copy tango into another path (inside a tango folder : <path>/tango), mainly to vendorize tango into another folder.
 
-* In most cases, you will have to use only tango management commands.
+
+
 
 
 
@@ -124,24 +123,21 @@ Tango is a command line tool written in bash.
 ### Tango concepts
 
 * A service is a containerized application (i.e sabnzbd, calibreweb, cloud9, codeserver,...), accessible through HTTP, configured and managed by tango. At core level, a service is a yml definition of a docker-compose file.
-* A module is a ready-to-use service with a yml predefined compose file, some configuration variable (see [modules catalogue](/pool/modules/))
-* Tango leverage services exposition mechanisms with traefik2. Tango automaticly set up all traefik2 rules and route to access to services.
+* A module is a ready-to-use service with a markdown description, a yml predefined compose file and a set of configurable variables in an environment file (see [modules catalogue](/pool/modules/))
+* Tango leverage services exposition mechanisms using traefik2. Tango automaticly set up all traefik2 rules and routes to provide access to services.
 
-* see details in [variables documentation](/doc/services.md)
-
-
-
+* *see details in [variables documentation](/doc/services.md)*
 
 ----
-### Contexts
+### Context
 
-* Tango can manage different context. It has a default 'tango'.
+* Tango can manage several contexts. However, it has a default context named 'tango'.
 
 * A context is a set of services, a configuration file, default services within a given folder.
 
 * Tango can manage a context by executing its cli command on it. By default tango commands are executed in tango context itself.
 
-* see [contexts](/doc/context.md)
+* *see details in [contexts](/doc/context.md)*
 
 
 
@@ -159,14 +155,14 @@ Tango is a command line tool written in bash.
     * Current context environment file variables
     * Default tango environment file variables
 
-* see details in [variables documentation](/doc/variables.md)
+* *see details in [variables documentation](/doc/variables.md)*
 
 
 ----
 ## Network
 
 * TODO REVIEW THIS DOCUMENTATION
-* see details in [variables documentation](/doc/network.md.md)
+* *see details in [variables documentation](/doc/network.md.md)*
 
 ----
 ## GPU
@@ -190,13 +186,13 @@ Tango is a command line tool written in bash.
 * Problem with a volume
     * May occurs when you move some folder with your data
     * FIX : delete docker volume with `docker volume rm <volumename>`
-    * Sample
-    ```
-       ERROR: Configuration for volume tango_shared_internal_data specifies "device" driver_opt /foo/folder/tango_shared, but a volume with the same name uses a different "device" driver_opt (/foo/bar/tango_shared). If you wish to use the new configuration, please remove the existing volume "tango_shared_internal_data" first:
+    * Sample :
+        ```
+        ERROR: Configuration for volume tango_shared_internal_data specifies "device" driver_opt /foo/folder/tango_shared, but a volume with the same name uses a different "device" driver_opt (/foo/bar/tango_shared). If you wish to use the new configuration, please remove the existing volume "tango_shared_internal_data" first:
         $ docker volume rm tango_shared_internal_data
-    ```
+        ```
 
-
+----
 ## Side notes
 
 * Tango was created initially as a framework for [mambo media stack](https://github.com/StudioEtrange/mambo)
