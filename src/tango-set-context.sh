@@ -473,6 +473,7 @@ case ${ACTION} in
 		TANGO_HOSTNAME="$(hostname)"
 		__add_declared_variables "TANGO_HOSTNAME"
 		if [ "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
+			# TODO catch error curl
 			TANGO_EXTERNAL_IP="$(__tango_curl --connect-timeout 2 -skL ipinfo.io/ip)"
 			__tango_log "INFO" "tango" "Declared being exposed on internet, external IP detected : $TANGO_EXTERNAL_IP"
 		else
