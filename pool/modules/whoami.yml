@@ -1,7 +1,7 @@
 services:
   whoami:
     image: ${WHOAMI_IMAGE_FIXED_VAR}:${WHOAMI_VERSION_FIXED_VAR:-latest}
-    container_name: ${TANGO_APP_NAME}_whoami
+    container_name: ${TANGO_CTX_NAME}_whoami
     depends_on: 
       - service_init
     restart: unless-stopped

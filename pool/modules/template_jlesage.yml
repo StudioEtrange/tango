@@ -5,12 +5,12 @@ volumes:
       type: none
       o: bind
       device: ${ROMVAULT_DATA_PATH}
-    name: ${TANGO_APP_NAME}_romvault_data
+    name: ${TANGO_CTX_NAME}_romvault_data
   
 services:
   romvault:
     image: ${ROMVAULT_IMAGE}:${ROMVAULT_VERSION:-latest}
-    container_name: ${TANGO_APP_NAME}_romvault
+    container_name: ${TANGO_CTX_NAME}_romvault
     depends_on:
       - service_init
     restart: unless-stopped

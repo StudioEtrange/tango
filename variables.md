@@ -21,7 +21,7 @@
 |TANGO_DOMAIN|domain used to access tango. It is a regexp. `.*` stands for any domain or host ip.|`.*`|`mydomain.org`|
 |TANGO_USER_ID|unix user which will run services and acces to files.|current user : `id -u`|`1000`|
 |TANGO_GROUP_ID|unix group which will run services and acces to files.|current group : `id -g`|`1000`|
-|APP_DATA_PATH|path on host for services configuration and data files.|`$(pwd)/workspace/tango/data`. Last part `data` can be defined by `APP_DATA_PATH_DEFAULT`|`/myapp/data`|
+|CTX_DATA_PATH|path on host for services configuration and data files.|`$(pwd)/workspace/tango/data`. Last part `data` can be defined by `CTX_DATA_PATH_DEFAULT`|`/myapp/data`|
 |TANGO_USER_ID|unix user which will run services and acces to files.|current user : `id -u`|`1000`|
 
 For full list see `tango.internal.env` file
@@ -32,7 +32,7 @@ For full list see `tango.internal.env` file
 
     ```
     export TANGO_DOMAIN="mydomain.org" 
-    export APP_DATA_PATH="/home/$USER/data" 
+    export CTX_DATA_PATH="/home/$USER/data" 
     ./tango info
     ```
 
@@ -43,7 +43,7 @@ For full list see `tango.internal.env` file
 
     ```
     NETWORK_PORT_MAIN=80
-    APP_DATA_PATH=../data
+    CTX_DATA_PATH=../data
     TANGO_ARTEFACT_FOLDERS=/mnt/MEDIA/MOVIES /mnt/MEDIA/TV_SHOWS
     ```
 
@@ -154,7 +154,7 @@ For full list see `tango.internal.env` file
 
 * Each declared path variable are turned into absolute path at runtime following these path evaluation rules
     * if variable path is an absolute path, then this absoluted path is used as is
-    * if variable path is a relative path, it will be relative to its parent path. If parent is unknown, `$TANGO_APP_WORK_ROOT` is used as default parent path
+    * if variable path is a relative path, it will be relative to its parent path. If parent is unknown, `$TANGO_CTX_WORK_ROOT` is used as default parent path
     * if variable path have an unknow parenthave an empty value,  its value will be the lower cased name of <variable_name> (`foo_path` for `FOO_PATH`)
         
         
@@ -164,7 +164,7 @@ For full list see `tango.internal.env` file
     |-|UNKNOWN PARENT|KNOWN PARENT|MISSING PATH BLOCKING|MISSING PATH CREATED|
     |-|-|-|-|-|
     |**`FOO_PATH` is an absolute path**|absolute host path : `$FOO_PATH`|*should not be possible, a subfolder must be a relative path to its parent*|YES|NO|
-    |**`FOO_PATH` is a relative path**|relative to app workspace : `$TANGO_APP_WORK_ROOT/$VAR_PATH`|relative to parent path : `$PARENT_PATH/$FOO_PATH`|NO|YES|
+    |**`FOO_PATH` is a relative path**|relative to ctx workspace : `$TANGO_CTX_WORK_ROOT/$VAR_PATH`|relative to parent path : `$PARENT_PATH/$FOO_PATH`|NO|YES|
 
 
 
@@ -203,24 +203,24 @@ For full list see `tango.internal.env` file
 
     |VARIABLE|DESC|DEFAULT VALUE|
     |-|-|-|
-    |`TANGO_APP_ROOT`|current app full path. Without a current app, tango is viewed as an app itself|-|
-    |`TANGO_APP_WORK_ROOT`|current app workspace full path.| `$TANGO_APP_ROOT/workspace/$TANGO_APP_NAME`|
-    |`APP_DATA_PATH`|current app data path.| `$TANGO_APP_WORK_ROOT/data`|
-    |`TANGO_DATA_PATH`|tango internal data path.| `$APP_DATA_PATH`|
+    |`TANGO_CTX_ROOT`|current app full path. Without a current app, tango is viewed as an app itself|-|
+    |`TANGO_CTX_WORK_ROOT`|current ctx workspace full path.| `$TANGO_CTX_ROOT/workspace/$TANGO_CTX_NAME`|
+    |`CTX_DATA_PATH`|current ctx data path.| `$TANGO_CTX_WORK_ROOT/data`|
+    |`TANGO_DATA_PATH`|tango internal data path.| `$CTX_DATA_PATH`|
     |`WORKING_DIR`|dir from where tango have been launched.| `equals $(pwd) before launching command`|
 
 
 
 
-* `APP_DATA_PATH` is a special path variable with a purpose to store and share data of services app in one unique location. It s added to TANGO_PATH_LIST if not already done. Its default definition is
+* `CTX_DATA_PATH` is a special path variable with a purpose to store and share data of services app in one unique location. It s added to TANGO_PATH_LIST if not already done. Its default definition is
     ```
-    TANGO_PATH_LIST=APP_DATA_PATH
-    APP_DATA_PATH=
-    APP_DATA_PATH_DEFAULT=data
+    TANGO_PATH_LIST=CTX_DATA_PATH
+    CTX_DATA_PATH=
+    CTX_DATA_PATH_DEFAULT=data
     ```
 
 * `TANGO_DATA_PATH` is a special path variable wich store generic tango data like letsencrypt data or traefik conf. Its value depends of tango instance mode (`isolated` or `shared`)
-    * if `isolated` (the default mode) `TANGO_DATA_PATH` equals `APP_DATA_PATH` - they are stored as subfolder of `APP_DATA_PATH`
+    * if `isolated` (the default mode) `TANGO_DATA_PATH` equals `CTX_DATA_PATH` - they are stored as subfolder of `CTX_DATA_PATH`
     * if `shared` `TANGO_DATA_PATH` is a subfolder of tango `workspace` itself
 
 

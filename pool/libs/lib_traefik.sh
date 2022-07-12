@@ -63,7 +63,7 @@ __traefik_api_main_request() {
         ;;
     esac
 
-    #__result="$(docker run --network "${TANGO_APP_NETWORK_NAME}" --rm curlimages/curl:7.70.0 curl -d "${__body}" -u "${TRAEFIK_API_USER}":"${TRAEFIK_API_PASSWORD}" -X ${__http_command} -skL "${__url}")"
+    #__result="$(docker run --network "${TANGO_CTX_NETWORK_NAME}" --rm curlimages/curl:7.70.0 curl -d "${__body}" -u "${TRAEFIK_API_USER}":"${TRAEFIK_API_PASSWORD}" -X ${__http_command} -skL "${__url}")"
     __result="$(__tango_curl -d "${__body}" -u "${TRAEFIK_API_USER}":"${TRAEFIK_API_PASSWORD}" -X ${__http_command} -skL "${__url}")"
 
 
@@ -122,8 +122,8 @@ __traefik_api_rest_request() {
         ;;
     esac
 
-    #[ "${__body}" = "" ] && __result="$(docker run --network "${TANGO_APP_NETWORK_NAME}" --rm curlimages/curl:7.70.0 curl -u "${TRAEFIK_API_USER}":"${TRAEFIK_API_HASH_PASSWORD}" -X ${__http_command} -skL "${__url}")" \
-    #    || __result="$(docker run --network "${TANGO_APP_NETWORK_NAME}" --rm curlimages/curl:7.70.0 curl -d "${__body}" -u "${TRAEFIK_API_USER}":"${TRAEFIK_API_PASSWORD}" -X ${__http_command} -skL "${__url}")"
+    #[ "${__body}" = "" ] && __result="$(docker run --network "${TANGO_CTX_NETWORK_NAME}" --rm curlimages/curl:7.70.0 curl -u "${TRAEFIK_API_USER}":"${TRAEFIK_API_HASH_PASSWORD}" -X ${__http_command} -skL "${__url}")" \
+    #    || __result="$(docker run --network "${TANGO_CTX_NETWORK_NAME}" --rm curlimages/curl:7.70.0 curl -d "${__body}" -u "${TRAEFIK_API_USER}":"${TRAEFIK_API_PASSWORD}" -X ${__http_command} -skL "${__url}")"
 
     [ "${__body}" = "" ] && __result="$(__tango_curl -u "${TRAEFIK_API_USER}":"${TRAEFIK_API_HASH_PASSWORD}" -X ${__http_command} -skL "${__url}")" \
         || __result="$(__tango_curl -d "${__body}" -u "${TRAEFIK_API_USER}":"${TRAEFIK_API_PASSWORD}" -X ${__http_command} -skL "${__url}")"

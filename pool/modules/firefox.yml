@@ -1,7 +1,7 @@
 services:
   firefox:
     image: ${FIREFOX_IMAGE_FIXED_VAR}:${FIREFOX_VERSION_FIXED_VAR:-latest}
-    container_name: ${TANGO_APP_NAME}_firefox
+    container_name: ${TANGO_CTX_NAME}_firefox
     depends_on: 
       - service_init
     restart: unless-stopped

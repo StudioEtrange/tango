@@ -1,12 +1,12 @@
 services:
   medusa:
     image: ${MEDUSA_IMAGE}:${MEDUSA_VERSION:-latest}
-    container_name: ${TANGO_APP_NAME}_medusa
+    container_name: ${TANGO_CTX_NAME}_medusa
     depends_on:
       - service_init
     restart: unless-stopped
     volumes:
-      # data is the data named volume for the current app
+      # data is the data named volume for the current ctx
       # data/medusa will contain medusa configuration
       - data:/data
       # different paths used by medusa

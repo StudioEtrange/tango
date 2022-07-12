@@ -11,28 +11,28 @@ if [ "${DEBUG}" = "1" ]; then
 	TANGO_LOG_LEVEL="DEBUG"
 fi
 
-# TANGO APP
-TANGO_NOT_IN_APP=
-[ "${TANGO_APP_NAME}" = "" ] && TANGO_APP_NAME="${APP}" || TANGO_APP_NAME="${TANGO_APP_NAME}"
-[ "${TANGO_APP_NAME}" = "" ] && TANGO_APP_NAME="tango" && TANGO_NOT_IN_APP=1
-TANGO_APP_NAME_CAPS="${TANGO_APP_NAME^^}"
+# TANGO CTX
+TANGO_NOT_IN_ANY_CTX=
+[ "${TANGO_CTX_NAME}" = "" ] && TANGO_CTX_NAME="${CTX}" || TANGO_CTX_NAME="${TANGO_CTX_NAME}"
+[ "${TANGO_CTX_NAME}" = "" ] && TANGO_CTX_NAME="tango" && TANGO_NOT_IN_ANY_CTX=1
+TANGO_CTX_NAME_CAPS="${TANGO_CTX_NAME^^}"
 
-[ "${APPROOT}" = "" ] && TANGO_APP_ROOT="${TANGO_ROOT}" || TANGO_APP_ROOT="${APPROOT}"
-TANGO_APP_ROOT="$($STELLA_API rel_to_abs_path "${TANGO_APP_ROOT}" "${TANGO_CURRENT_RUNNING_DIR}")"
+[ "${CTXROOT}" = "" ] && TANGO_CTX_ROOT="${TANGO_ROOT}" || TANGO_CTX_ROOT="${CTXROOT}"
+TANGO_CTX_ROOT="$($STELLA_API rel_to_abs_path "${TANGO_CTX_ROOT}" "${TANGO_CURRENT_RUNNING_DIR}")"
 
-[ "${TANGO_APP_COMPOSE_FILE}" = "" ] && TANGO_APP_COMPOSE_FILE="${TANGO_APP_ROOT}/${TANGO_APP_NAME}.docker-compose.yml"
-TANGO_APP_ENV_FILE="${TANGO_APP_ROOT}/${TANGO_APP_NAME}.env"
-TANGO_APP_COMPOSE_FILE="${TANGO_APP_ROOT}/${TANGO_APP_NAME}.docker-compose.yml"
-TANGO_APP_MODULES_ROOT="${TANGO_APP_ROOT}/pool/modules"
-TANGO_APP_PLUGINS_ROOT="${TANGO_APP_ROOT}/pool/plugins"
-TANGO_APP_SCRIPTS_ROOT="${TANGO_APP_ROOT}/pool/scripts"
+[ "${TANGO_CTX_COMPOSE_FILE}" = "" ] && TANGO_CTX_COMPOSE_FILE="${TANGO_CTX_ROOT}/${TANGO_CTX_NAME}.docker-compose.yml"
+TANGO_CTX_ENV_FILE="${TANGO_CTX_ROOT}/${TANGO_CTX_NAME}.env"
+TANGO_CTX_COMPOSE_FILE="${TANGO_CTX_ROOT}/${TANGO_CTX_NAME}.docker-compose.yml"
+TANGO_CTX_MODULES_ROOT="${TANGO_CTX_ROOT}/pool/modules"
+TANGO_CTX_PLUGINS_ROOT="${TANGO_CTX_ROOT}/pool/plugins"
+TANGO_CTX_SCRIPTS_ROOT="${TANGO_CTX_ROOT}/pool/scripts"
 
 
 # workspace folder
 TANGO_WORK_ROOT="${TANGO_ROOT}/workspace"
 mkdir -p "${TANGO_WORK_ROOT}"
-TANGO_APP_WORK_ROOT="${TANGO_APP_ROOT}/workspace/${TANGO_APP_NAME}"
-mkdir -p "${TANGO_APP_WORK_ROOT}"
+TANGO_CTX_WORK_ROOT="${TANGO_CTX_ROOT}/workspace/${TANGO_CTX_NAME}"
+mkdir -p "${TANGO_CTX_WORK_ROOT}"
 
 
 # available modules from tango
@@ -41,22 +41,22 @@ TANGO_MODULES_AVAILABLE="$(__list_items "module" "tango")"
 TANGO_PLUGINS_AVAILABLE="$(__list_items "plugin" "tango")"
 # available scripts from tango
 TANGO_SCRIPTS_AVAILABLE="$(__list_items "script" "tango")"
-if [ "${TANGO_NOT_IN_APP}" = "1" ]; then
-	TANGO_APP_ENV_FILE=
-	TANGO_APP_COMPOSE_FILE=
-	TANGO_APP_MODULES_ROOT=
-	TANGO_APP_MODULES_AVAILABLE=
-	TANGO_APP_PLUGINS_ROOT=
-	TANGO_APP_PLUGINS_AVAILABLE=
-	TANGO_APP_SCRIPTS_ROOT=
-	TANGO_APP_SCRIPTS_AVAILABLE=
+if [ "${TANGO_NOT_IN_ANY_CTX}" = "1" ]; then
+	TANGO_CTX_ENV_FILE=
+	TANGO_CTX_COMPOSE_FILE=
+	TANGO_CTX_MODULES_ROOT=
+	TANGO_CTX_MODULES_AVAILABLE=
+	TANGO_CTX_PLUGINS_ROOT=
+	TANGO_CTX_PLUGINS_AVAILABLE=
+	TANGO_CTX_SCRIPTS_ROOT=
+	TANGO_CTX_SCRIPTS_AVAILABLE=
 else
-	# available modules from current app
-	TANGO_APP_MODULES_AVAILABLE="$(__list_items "module" "app")"
-	# available plugins from current app
-	TANGO_APP_PLUGINS_AVAILABLE="$(__list_items "plugin" "app")"
-	# available scripts from current app
-	TANGO_APP_SCRIPTS_AVAILABLE="$(__list_items "script" "app")"
+	# available modules from current ctx
+	TANGO_CTX_MODULES_AVAILABLE="$(__list_items "module" "ctx")"
+	# available plugins from current ctx
+	TANGO_CTX_PLUGINS_AVAILABLE="$(__list_items "plugin" "ctx")"
+	# available scripts from current ctx
+	TANGO_CTX_SCRIPTS_AVAILABLE="$(__list_items "script" "ctx")"
 fi
 
 # TANGO USER FILES 
@@ -64,16 +64,16 @@ fi
 [ ! "${ENV}" = "" ] && TANGO_USER_ENV_FILE="$($STELLA_API rel_to_abs_path "${ENV}" "${TANGO_CURRENT_RUNNING_DIR}")"
 
 # GENERATED FILES
-GENERATED_DOCKER_COMPOSE_FILE="${TANGO_APP_ROOT}/generated.${TANGO_APP_NAME}.docker-compose.yml"
-GENERATED_ENV_FILE_FOR_BASH="${TANGO_APP_ROOT}/generated.${TANGO_APP_NAME}.bash.env"
-GENERATED_ENV_FILE_FOR_COMPOSE="${TANGO_APP_ROOT}/generated.${TANGO_APP_NAME}.compose.env"
-GENERATED_ENV_FILE_FREEPORT="${TANGO_APP_ROOT}/generated.${TANGO_APP_NAME}.freeport.env"
+GENERATED_DOCKER_COMPOSE_FILE="${TANGO_CTX_ROOT}/generated.${TANGO_CTX_NAME}.docker-compose.yml"
+GENERATED_ENV_FILE_FOR_BASH="${TANGO_CTX_ROOT}/generated.${TANGO_CTX_NAME}.bash.env"
+GENERATED_ENV_FILE_FOR_COMPOSE="${TANGO_CTX_ROOT}/generated.${TANGO_CTX_NAME}.compose.env"
+GENERATED_ENV_FILE_FREEPORT="${TANGO_CTX_ROOT}/generated.${TANGO_CTX_NAME}.freeport.env"
 
 # follow option
 [ "${FOLLOW}" = 1 ] && FOLLOW="-f " || FOLLOW=
 
-# load app libs
-for f in ${TANGO_APP_ROOT}/pool/libs/*; do
+# load ctx libs
+for f in ${TANGO_CTX_ROOT}/pool/libs/*; do
 	[ -f "${f}" ] && . ${f}
 done
 
@@ -85,7 +85,7 @@ case ${ACTION} in
 
 	* )
 		type docker-compose 1>/dev/null 2>&1 || {
-			echo "** ERROR : please install app first"
+			echo "** ERROR : please install tango first with ./tango install command"
 			exit 1
 		}
 
@@ -101,7 +101,7 @@ case ${ACTION} in
 		#	- command line
 		# 	- user env file
 		# 	- modules env file
-		# 	- app env file
+		# 	- ctx env file
 		# 	- default tango env file
 		# 	- default values hardcoded and runtume computed
 		
@@ -116,15 +116,15 @@ case ${ACTION} in
 		__add_declared_variables "ASSOCIATIVE_ARRAY_LIST"
 
 		
-		# create bash env file using only user, app and default files
+		# create bash env file using only user, ctx and default files
 		# bash env files priority :
 		# 	- user env file
-		# 	- app env file
+		# 	- ctx env file
 		# 	- default env file
-		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __create_env_files "bash" "default app user"
+		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __create_env_files "bash" "default ctx user"
 
 		# modules -----
-		# extract declared services modules from user, app and default env files
+		# extract declared services modules from user, ctx and default env files
 		# only if external environement variable TANGO_SERVICES_MODULES was not defined
 		# 	take value from TANGO_SERVICES_MODULES_ORIGINAL_VAR which contains non scaled TANGO_SERVICES_MODULES original values (without command line values) from a previous launch (usefull when TANGO_ALTER_GENERATED_FILES is OFF)
 		#   OR from TANGO_SERVICES_MODULES
@@ -135,17 +135,17 @@ case ${ACTION} in
 		fi
 
 		# cumulate modules declared by --module AND variable TANGO_SERVICES_MODULES into TANGO_SERVICES_MODULES
-		# at this point TANGO_SERVICES_MODULES can come from external shell environment variable OR user, app or default env files
+		# at this point TANGO_SERVICES_MODULES can come from external shell environment variable OR user, ctx or default env files
 		# --module option is cumulative with TANGO_SERVICES_MODULES but if a module is declared through both, command line declaration override the other
 		if [ ! "${MODULE}" = "" ]; then
 			__add_item_declaration_from_cmdline "module"
 		fi
 		
-		# take care of modules env files by recreating bash env file using user, app, modules and default files
+		# take care of modules env files by recreating bash env file using user, ctx, modules and default files
 		# bash env files priority :
 		# 			- user env file
 		# 			- modules env file
-		# 			- app env file
+		# 			- ctx env file
 		# 			- default env file
 		if [ ! "${TANGO_SERVICES_MODULES}" = "" ]; then
 			#  we need to extract modules instances list names before __filter_and_scale_items for eventually scaled modules to come
@@ -153,7 +153,7 @@ case ${ACTION} in
 			# filter and scale module list
 			__filter_and_scale_items "module"
 			
-			[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __create_env_files "bash" "default app modules user"
+			[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __create_env_files "bash" "default ctx modules user"
 		fi
 		
 
@@ -204,7 +204,7 @@ case ${ACTION} in
 		# generate compose env files
 		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __create_env_files "docker_compose"
 
-		# add to VARIABLES_LIST all variables cumulated from default, app, modules and user env file
+		# add to VARIABLES_LIST all variables cumulated from default, ctx, modules and user env file
 		__extract_declared_variable_names "${GENERATED_ENV_FILE_FOR_COMPOSE}"
 		
 
@@ -229,39 +229,39 @@ case ${ACTION} in
 		# add variables created at runtime or computed from command line
 		__add_declared_variables "DEBUG"
 		
-		__add_declared_variables "TANGO_APP_NAME"
-		__add_declared_variables "TANGO_APP_NAME_CAPS"
+		__add_declared_variables "TANGO_CTX_NAME"
+		__add_declared_variables "TANGO_CTX_NAME_CAPS"
 
 		__add_declared_variables "TANGO_ROOT"
-		__add_declared_variables "TANGO_APP_ROOT"
-		__add_declared_variables "TANGO_APP_WORK_ROOT"
+		__add_declared_variables "TANGO_CTX_ROOT"
+		__add_declared_variables "TANGO_CTX_WORK_ROOT"
 		__add_declared_variables "WORKING_DIR"
 		
 		__add_declared_variables "TANGO_ENV_FILE"
-		__add_declared_variables "TANGO_APP_ENV_FILE"
+		__add_declared_variables "TANGO_CTX_ENV_FILE"
 		__add_declared_variables "TANGO_USER_ENV_FILE"
 		__add_declared_variables "TANGO_COMPOSE_FILE"
-		__add_declared_variables "TANGO_APP_COMPOSE_FILE"
+		__add_declared_variables "TANGO_CTX_COMPOSE_FILE"
 		__add_declared_variables "TANGO_USER_COMPOSE_FILE"
 
 		__add_declared_variables "TANGO_MODULES_AVAILABLE"
 		__add_declared_variables "TANGO_MODULES_ROOT"
-		__add_declared_variables "TANGO_APP_MODULES_AVAILABLE"
-		__add_declared_variables "TANGO_APP_MODULES_ROOT"
+		__add_declared_variables "TANGO_CTX_MODULES_AVAILABLE"
+		__add_declared_variables "TANGO_CTX_MODULES_ROOT"
 
 		__add_declared_variables "TANGO_PLUGINS_AVAILABLE"
 		__add_declared_variables "TANGO_PLUGINS_ROOT"
-		__add_declared_variables "TANGO_APP_PLUGINS_AVAILABLE"
-		__add_declared_variables "TANGO_APP_PLUGINS_ROOT"
+		__add_declared_variables "TANGO_CTX_PLUGINS_AVAILABLE"
+		__add_declared_variables "TANGO_CTX_PLUGINS_ROOT"
 
 		__add_declared_variables "TANGO_SCRIPTS_AVAILABLE"
 		__add_declared_variables "TANGO_SCRIPTS_ROOT"
-		__add_declared_variables "TANGO_APP_SCRIPTS_AVAILABLE"
-		__add_declared_variables "TANGO_APP_SCRIPTS_ROOT"
+		__add_declared_variables "TANGO_CTX_SCRIPTS_AVAILABLE"
+		__add_declared_variables "TANGO_CTX_SCRIPTS_ROOT"
 
 		__add_declared_variables "GENERATED_ENV_FILE_FOR_COMPOSE"
 		__add_declared_variables "GENERATED_ENV_FILE_FREEPORT"
-		__add_declared_variables "TANGO_NOT_IN_APP"
+		__add_declared_variables "TANGO_NOT_IN_ANY_CTX"
 
 		# contains list of modules names (including scaled modules)
 		__add_declared_variables "TANGO_SERVICES_MODULES"
@@ -286,7 +286,7 @@ case ${ACTION} in
 		#	- command line
 		# 	- user env file
 		# 	- modules env file
-		# 	- app env file
+		# 	- ctx env file
 		# 	- default tango env file
 		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __update_env_files "ingest with env variables from shell and command line"
 		# load env var
@@ -307,7 +307,7 @@ case ${ACTION} in
 		#	- command line
 		# 	- user env file
 		# 	- modules env file
-		# 	- app env file
+		# 	- ctx env file
 		# 	- default tango env file
 		# 	- hardcoded and runtime computed default values
 
@@ -386,13 +386,13 @@ case ${ACTION} in
 		
 		# TANGO_PATH_LIST list of generic path variables
 
-		# APP_DATA_PATH			 			path to store data relative to app
-		# APP_DATA_PATH_DEFAULT 			default path relative to app workspace folder (TANGO_APP_WORK_ROOT)
-		# APP_DATA_PATH_SUBPATH_LIST		list of subpath variables relative to app data
-		# APP_DATA_PATH_SUBPATH_CREATE		instructions to create subpath relative to app data (internal variable)
+		# CTX_DATA_PATH			 			path to store data relative to ctx
+		# CTX_DATA_PATH_DEFAULT 			default path relative to ctx workspace folder (TANGO_CTX_WORK_ROOT)
+		# CTX_DATA_PATH_SUBPATH_LIST		list of subpath variables relative to ctx data
+		# CTX_DATA_PATH_SUBPATH_CREATE		instructions to create subpath relative to ctx data (internal variable)
 
-		# TANGO_APP_WORK_ROOT_SUBPATH_CREATE 		instructions to create subpath relative to TANGO_APP_WORK_ROOT (which is an internal variable)
-		TANGO_APP_WORK_ROOT_SUBPATH_CREATE=
+		# TANGO_CTX_WORK_ROOT_SUBPATH_CREATE 		instructions to create subpath relative to TANGO_CTX_WORK_ROOT (which is an internal variable)
+		TANGO_CTX_WORK_ROOT_SUBPATH_CREATE=
 		
 		# TANGO_DATA_PATH 					path to store data relative to internal tango services - hardcoded according to TANGO_INSTANCE_MODE (internal variable)
 		# TANGO_DATA_PATH_DEFAULT			N/A (hardcoced TANGO_DATA_PATH)
@@ -401,13 +401,13 @@ case ${ACTION} in
 		TANGO_DATA_PATH_SUBPATH_CREATE=
 
 		# manage generic path
-		# add APP_DATA_PATH variable name to TANGO_PATH_LIST
-		TANGO_PATH_LIST="APP_DATA_PATH ${TANGO_PATH_LIST}"
+		# add CTX_DATA_PATH variable name to TANGO_PATH_LIST
+		TANGO_PATH_LIST="CTX_DATA_PATH ${TANGO_PATH_LIST}"
 		TANGO_PATH_LIST="$($STELLA_API list_filter_duplicate "${TANGO_PATH_LIST}")"
 
 		__tango_log "DEBUG" "tango" "path management -- list of path variables to manage : ${TANGO_PATH_LIST} (defined by TANGO_PATH_LIST)"
 		for p in $TANGO_PATH_LIST; do
-			__manage_path "$p" "TANGO_APP_WORK_ROOT"
+			__manage_path "$p" "TANGO_CTX_WORK_ROOT"
 		done
 
 		# Tango instance mode
@@ -416,47 +416,47 @@ case ${ACTION} in
 				TANGO_INSTANCE_NAME="tango_shared"
 				mkdir -p "${TANGO_WORK_ROOT}/tango_shared"
 				TANGO_DATA_PATH="${TANGO_WORK_ROOT}/tango_shared"
-				__tango_log "DEBUG" "tango" "SHARED TRAEFIK : Traefik is in shared mode between several app"
+				__tango_log "DEBUG" "tango" "SHARED TRAEFIK : Traefik is in shared mode between several tango context"
 				__tango_log "DEBUG" "tango" "    L [TANGO_INSTANCE_NAME=$TANGO_INSTANCE_NAME]"
 				__tango_log "DEBUG" "tango" "    L [TANGO_DATA_PATH=$TANGO_DATA_PATH]"
-				__tango_log "DEBUG" "tango" "    L [APP_DATA_PATH=$APP_DATA_PATH]"
+				__tango_log "DEBUG" "tango" "    L [CTX_DATA_PATH=$CTX_DATA_PATH]"
 				;;
 			isolated )
-				TANGO_INSTANCE_NAME="${TANGO_APP_NAME}"
-				TANGO_DATA_PATH="${APP_DATA_PATH}"
-				__tango_log "DEBUG" "tango" "ISOLATED TRAEFIK : This traefik instance is dedicated to current app ${TANGO_APP_NAME}, so TANGO_DATA_PATH=APP_DATA_PATH"
+				TANGO_INSTANCE_NAME="${TANGO_CTX_NAME}"
+				TANGO_DATA_PATH="${CTX_DATA_PATH}"
+				__tango_log "DEBUG" "tango" "ISOLATED TRAEFIK : This traefik instance is dedicated to current context ${TANGO_CTX_NAME}, so TANGO_DATA_PATH=CTX_DATA_PATH"
 				__tango_log "DEBUG" "tango" "    L [TANGO_INSTANCE_NAME=$TANGO_INSTANCE_NAME]"
 				__tango_log "DEBUG" "tango" "    L [TANGO_DATA_PATH=$TANGO_DATA_PATH]"
-				__tango_log "DEBUG" "tango" "    L [APP_DATA_PATH=$APP_DATA_PATH]"
+				__tango_log "DEBUG" "tango" "    L [CTX_DATA_PATH=$CTX_DATA_PATH]"
 				;;
 		esac
 
-		TANGO_APP_NETWORK_NAME="${TANGO_INSTANCE_NAME}_default"
-		__tango_log "DEBUG" "tango" "    L [TANGO_APP_NETWORK_NAME=$TANGO_APP_NETWORK_NAME]"
+		TANGO_CTX_NETWORK_NAME="${TANGO_INSTANCE_NAME}_default"
+		__tango_log "DEBUG" "tango" "    L [TANGO_CTX_NETWORK_NAME=$TANGO_CTX_NETWORK_NAME]"
 
 		# hardcoded subpath relative to tango data path
 		LETS_ENCRYPT_DATA_PATH="${TANGO_DATA_PATH}/letsencrypt"
 		LETS_ENCRYPT_TEST_DATA_PATH="${TANGO_DATA_PATH}/letsencrypt-test"
 		TRAEFIK_CONFIG_DATA_PATH="${TANGO_DATA_PATH}/traefikconfig"
-		TANGO_DATA_PATH_SUBPATH_CREATE="${TANGO_DATA_PATH_SUBPATH_CREATE} FOLDER letsencrypt letsencrypt-test traefikconfig FILE letsencrypt/acme.json traefikconfig/generated.${TANGO_APP_NAME}.tls.yml"
-		GENERATED_TLS_FILE_PATH="${TANGO_DATA_PATH}/traefikconfig/generated.${TANGO_APP_NAME}.tls.yml"
+		TANGO_DATA_PATH_SUBPATH_CREATE="${TANGO_DATA_PATH_SUBPATH_CREATE} FOLDER letsencrypt letsencrypt-test traefikconfig FILE letsencrypt/acme.json traefikconfig/generated.${TANGO_CTX_NAME}.tls.yml"
+		GENERATED_TLS_FILE_PATH="${TANGO_DATA_PATH}/traefikconfig/generated.${TANGO_CTX_NAME}.tls.yml"
 		
-		PLUGINS_DATA_PATH="${APP_DATA_PATH}/plugins"
+		PLUGINS_DATA_PATH="${CTX_DATA_PATH}/plugins"
 		__tango_log "DEBUG" "tango" "    L [PLUGINS_DATA_PATH=$PLUGINS_DATA_PATH]"
-		APP_DATA_PATH_SUBPATH_CREATE="${APP_DATA_PATH_SUBPATH_CREATE} FOLDER plugins"
+		CTX_DATA_PATH_SUBPATH_CREATE="${CTX_DATA_PATH_SUBPATH_CREATE} FOLDER plugins"
 		__tango_log "DEBUG" "tango" "ADD hardcoded paths instructions to create letsencrypt, traefik config and plugins data folders"
 		__tango_log "DEBUG" "tango" "    L TANGO_DATA_PATH_SUBPATH_CREATE=$TANGO_DATA_PATH_SUBPATH_CREATE"
-		__tango_log "DEBUG" "tango" "    L APP_DATA_PATH_SUBPATH_CREATE=$APP_DATA_PATH_SUBPATH_CREATE"
+		__tango_log "DEBUG" "tango" "    L CTX_DATA_PATH_SUBPATH_CREATE=$CTX_DATA_PATH_SUBPATH_CREATE"
 
 
 		# check and turn to absolute path some path variable
 		__translate_path
 
-		# path pointing where the tango cross-app data will be stored
+		# path pointing where the tango cross-ctx data will be stored
 		__add_declared_variables "TANGO_DATA_PATH"
 		__add_declared_variables "TANGO_INSTANCE_NAME"
 		__add_declared_variables "GENERATED_TLS_FILE_PATH"
-		__add_declared_variables "TANGO_APP_NETWORK_NAME"
+		__add_declared_variables "TANGO_CTX_NETWORK_NAME"
 		__add_declared_variables "PLUGINS_DATA_PATH"
 		__add_declared_variables "LETS_ENCRYPT_DATA_PATH"
 		__add_declared_variables "LETS_ENCRYPT_TEST_DATA_PATH"
@@ -630,7 +630,7 @@ case ${ACTION} in
 		#	- command line
 		# 	- user env file
 		# 	- modules env file
-		# 	- app env file
+		# 	- ctx env file
 		# 	- default tango env file
 		# 	- hardcoded and runtime computed default values
 		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __update_env_files "ingest default hardcoded values and runtime only variables"
@@ -648,7 +648,7 @@ case ${ACTION} in
 		#	- command line
 		# 	- user env file
 		# 	- modules env file		
-		# 	- app env file
+		# 	- ctx env file
 		# 	- default tango env file
 		# 	- hardcoded and runtime computed default values
 		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __update_env_files "ingest created/modified/translated variables"

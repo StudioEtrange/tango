@@ -4,8 +4,8 @@
 for f in /pool/tango/libs/*; do
 	[ -f "${f}" ] && . ${f}
 done
-# load app libs
-[ ! "${TANGO_NOT_IN_APP}" = "1" ] && for f in /pool/${TANGO_APP_NAME}/libs/*.sh; do [ -f "${f}" ] && . ${f}; done
+# load ctx libs
+[ ! "${TANGO_NOT_IN_ANY_CTX}" = "1" ] && for f in /pool/${TANGO_CTX_NAME}/libs/*.sh; do [ -f "${f}" ] && . ${f}; done
 
 
 

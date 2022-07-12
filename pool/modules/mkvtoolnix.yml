@@ -5,12 +5,12 @@ volumes:
       type: none
       o: bind
       device: ${MKVTOOLNIX_DATA_PATH}
-    name: ${TANGO_APP_NAME}_mkvtoolnix_data
+    name: ${TANGO_CTX_NAME}_mkvtoolnix_data
   
 services:
   mkvtoolnix:
     image: ${MKVTOOLNIX_IMAGE}:${MKVTOOLNIX_VERSION:-latest}
-    container_name: ${TANGO_APP_NAME}_mkvtoolnix
+    container_name: ${TANGO_CTX_NAME}_mkvtoolnix
     depends_on:
       - service_init
     restart: unless-stopped

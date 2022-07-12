@@ -26,7 +26,7 @@
     ./tango info <service>
     ```
 
-* A service is manageable with these commands ONLY if a matching module was attached to the current tango context (simple way, see [Modules](#modules) below) OR if the service was manually defined as a default service inside a dedicated application docker-compose yml file and enabled (advanced way, see [Services creation](#services-creation)).
+* A service is manageable with these commands ONLY if a matching module was attached to the current tango context (simple way, see [Modules](#modules) below) OR if the service was manually defined as a default service inside a dedicated context docker-compose yml file and enabled (advanced way, see [Services creation](#services-creation)).
 
 * A service managed by tango will automaticly have an HTTPS route setted with this format : `https://<SERVICE_SUBDOMAIN>.<TANGO_DOMAIN>:<PORT>`
     * By default `SERVICE_SUBDOMAIN` is the service name
@@ -179,21 +179,21 @@
     ```
 
 
-* If plugins have data, it will be stored in `$APP_DATA_PATH/plugins`
+* If plugins have data, it will be stored in `$CTX_DATA_PATH/plugins`
     
 ### Plugins creation
 
-* You can create plugins and store them in the context of your application.
+* You can create plugins and store them in a context.
 
 * A plugin is defined by 1 executable file, follow the provided templates file and rename it with the plugin name
     * [template.md](/pool/plugins/template) : executable script
 
-* Files of your created plugins must be placed in the `pool/plugins` folder inside your app root path
+* Files of your created plugins must be placed in the `pool/plugins` folder inside your ctx root path
     ```
-    $HOME/myapp
-    $HOME/myapp/pool/plugins/myplugin
+    $HOME/myctx
+    $HOME/myctx/pool/plugins/myplugin
 
-    ./tango --app myapp --approot $HOME/myapp --domain mydomain.org --freeport --module firefox --plugin myplugin%firefox up firefox
+    ./tango --ctx myctx --ctxroot $HOME/myctx --domain mydomain.org --freeport --module firefox --plugin myplugin%firefox up firefox
     ```
 
 * Take inspiration from [plugins catalogue](/pool/plugins/) folder.
@@ -213,7 +213,7 @@
 
 ### Modules creation
 
-* You can create modules and store them in the context of your application.
+* You can create modules and store them in a context.
 
 * A module is defined by 4 files, follow the provided template files and rename them with the module name
     * [template.md](/pool/modules/template.md) : markdown file with module description
@@ -221,22 +221,22 @@
     * [template.yml](/pool/modules/template.yml) : yml definition for docker-compose that will be integrated into generated docker-compose file. see [format](#service-yml-definition-for-docker-compose)
     * [template.scalable](/pool/modules/template.scalable) : empty file that indicates the module can be instancied multiple times
 
-* Files of your created modules must be placed in the `pool/modules` folder inside your app root path
+* Files of your created modules must be placed in the `pool/modules` folder inside your ctx root path
     ```
-    $HOME/myapp
-    $HOME/myapp/pool/modules/mymodule.md
-    $HOME/myapp/pool/modules/mymodule.env
-    $HOME/myapp/pool/modules/mymodule.yml
-    $HOME/myapp/pool/modules/mymodule.scalable
+    $HOME/myctx
+    $HOME/myctx/pool/modules/mymodule.md
+    $HOME/myctx/pool/modules/mymodule.env
+    $HOME/myctx/pool/modules/mymodule.yml
+    $HOME/myctx/pool/modules/mymodule.scalable
 
-    ./tango --app myapp --approot $HOME/myapp --domain mydomain.org --freeport  --module mymodule up mymodule
+    ./tango --ctx myctx --ctxroot $HOME/myctx --domain mydomain.org --freeport  --module mymodule up mymodule
     ```
 
 * Take inspiration from available tango modules are located in [pool/modules](/pool/modules/) folder.
 
 ### Manually default services creation
 
-* You can manually create services and store them directly inside your docker-compose file of your application.
+* You can manually create services and store them directly inside a context docker-compose file.
 
 * You have to define a yml definition for docker-compose. see [format](#service-yml-definition-for-docker-compose)
 
@@ -249,8 +249,8 @@
 ### Service YML definition for docker-compose
 
 * The yml definition is the same in both case : 
-    * a `module.yml` file stored in applcation folder
-    * or yml block definition inserted in the application docker-compose.yml file
+    * a `module.yml` file stored in context folder
+    * or yml block definition inserted in the context docker-compose.yml file
 
 * Format see [pool/modules/templates.yml](/pool/modules/template.yml)
 

@@ -2,15 +2,15 @@
 
 
 echo "---------==---- INFO  ----==---------"
-echo "* Tango current app name : ${TANGO_APP_NAME}"
-echo "L-- standalone app : $([ "${TANGO_NOT_IN_APP}" = "1" ] && echo NO || echo YES)"
+echo "* Tango current context name : ${TANGO_CTX_NAME}"
+echo "L-- standalone context : $([ "${TANGO_NOT_IN_ANY_CTX}" = "1" ] && echo NO || echo YES)"
 echo "L-- instance mode : ${TANGO_INSTANCE_MODE}"
 echo "L-- tango root : ${TANGO_ROOT}"
 echo "L-- tango env file : ${TANGO_ENV_FILE}"
 echo "L-- tango compose file : ${TANGO_COMPOSE_FILE}"
-echo "L-- app root : ${TANGO_APP_ROOT}"
-echo "L-- app env file : ${TANGO_APP_ENV_FILE}"
-echo "L-- app compose file : ${TANGO_APP_COMPOSE_FILE}"
+echo "L-- selected context root : ${TANGO_CTX_ROOT}"
+echo "L-- selected context env file : ${TANGO_CTX_ENV_FILE}"
+echo "L-- selected context compose file : ${TANGO_CTX_COMPOSE_FILE}"
 echo "L-- user env file : ${TANGO_USER_ENV_FILE}"
 echo "L-- user compose file : ${TANGO_USER_COMPOSE_FILE}"
 echo "---------==---- INFO SERVICES ----==---------"
@@ -169,9 +169,9 @@ echo "L-- modules scaled : ${TANGO_SERVICES_MODULES_SCALED}"
 echo "* Available Tango Modules"
 echo "L-- tango modules root : [${TANGO_MODULES_ROOT}]"
 echo "L-- tango modules list : ${TANGO_MODULES_AVAILABLE}"
-echo "* Available App Modules"
-echo "L-- app modules root : [${TANGO_APP_MODULES_ROOT}]"
-echo "L-- app modules list : ${TANGO_APP_MODULES_AVAILABLE}"
+echo "* Available Context Modules"
+echo "L-- ctx modules root : [${TANGO_CTX_MODULES_ROOT}]"
+echo "L-- ctx modules list : ${TANGO_CTX_MODULES_AVAILABLE}"
 
 
 
@@ -183,9 +183,9 @@ echo "L-- list : ${TANGO_PLUGINS_FULL}"
 echo "* Available Tango plugins"
 echo "L-- tango plugins root : [${TANGO_PLUGINS_ROOT}] {/pool/tango/plugins}"
 echo "L-- tango plugins list : ${TANGO_PLUGINS_AVAILABLE}"
-echo "* Available App plugins"
-echo "L-- app plugins root : [${TANGO_APP_PLUGINS_ROOT}] {/pool/${TANGO_APP_NAME}/plugins}"
-echo "L-- app plugins list : ${TANGO_APP_PLUGINS_AVAILABLE}"
+echo "* Available Context plugins"
+echo "L-- ctx plugins root : [${TANGO_CTX_PLUGINS_ROOT}] {/pool/${TANGO_CTX_NAME}/plugins}"
+echo "L-- ctx plugins list : ${TANGO_CTX_PLUGINS_AVAILABLE}"
 
 
 echo "---------==---- SCRIPTS ----==---------"
@@ -194,9 +194,9 @@ echo "L-- a script is executed on host"
 echo "* Available Tango scripts"
 echo "L-- tango scripts root : [${TANGO_SCRIPTS_ROOT}] {/pool/tango/scripts}"
 echo "L-- tango scripts list : ${TANGO_SCRIPTS_AVAILABLE}"
-echo "* Available App scripts"
-echo "L-- app scripts root : [${TANGO_APP_SCRIPTS_ROOT}] {/pool/${TANGO_APP_NAME}/scripts}"
-echo "L-- app scripts list : ${TANGO_APP_SCRIPTS_AVAILABLE}"
+echo "* Available Context scripts"
+echo "L-- ctx scripts root : [${TANGO_CTX_SCRIPTS_ROOT}] {/pool/${TANGO_CTX_NAME}/scripts}"
+echo "L-- ctx scripts list : ${TANGO_CTX_SCRIPTS_AVAILABLE}"
 
 
 
@@ -280,7 +280,7 @@ done
 
 echo "---------==---- PATHS ----==---------"
 echo "Format : [host path] is mapped to {inside container path}"
-echo "App data path : [$APP_DATA_PATH] is mapped to {/data}"
+echo "Context data path : [$CTX_DATA_PATH] is mapped to {/data}"
 echo "Plugins data path : [$PLUGINS_DATA_PATH] is mapped to {/plugins_data}"
 echo "Data path of internal tango data : [$TANGO_DATA_PATH] is mapped to {/internal_data}"
 echo "Artefact folders : [$TANGO_ARTEFACT_FOLDERS] are mapped to {${TANGO_ARTEFACT_MOUNT_POINT:-/artefact}} subfolders"

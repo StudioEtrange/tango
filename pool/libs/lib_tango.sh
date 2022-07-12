@@ -67,26 +67,26 @@ __service_down_all() {
 	if [ "${TANGO_INSTANCE_MODE}" = "shared" ]; then 
 		if [ ! "${ALL}" = "1" ]; then
 			# test if network already exist and set it as 'external' to not erase it
-			if [ ! -z $(docker network ls --filter name=^${TANGO_APP_NETWORK_NAME}$ --format="{{ .Name }}") ] ; then 
-				[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __set_network_as_external "default" "${TANGO_APP_NETWORK_NAME}"
+			if [ ! -z $(docker network ls --filter name=^${TANGO_CTX_NETWORK_NAME}$ --format="{{ .Name }}") ] ; then 
+				[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __set_network_as_external "default" "${TANGO_CTX_NETWORK_NAME}"
 			fi
 		fi
 
 		if [ ! "${ALL}" = "1" ]; then
 			# only non shared service
-			docker stop $(docker ps -q $(__container_filter 'NON_STOPPED LIST_NAMES '${TANGO_APP_NAME}'_.*'))
-			[ ! "${__no_delete}" = "1" ] && docker rm $(docker ps -q $(__container_filter 'ONLY_STOPPED LIST_NAMES '${TANGO_APP_NAME}'_.*'))
+			docker stop $(docker ps -q $(__container_filter 'NON_STOPPED LIST_NAMES '${TANGO_CTX_NAME}'_.*'))
+			[ ! "${__no_delete}" = "1" ] && docker rm $(docker ps -q $(__container_filter 'ONLY_STOPPED LIST_NAMES '${TANGO_CTX_NAME}'_.*'))
 		else
 			# only shared and non shared service
 			if [ "${__no_delete}" = "1" ]; then
-				docker stop $(docker ps -q $(__container_filter 'NON_STOPPED LIST_NAMES '${TANGO_APP_NAME}'_.* '${TANGO_INSTANCE_NAME}'_.*'))
+				docker stop $(docker ps -q $(__container_filter 'NON_STOPPED LIST_NAMES '${TANGO_CTX_NAME}'_.* '${TANGO_INSTANCE_NAME}'_.*'))
 			else
 				docker-compose down -v
 			fi
 		fi
 	else
 		if [ "${__no_delete}" = "1" ]; then
-			docker stop $(docker ps -q $(__container_filter 'NON_STOPPED LIST_NAMES '${TANGO_APP_NAME}'_.* '${TANGO_INSTANCE_NAME}'_.*'))
+			docker stop $(docker ps -q $(__container_filter 'NON_STOPPED LIST_NAMES '${TANGO_CTX_NAME}'_.* '${TANGO_INSTANCE_NAME}'_.*'))
 		else
 			docker-compose down -v
 		fi
@@ -176,7 +176,7 @@ __update_env_files() {
 	
 }
 
-# extract declared variable names from various env files (tango, app and user env files)
+# extract declared variable names from various env files (tango, ctx and user env files)
 __init_declared_variable_names() {
 	# reset global variables values
 	export VARIABLES_LIST=""
@@ -207,17 +207,17 @@ __add_declared_associative_array() {
 
 
 
-# generate an env file from various env files (tango, app, modules and user env files) 
+# generate an env file from various env files (tango, ctx, modules and user env files) 
 # 		__target bash : generate a bash file to be sourced (GENERATED_ENV_FILE_FOR_BASH)
 # 		__target docker_compose : generate an env file to be used as env-file in environment section of docker compose file (GENERATED_ENV_FILE_FOR_COMPOSE)
 # __target : bash | docker_compose
-# __source_list : user, modules, app, default -- will create env file by adding in order thoses source file (ascending priority order)
-#				default ascending priority order is 'default app modules user', so default env var have lowest priority
+# __source_list : user, modules, ctx, default -- will create env file by adding in order thoses source file (ascending priority order)
+#				default ascending priority order is 'default ctx modules user', so default env var have lowest priority
 __create_env_files() {
 	local __target="$1"
 	local __source_list="$2"
 
-	[ "${__source_list}" = "" ] && __source_list="default app modules user"
+	[ "${__source_list}" = "" ] && __source_list="default ctx modules user"
 
 	local __file=
 	local __instances_list=
@@ -247,11 +247,11 @@ __create_env_files() {
 				cat <(echo \# --- PART FROM default tango env file ${TANGO_ENV_FILE}) <(echo) <(echo) "${TANGO_ENV_FILE}" <(echo) >> "${__file}"
 			;;
 
-			app )
-				# add app env file
-				if [ -f "${TANGO_APP_ENV_FILE}" ]; then 
-					__tango_log "DEBUG" "tango" "create_env_files for $__target : add app env file ${TANGO_APP_ENV_FILE}"
-					cat <(echo \# --- PART FROM app env file ${TANGO_APP_ENV_FILE}) <(echo) <(echo) "${TANGO_APP_ENV_FILE}" <(echo) >> "${__file}"
+			ctx )
+				# add ctx env file
+				if [ -f "${TANGO_CTX_ENV_FILE}" ]; then 
+					__tango_log "DEBUG" "tango" "create_env_files for $__target : add ctx env file ${TANGO_CTX_ENV_FILE}"
+					cat <(echo \# --- PART FROM ctx env file ${TANGO_CTX_ENV_FILE}) <(echo) <(echo) "${TANGO_CTX_ENV_FILE}" <(echo) >> "${__file}"
 				fi
 			;;
 
@@ -265,15 +265,15 @@ __create_env_files() {
 						__instances_list="${m^^}_INSTANCES_LIST"
 
 						for i in ${!__instances_list}; do
-							# app modules overrides tango modules
-							if [ -f "${TANGO_APP_MODULES_ROOT}/${m}.env" ]; then
-								__tango_log "DEBUG" "tango" "create_env_files for $__target : app module ${m} instance ${i} : add env file : ${TANGO_APP_MODULES_ROOT}/${m}.env"
+							# ctx modules overrides tango modules
+							if [ -f "${TANGO_CTX_MODULES_ROOT}/${m}.env" ]; then
+								__tango_log "DEBUG" "tango" "create_env_files for $__target : ctx module ${m} instance ${i} : add env file : ${TANGO_CTX_MODULES_ROOT}/${m}.env"
 								# we replace all ocurrence of module name with an instance name
 								# except into lines containing FIXED_VAR expression anywhere
 								# except expression beginngin with SHARED_VAR_
 								# use sed implementation of negative lookbehind https://stackoverflow.com/a/26110465
-								#sed -e "/FIXED_VAR/!s/${m}\([^a-zA-Z0-9]*\)/${i}\1/g" -e "/FIXED_VAR/!s/${m^^}\([^a-zA-Z0-9]*\)/${i^^}\1/g" <(echo \# --- PART FROM modules env file ${TANGO_APP_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_APP_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
-								sed -E "{/FIXED_VAR/! {s/#/##/g; s/(SHARED_VAR_)(${m})/\1_#_/g; s/(SHARED_VAR_)(${m^^})/\1-#-/g; s/${m}([^a-zA-Z0-9]*)/${i}\1/g; s/${m^^}([^a-zA-Z0-9]*)/${i^^}\1/g; s/(SHARED_VAR_)_#_/\1${m}/g; s/(SHARED_VAR_)-#-/\1${m^^}/g; s/##/#/g} }" <(echo \# --- PART FROM modules env file ${TANGO_APP_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_APP_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
+								#sed -e "/FIXED_VAR/!s/${m}\([^a-zA-Z0-9]*\)/${i}\1/g" -e "/FIXED_VAR/!s/${m^^}\([^a-zA-Z0-9]*\)/${i^^}\1/g" <(echo \# --- PART FROM modules env file ${TANGO_CTX_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_CTX_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
+								sed -E "{/FIXED_VAR/! {s/#/##/g; s/(SHARED_VAR_)(${m})/\1_#_/g; s/(SHARED_VAR_)(${m^^})/\1-#-/g; s/${m}([^a-zA-Z0-9]*)/${i}\1/g; s/${m^^}([^a-zA-Z0-9]*)/${i^^}\1/g; s/(SHARED_VAR_)_#_/\1${m}/g; s/(SHARED_VAR_)-#-/\1${m^^}/g; s/##/#/g} }" <(echo \# --- PART FROM modules env file ${TANGO_CTX_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_CTX_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
 							else
 								if [ -f "${TANGO_MODULES_ROOT}/${m}.env" ]; then
 									__tango_log "DEBUG" "tango" "create_env_files for $__target : tango module ${m} instance ${i} : add env file : ${TANGO_MODULES_ROOT}/${m}.env"
@@ -284,7 +284,7 @@ __create_env_files() {
 									#sed -e "/FIXED_VAR/!s/${m}\([^a-zA-Z0-9]*\)/${i}\1/g" -e "/FIXED_VAR/!s/${m^^}\([^a-zA-Z0-9]*\)/${i^^}\1/g" <(echo \# --- PART FROM modules env file ${TANGO_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
 									sed -E "{/FIXED_VAR/! {s/#/##/g; s/(SHARED_VAR_)(${m})/\1_#_/g; s/(SHARED_VAR_)(${m^^})/\1-#-/g; s/${m}([^a-zA-Z0-9]*)/${i}\1/g; s/${m^^}([^a-zA-Z0-9]*)/${i^^}\1/g; s/(SHARED_VAR_)_#_/\1${m}/g; s/(SHARED_VAR_)-#-/\1${m^^}/g; s/##/#/g} }"  <(echo \# --- PART FROM modules env file ${TANGO_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
 								else
-									__tango_log "DEBUG" "tango" "create_env_files for $__target : scaled module $m do not have an env file (${TANGO_APP_MODULES_ROOT}/${m}.env nor ${TANGO_MODULES_ROOT}/${m}.env do not exists) might be an error"
+									__tango_log "DEBUG" "tango" "create_env_files for $__target : scaled module $m do not have an env file (${TANGO_CTX_MODULES_ROOT}/${m}.env nor ${TANGO_MODULES_ROOT}/${m}.env do not exists) might be an error"
 								fi
 							fi
 							__scaled_modules_processed="${__scaled_modules_processed} ${i}"
@@ -297,16 +297,16 @@ __create_env_files() {
 				# add modules env files
 				__tango_log "DEBUG" "tango" "create_env_files for $__target : add modules env files for modules : ${__modules_list}"
 				for s in ${__modules_list}; do
-					# app modules overrides tango modules
-					if [ -f "${TANGO_APP_MODULES_ROOT}/${s}.env" ]; then
-						__tango_log "DEBUG" "tango" "create_env_files for $__target : app module ${s} : add env file : ${TANGO_APP_MODULES_ROOT}/${s}.env"
-						cat <(echo \# --- PART FROM modules env file ${TANGO_APP_MODULES_ROOT}/${s}.env) <(echo) <(echo) "${TANGO_APP_MODULES_ROOT}/${s}.env" <(echo) >> "${__file}"
+					# ctx modules overrides tango modules
+					if [ -f "${TANGO_CTX_MODULES_ROOT}/${s}.env" ]; then
+						__tango_log "DEBUG" "tango" "create_env_files for $__target : ctx module ${s} : add env file : ${TANGO_CTX_MODULES_ROOT}/${s}.env"
+						cat <(echo \# --- PART FROM modules env file ${TANGO_CTX_MODULES_ROOT}/${s}.env) <(echo) <(echo) "${TANGO_CTX_MODULES_ROOT}/${s}.env" <(echo) >> "${__file}"
 					else
 						if [ -f "${TANGO_MODULES_ROOT}/${s}.env" ]; then
 							__tango_log "DEBUG" "tango" "create_env_files for $__target : tango module ${s} : add env file : ${TANGO_MODULES_ROOT}/${s}.env"
 							cat <(echo \# --- PART FROM modules env file ${TANGO_MODULES_ROOT}/${s}.env) <(echo) <(echo) "${TANGO_MODULES_ROOT}/${s}.env" <(echo) >> "${__file}"
 						else
-							__tango_log "DEBUG" "tango" "create_env_files for $__target : module $s do not have an env file (${TANGO_APP_MODULES_ROOT}/${s}.env nor ${TANGO_MODULES_ROOT}/${s}.env do not exists) maybe abnormal or not"
+							__tango_log "DEBUG" "tango" "create_env_files for $__target : module $s do not have an env file (${TANGO_CTX_MODULES_ROOT}/${s}.env nor ${TANGO_MODULES_ROOT}/${s}.env do not exists) maybe abnormal or not"
 						fi
 					fi
 				done
@@ -521,8 +521,8 @@ __create_docker_compose_file() {
 	__add_entrypoints_all
 
 
-	# app compose file
-	[ -f "${TANGO_APP_COMPOSE_FILE}" ] && yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_APP_COMPOSE_FILE}")
+	# ctx compose file
+	[ -f "${TANGO_CTX_COMPOSE_FILE}" ] && yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_CTX_COMPOSE_FILE}")
 
 	# user compose file
 	[ -f "${TANGO_USER_COMPOSE_FILE}" ] && yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_USER_COMPOSE_FILE}")
@@ -595,7 +595,7 @@ __translate_path() {
 	if [ ! "${TANGO_ARTEFACT_FOLDERS}" = "" ]; then
 		__tmp=
 		for f in ${TANGO_ARTEFACT_FOLDERS}; do
-			f="$($STELLA_API rel_to_abs_path "${f}" "${TANGO_APP_WORK_ROOT}")"
+			f="$($STELLA_API rel_to_abs_path "${f}" "${TANGO_CTX_WORK_ROOT}")"
 			__tmp="${__tmp} ${f}"
 		done
 		export TANGO_ARTEFACT_FOLDERS="$($STELLA_API trim "${__tmp}")"
@@ -604,7 +604,7 @@ __translate_path() {
 	if [ ! "${TANGO_CERT_FILES}" = "" ]; then
 		__tmp=
 		for f in ${TANGO_CERT_FILES}; do
-			f="$($STELLA_API rel_to_abs_path "${f}" "${TANGO_APP_WORK_ROOT}")"
+			f="$($STELLA_API rel_to_abs_path "${f}" "${TANGO_CTX_WORK_ROOT}")"
 			__tmp="${__tmp} ${f}"
 		done
 		export TANGO_CERT_FILES="$($STELLA_API trim "${__tmp}")"
@@ -613,7 +613,7 @@ __translate_path() {
 	if [ ! "${TANGO_KEY_FILES}" = "" ]; then
 		__tmp=
 		for f in ${TANGO_KEY_FILES}; do
-			f="$($STELLA_API rel_to_abs_path "${f}" "${TANGO_APP_WORK_ROOT}")"
+			f="$($STELLA_API rel_to_abs_path "${f}" "${TANGO_CTX_WORK_ROOT}")"
 			__tmp="${__tmp} ${f}"
 		done
 		export TANGO_KEY_FILES="$($STELLA_API trim "${__tmp}")"
@@ -633,7 +633,7 @@ __translate_path() {
 					esac
 					
 					# convert to absolute USELESS ?
-					#export ${__variable}="$($STELLA_API rel_to_abs_path "${!__variable}" "${TANGO_APP_ROOT}")"
+					#export ${__variable}="$($STELLA_API rel_to_abs_path "${!__variable}" "${TANGO_CTX_ROOT}")"
 				#fi
 			;;
 		esac
@@ -836,7 +836,7 @@ __add_environment_service_all() {
 # attach this artefact_xxx named volume to a /$TANGO_ARTEFACT_MOUNT_POINT/xxxx folder to each service listed in TANGO_ARTEFACT_SERVICES
 __add_volume_artefact_all() {
 	for f in ${TANGO_ARTEFACT_FOLDERS}; do
-		f="$($STELLA_API rel_to_abs_path "${f}" "${TANGO_APP_ROOT}")"
+		f="$($STELLA_API rel_to_abs_path "${f}" "${TANGO_CTX_ROOT}")"
 		target="$(basename "${f}")"
 		if [ -f "${f}" ]; then 
 			__tango_log "WARN" "tango" "[${f}] is a file, not mounted inside folder {${TANGO_ARTEFACT_MOUNT_POINT}}"
@@ -875,14 +875,14 @@ __add_volume_pool_and_plugins_data_all() {
 	__add_volume_mapping_service "service_init" "${TANGO_ROOT}/pool:/pool/tango"
 	__add_volume_mapping_service "service_init" "${PLUGINS_DATA_PATH}:/plugins_data"
 
-	# add pool app folder if it exists 
-	if [ ! "${TANGO_NOT_IN_APP}" = "1" ]; then
-		if [ -d "${TANGO_APP_ROOT}/pool" ]; then
+	# add pool ctx folder if it exists 
+	if [ ! "${TANGO_NOT_IN_ANY_CTX}" = "1" ]; then
+		if [ -d "${TANGO_CTX_ROOT}/pool" ]; then
 			for s in ${TANGO_SERVICES_ACTIVE}; do
-				__add_volume_mapping_service "${s}" "${TANGO_APP_ROOT}/pool:/pool/${TANGO_APP_NAME}"
+				__add_volume_mapping_service "${s}" "${TANGO_CTX_ROOT}/pool:/pool/${TANGO_CTX_NAME}"
 			done
-			__add_volume_mapping_service "service_info" "${TANGO_APP_ROOT}/pool:/pool/${TANGO_APP_NAME}"
-			__add_volume_mapping_service "service_init" "${TANGO_APP_ROOT}/pool:/pool/${TANGO_APP_NAME}"
+			__add_volume_mapping_service "service_info" "${TANGO_CTX_ROOT}/pool:/pool/${TANGO_CTX_NAME}"
+			__add_volume_mapping_service "service_init" "${TANGO_CTX_ROOT}/pool:/pool/${TANGO_CTX_NAME}"
 		fi
 	fi
 
@@ -1516,18 +1516,18 @@ __set_module() {
 
 	# add yml to docker compose file
 	case ${__owner} in
-		APP )
-			__tango_log "DEBUG" "tango" "set_module : ${__module} is an app module"
+		CTX )
+			__tango_log "DEBUG" "tango" "set_module : ${__module} is an ctx module"
 			if [ "$__original_module_scaled" = "" ]; then
-				yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_APP_MODULES_ROOT}/${_MODULE_NAME}.yml")
+				yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_CTX_MODULES_ROOT}/${_MODULE_NAME}.yml")
 			else
 				# we replace all ocurrence of module name with an instance name
 				# except into lines containing FIXED_VAR expression anywhere
 				# except expression beginngin with SHARED_VAR_
 				# use sed implementation of negative lookbehind https://stackoverflow.com/a/26110465
 				__tango_log "DEBUG" "tango" "set_module : ${__module} is an instance of scaled module : $_ORIGINAL_NAME"
-				#yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_APP_MODULES_ROOT}/${_ORIGINAL_NAME}.yml" | sed -e "/FIXED_VAR/!s/${_ORIGINAL_NAME}\([^a-zA-Z0-9]*\)/${_MODULE_NAME}\1/g" -e "/FIXED_VAR/!s/${_ORIGINAL_NAME^^}\([^a-zA-Z0-9]*\)/${_MODULE_NAME^^}\1/g")
-				yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_APP_MODULES_ROOT}/${_ORIGINAL_NAME}.yml" | sed -E "{/FIXED_VAR/! {s/#/##/g; s/(SHARED_VAR_)(${_ORIGINAL_NAME})/\1_#_/g; s/(SHARED_VAR_)(${_ORIGINAL_NAME^^})/\1-#-/g; s/${_ORIGINAL_NAME}([^a-zA-Z0-9]*)/${_MODULE_NAME}\1/g; s/${_ORIGINAL_NAME^^}([^a-zA-Z0-9]*)/${_MODULE_NAME^^}\1/g; s/(SHARED_VAR_)_#_/\1${_ORIGINAL_NAME}/g; s/(SHARED_VAR_)-#-/\1${_ORIGINAL_NAME^^}/g; s/##/#/g} }")
+				#yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_CTX_MODULES_ROOT}/${_ORIGINAL_NAME}.yml" | sed -e "/FIXED_VAR/!s/${_ORIGINAL_NAME}\([^a-zA-Z0-9]*\)/${_MODULE_NAME}\1/g" -e "/FIXED_VAR/!s/${_ORIGINAL_NAME^^}\([^a-zA-Z0-9]*\)/${_MODULE_NAME^^}\1/g")
+				yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_CTX_MODULES_ROOT}/${_ORIGINAL_NAME}.yml" | sed -E "{/FIXED_VAR/! {s/#/##/g; s/(SHARED_VAR_)(${_ORIGINAL_NAME})/\1_#_/g; s/(SHARED_VAR_)(${_ORIGINAL_NAME^^})/\1-#-/g; s/${_ORIGINAL_NAME}([^a-zA-Z0-9]*)/${_MODULE_NAME}\1/g; s/${_ORIGINAL_NAME^^}([^a-zA-Z0-9]*)/${_MODULE_NAME^^}\1/g; s/(SHARED_VAR_)_#_/\1${_ORIGINAL_NAME}/g; s/(SHARED_VAR_)-#-/\1${_ORIGINAL_NAME^^}/g; s/##/#/g} }")
 			fi
 		;;
 		TANGO )
@@ -1717,7 +1717,7 @@ __exec_plugin() {
 		__instances="${__service^^}_INSTANCES_LIST"
 		for i in ${!__instances}; do
 			__tango_log "INFO" "tango" "            instance : ${i}"
-			docker-compose exec --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} ${i} /bin/sh -c '[ "'${PLUGIN_OWNER}'" = "APP" ] && /pool/'${TANGO_APP_NAME}'/plugins/'${PLUGIN_NAME}' '${PLUGIN_ARG_LIST}' || /pool/tango/plugins/'${PLUGIN_NAME}' '${PLUGIN_ARG_LIST}
+			docker-compose exec --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} ${i} /bin/sh -c '[ "'${PLUGIN_OWNER}'" = "CTX" ] && /pool/'${TANGO_CTX_NAME}'/plugins/'${PLUGIN_NAME}' '${PLUGIN_ARG_LIST}' || /pool/tango/plugins/'${PLUGIN_NAME}' '${PLUGIN_ARG_LIST}
 		done
 	else
 
@@ -1725,7 +1725,7 @@ __exec_plugin() {
 		__tango_log "INFO" "tango" "  with args list : ${PLUGIN_ARG_LIST}"
 		__tango_log "INFO" "tango" "	into service : ${__service}"
 
-		docker-compose exec --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} ${__service} /bin/sh -c '[ "'${PLUGIN_OWNER}'" = "APP" ] && /pool/'${TANGO_APP_NAME}'/plugins/'${PLUGIN_NAME}' '${PLUGIN_ARG_LIST}' || /pool/tango/plugins/'${PLUGIN_NAME}' '${PLUGIN_ARG_LIST}
+		docker-compose exec --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} ${__service} /bin/sh -c '[ "'${PLUGIN_OWNER}'" = "CTX" ] && /pool/'${TANGO_CTX_NAME}'/plugins/'${PLUGIN_NAME}' '${PLUGIN_ARG_LIST}' || /pool/tango/plugins/'${PLUGIN_NAME}' '${PLUGIN_ARG_LIST}
 	fi
 }
 
@@ -1795,20 +1795,20 @@ __filter_and_scale_items() {
 
 	local __list_full=
 	local __list_names=
-	local __app_folder=
+	local __ctx_folder=
 	local __tango_folder=
 	local __file_ext=
 	case ${__type} in
 		module )
 			__list_full="${TANGO_SERVICES_MODULES}"
-			__app_folder="${TANGO_APP_MODULES_ROOT}"
+			__ctx_folder="${TANGO_CTX_MODULES_ROOT}"
 			__tango_folder="${TANGO_MODULES_ROOT}"
 			__file_ext='.yml'
 		;;
 
 		plugin )
 			__list_full="${TANGO_PLUGINS}"
-			__app_folder="${TANGO_APP_PLUGINS_ROOT}"
+			__ctx_folder="${TANGO_CTX_PLUGINS_ROOT}"
 			__tango_folder="${TANGO_PLUGINS_ROOT}"
 			__file_ext=
 		;;
@@ -1832,10 +1832,10 @@ __filter_and_scale_items() {
 		__item_scalable=
 		__name="${__array_list_names[$index]}"
 		__full="${__array_list_full[$index]}"
-		# look for an existing item file in current app
-		if [ -f "${__app_folder}/${__name}${__file_ext}" ]; then
+		# look for an existing item file in current ctx
+		if [ -f "${__ctx_folder}/${__name}${__file_ext}" ]; then
 			__item_exists="1"
-			[ -f "${__app_folder}/${__name}.scalable" ] && __item_scalable="1"
+			[ -f "${__ctx_folder}/${__name}.scalable" ] && __item_scalable="1"
 		else
 			# look for an existing item file in tango folder
 			if [ -f "${__tango_folder}/${__name}${__file_ext}" ]; then
@@ -1938,7 +1938,7 @@ __parse_item() {
 	local __item="$2"
 	local __result_prefix="$3"
 
-	local __app_folder=
+	local __ctx_folder=
 	local __tango_folder=
 	local __file_ext=
 
@@ -1954,7 +1954,7 @@ __parse_item() {
 	case ${__type} in
 
 		plugin)
-			# item is in APP or TANGO folder
+			# item is in CTX or TANGO folder
 			eval ${__result_prefix}_OWNER=
 			# arguments list to pass to item
 			eval ${__result_prefix}_ARG_LIST=
@@ -1964,7 +1964,7 @@ __parse_item() {
 			eval ${__result_prefix}_LINKS=
 		;;
 		module)
-			# item is in APP or TANGO folder
+			# item is in CTX or TANGO folder
 			eval ${__result_prefix}_OWNER=
 			# scale module to nb instances
 			eval ${__result_prefix}_INSTANCES_NB=
@@ -2161,21 +2161,21 @@ __parse_item() {
 			# determine item owner
 			case ${__type} in
 				plugin) 
-					__app_folder="${TANGO_APP_PLUGINS_ROOT}"
+					__ctx_folder="${TANGO_CTX_PLUGINS_ROOT}"
 					__tango_folder="${TANGO_PLUGINS_ROOT}"
 					__file_ext=''
 				;;
 				module) 
-					__app_folder="${TANGO_APP_MODULES_ROOT}"
+					__ctx_folder="${TANGO_CTX_MODULES_ROOT}"
 					__tango_folder="${TANGO_MODULES_ROOT}"
 					__file_ext='.yml'
 					;;
 			esac
 
 			# we have already test item exists in filter_and_scale_items
-			# so item is either in APP folder or TANGO folder
-			if [ -f "${__app_folder}/${__name}${__file_ext}" ]; then
-				eval ${__result_prefix}_OWNER="APP"
+			# so item is either in CTX folder or TANGO folder
+			if [ -f "${__ctx_folder}/${__name}${__file_ext}" ]; then
+				eval ${__result_prefix}_OWNER="CTX"
 			else
 				eval ${__result_prefix}_OWNER="TANGO"
 			fi
@@ -2186,31 +2186,31 @@ __parse_item() {
 
 # list available modules or plugins or scripts
 # type : module | plugin | script
-# mode : all (default) | app | tango
+# mode : all (default) | ctx | tango
 __list_items() {
 	local __type="${1}"
 	local __mode="${2:-all}"
 
-	local __app_folder=
+	local __ctx_folder=
 	local __tango_folder=
 	local __file_ext=
 	case ${__type} in
-		module ) __app_folder="${TANGO_APP_MODULES_ROOT}"; __tango_folder="${TANGO_MODULES_ROOT}"; __file_ext='*.yml';;
-		plugin ) __app_folder="${TANGO_APP_PLUGINS_ROOT}"; __tango_folder="${TANGO_PLUGINS_ROOT}"; __file_ext='*';;
-		script ) __app_folder="${TANGO_APP_SCRIPTS_ROOT}"; __tango_folder="${TANGO_SCRIPTS_ROOT}"; __file_ext='*';;
+		module ) __ctx_folder="${TANGO_CTX_MODULES_ROOT}"; __tango_folder="${TANGO_MODULES_ROOT}"; __file_ext='*.yml';;
+		plugin ) __ctx_folder="${TANGO_CTX_PLUGINS_ROOT}"; __tango_folder="${TANGO_PLUGINS_ROOT}"; __file_ext='*';;
+		script ) __ctx_folder="${TANGO_CTX_SCRIPTS_ROOT}"; __tango_folder="${TANGO_SCRIPTS_ROOT}"; __file_ext='*';;
 	esac
 
 	local __result=""
 	case ${__mode} in
-		all ) __do_app=1; __do_tango=1;;
-		app ) __do_app=1; __do_tango=0;;
-		tango ) __do_app=0; __do_tango=1;;
+		all ) __do_ctx=1; __do_tango=1;;
+		ctx ) __do_ctx=1; __do_tango=0;;
+		tango ) __do_ctx=0; __do_tango=1;;
 	esac
 
 	 
-	if [ "${__do_app}" = "1" ]; then
-		if ! $STELLA_API "is_dir_empty" "${__app_folder}"; then
-			for f in ${__app_folder}/*; do
+	if [ "${__do_ctx}" = "1" ]; then
+		if ! $STELLA_API "is_dir_empty" "${__ctx_folder}"; then
+			for f in ${__ctx_folder}/*; do
 				case $f in
 					$__file_ext )	__result="${__result} $(basename $f | sed s/.yml//)";;
 				esac
@@ -2863,7 +2863,7 @@ __add_volume_definition_by_value() {
 	local __path="$2"
 
 	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver" "local"
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.name" "\${TANGO_APP_NAME}_${__name}"
+	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.name" "\${TANGO_CTX_NAME}_${__name}"
 	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver_opts.type" "none"
 	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver_opts.o" "bind"
 	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver_opts.device" "${__path}"
@@ -2875,7 +2875,7 @@ __add_volume_definition_by_variable() {
 	local __variable="$2"
 
 	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver" "local"
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.name" "\${TANGO_APP_NAME}_${__name}"
+	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.name" "\${TANGO_CTX_NAME}_${__name}"
 	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver_opts.type" "none"
 	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver_opts.o" "bind"
 	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver_opts.device" "\${${__variable}}"
@@ -3031,12 +3031,12 @@ docker-compose() {
 	# NOTE we need to specify project directory because when launching from an other directory, docker compose seems to NOT auto load .env file
 	case ${TANGO_INSTANCE_MODE} in
 		shared ) 
-			__tango_log "DEBUG" "tango" "COMPOSE_IGNORE_ORPHANS=1 docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_INSTANCE_NAME}" --project-directory "${TANGO_APP_ROOT}" "$@""
-			COMPOSE_IGNORE_ORPHANS=1 command docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_INSTANCE_NAME}" --project-directory "${TANGO_APP_ROOT}" "$@"
+			__tango_log "DEBUG" "tango" "COMPOSE_IGNORE_ORPHANS=1 docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_INSTANCE_NAME}" --project-directory "${TANGO_CTX_ROOT}" "$@""
+			COMPOSE_IGNORE_ORPHANS=1 command docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_INSTANCE_NAME}" --project-directory "${TANGO_CTX_ROOT}" "$@"
 			;;
 		* ) 
-			__tango_log "DEBUG" "tango" "COMPOSE_IGNORE_ORPHANS=1 docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_APP_NAME}" --project-directory "${TANGO_APP_ROOT}" "$@""
-			COMPOSE_IGNORE_ORPHANS=1 command docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_APP_NAME}" --project-directory "${TANGO_APP_ROOT}" "$@"
+			__tango_log "DEBUG" "tango" "COMPOSE_IGNORE_ORPHANS=1 docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_CTX_NAME}" --project-directory "${TANGO_CTX_ROOT}" "$@""
+			COMPOSE_IGNORE_ORPHANS=1 command docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_CTX_NAME}" --project-directory "${TANGO_CTX_ROOT}" "$@"
 			;;
 	esac
 	
@@ -3056,11 +3056,11 @@ __base64_basic_authentification() {
 # within the current tango network context
 __tango_curl() {
 	if __is_docker_client_available; then
-		local __id="$TANGO_APP_NAME_$($STELLA_API md5 "$@")"
+		local __id="$TANGO_CTX_NAME_$($STELLA_API md5 "$@")"
 		docker stop ${__id} 1>&2 2>/dev/null
 		docker rm ${__id} 1>&2 2>/dev/null
-		# At this point network TANGO_APP_NETWORK_NAME may not exists yet
-		if docker run --name ${__id} --user "${TANGO_USER_ID}:${TANGO_GROUP_ID}" --network "${TANGO_APP_NETWORK_NAME}" --rm curlimages/curl:7.70.0 "$@"; then
+		# At this point network TANGO_CTX_NETWORK_NAME may not exists yet
+		if docker run --name ${__id} --user "${TANGO_USER_ID}:${TANGO_GROUP_ID}" --network "${TANGO_CTX_NETWORK_NAME}" --rm curlimages/curl:7.70.0 "$@"; then
 			docker rm ${__id} 1>&2 2>/dev/null
 		else
 			docker rm ${__id} 1>&2 2>/dev/null
@@ -3075,7 +3075,7 @@ __tango_curl() {
 __tango_git() {
 	if __is_docker_client_available; then
 		# https://hub.docker.com/r/alpine/git
-		docker run --user "${TANGO_USER_ID}:${TANGO_GROUP_ID}" --network "${TANGO_APP_NETWORK_NAME}" --rm -it -v $(pwd):/git alpine/git:latest "$@"
+		docker run --user "${TANGO_USER_ID}:${TANGO_GROUP_ID}" --network "${TANGO_CTX_NETWORK_NAME}" --rm -it -v $(pwd):/git alpine/git:latest "$@"
 	else
 		type git &>/dev/null && git "$@"
 	fi
@@ -3130,7 +3130,7 @@ __manage_path() {
 	local __var_path="$1"
 	# if __var_path is not defined, default folder name will have __default_root as root folder
 	local __default_root="$2"
-	[ "${__default_root}" = "" ] && __default_root="TANGO_APP_WORK_ROOT"
+	[ "${__default_root}" = "" ] && __default_root="TANGO_CTX_WORK_ROOT"
 	# __var_path MUST BE be a subfolder relative to this root
 	local __relative_root="$3"
 
@@ -3212,9 +3212,9 @@ __create_path_all() {
 
 	__tango_log "INFO" "tango" "Managing paths creation"
 	# force to create first these root folders before all other that might be subfolders
-	if [ ! "${TANGO_APP_WORK_ROOT_SUBPATH_CREATE}" = "" ]; then
-		__tango_log "DEBUG" "tango" "create_path_all : parse TANGO_APP_WORK_ROOT_SUBPATH_CREATE instructions"
-		__create_path "${TANGO_APP_WORK_ROOT}" "${TANGO_APP_WORK_ROOT_SUBPATH_CREATE}"
+	if [ ! "${TANGO_CTX_WORK_ROOT_SUBPATH_CREATE}" = "" ]; then
+		__tango_log "DEBUG" "tango" "create_path_all : parse TANGO_CTX_WORK_ROOT_SUBPATH_CREATE instructions"
+		__create_path "${TANGO_CTX_WORK_ROOT}" "${TANGO_CTX_WORK_ROOT_SUBPATH_CREATE}"
 		__tango_log "DEBUG_NO_HEADER_BEGINNING_NEWLINE" "" ""
 	fi
 	if [ ! "${TANGO_DATA_PATH_SUBPATH_CREATE}" = "" ]; then
@@ -3225,7 +3225,7 @@ __create_path_all() {
 
 	# create others folders
 	for p in $(compgen -A variable | grep _SUBPATH_CREATE$); do
-		[ "$p" = "TANGO_APP_WORK_ROOT_SUBPATH_CREATE" ] && continue
+		[ "$p" = "TANGO_CTX_WORK_ROOT_SUBPATH_CREATE" ] && continue
 		[ "$p" = "TANGO_DATA_PATH_SUBPATH_CREATE" ] && continue
 		__tango_log "DEBUG" "tango" "create_path_all : instructions of ${p}"
 		__create_path_instructions="${!p}"
@@ -3243,7 +3243,7 @@ __create_path_all() {
 # create various sub folder and files if not exist
 # using TANGO_USER_ID
 # root must exist
-# format example : __create_path "/path" "FOLDER foo bar FILE foo/file.txt FOLDER letsencrypt traefikconfig FILE letsencrypt/acme.json traefikconfig/generated.${TANGO_APP_NAME}.tls.yml"
+# format example : __create_path "/path" "FOLDER foo bar FILE foo/file.txt FOLDER letsencrypt traefikconfig FILE letsencrypt/acme.json traefikconfig/generated.${TANGO_CTX_NAME}.tls.yml"
 __create_path() {
 	local __root="$1"
 	local __list="$2"

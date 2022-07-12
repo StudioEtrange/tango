@@ -2,27 +2,27 @@ version: '2.4'
 
 networks:
   default:
-    name: ${TANGO_APP_NETWORK_NAME}
+    name: ${TANGO_CTX_NETWORK_NAME}
 
 volumes:
-  # volumes specific for each app
+  # volumes specific for each ctx
   artefact:
-    name: ${TANGO_APP_NAME}_artefact
+    name: ${TANGO_CTX_NAME}_artefact
   data:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: ${APP_DATA_PATH}
-    name: ${TANGO_APP_NAME}_data
+      device: ${CTX_DATA_PATH}
+    name: ${TANGO_CTX_NAME}_data
   plugins_data:
     driver: local
     driver_opts:
       type: none
       o: bind
       device: ${PLUGINS_DATA_PATH}
-    name: ${TANGO_APP_NAME}_plugins_data
-  # volumes that can be shared between each app
+    name: ${TANGO_CTX_NAME}_plugins_data
+  # volumes that can be shared between each ctx
   internal_data:
     driver: local
     driver_opts:
@@ -83,7 +83,7 @@ services:
   # Launch all services
   tango:
     image: ${TANGO_SHELL_IMAGE}
-    container_name: ${TANGO_APP_NAME}
+    container_name: ${TANGO_CTX_NAME}
     user: ${TANGO_USER_ID:-0}:${TANGO_GROUP_ID:-0}
     env_file:
       - ${GENERATED_ENV_FILE_FOR_COMPOSE}
@@ -92,7 +92,7 @@ services:
     networks:
       - default
     command: >
-      bash -c "echo Hello ${TANGO_APP_NAME}."
+      bash -c "echo Hello ${TANGO_CTX_NAME}."
 
   # do some init on internal volume
   # populate artefact named volume with a foo file because when mounting an empty named volume on {$TANGO_ARTEFACT_MOUNT_POINT}, it might get existing content if TANGO_ARTEFACT_MOUNT_POINT have content on host (i.e : cdrom, floppy, usb... for /media)
@@ -126,7 +126,7 @@ services:
       - default
     command: >
       bash -c "for f in /pool/tango/scripts_init/*; do [ -f \"$${f}\" ] && $${f}; done &&
-      [ ! \"${TANGO_NOT_IN_APP}\" = "1" ] && for f in /pool/${TANGO_APP_NAME}/scripts_init/*; do [ -f \"$${f}\" ] && $${f}; done
+      [ ! \"${TANGO_NOT_IN_ANY_CTX}\" = "1" ] && for f in /pool/${TANGO_CTX_NAME}/scripts_init/*; do [ -f \"$${f}\" ] && $${f}; done
       "
 
   # info on services
@@ -140,7 +140,7 @@ services:
       - default
     command: >
       bash -c "for f in /pool/tango/scripts_info/*; do [ -f \"$${f}\" ] && $${f}; done &&
-      [ ! \"${TANGO_NOT_IN_APP}\" = "1" ] && for f in /pool/${TANGO_APP_NAME}/scripts_info/*; do [ -f \"$${f}\" ] && $${f}; done
+      [ ! \"${TANGO_NOT_IN_ANY_CTX}\" = "1" ] && for f in /pool/${TANGO_CTX_NAME}/scripts_info/*; do [ -f \"$${f}\" ] && $${f}; done
       "
 
 

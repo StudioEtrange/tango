@@ -12,4 +12,4 @@
 
 | inside path | host path variables | default host path values | desc |
 |-|-|-|-|
-| `/config` | `APP_DATA_PATH/MKVTOOLNIX_DATA_PATH` | `data/mkvtoolnix` | contains mkvtoolnix config |
+| `/config` | `CTX_DATA_PATH/MKVTOOLNIX_DATA_PATH` | `data/mkvtoolnix` | contains mkvtoolnix config |
