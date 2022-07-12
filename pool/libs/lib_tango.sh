@@ -1047,7 +1047,7 @@ __set_routers_info_service_all() {
 		fi
 
 
-
+		# service URI hostname form : <SUBDOMAIN>[<TANGO_SUBDOMAIN_SUFFIX_SEPARATOR><TANGO_SUBDOMAIN_SUFFIX>]<TANGO_SUBDOMAIN_SEPARATOR><TANGO_DOMAIN>
 		if [ ! "${__entrypoints}" = "" ]; then
 			__var="${__service^^}_SUBDOMAIN"
 			if [ -z ${!__var+x} ]; then
@@ -1062,16 +1062,26 @@ __set_routers_info_service_all() {
 					__subdomain="${__subdomain}${TANGO_SUBDOMAIN_SUFFIX_SEPARATOR}${TANGO_SUBDOMAIN_SUFFIX}"
 				fi
 
-				eval "export ${__service^^}_SUBDOMAIN=${__subdomain}"
+				#eval "export ${__service^^}_SUBDOMAIN=${__subdomain}"
 				__add_declared_variables "${__service^^}_SUBDOMAIN"
 			else
 				__subdomain="${!__var}"
 				if [ ! "${TANGO_SUBDOMAIN_SUFFIX}" = "" ]; then
 					__subdomain="${__subdomain}${TANGO_SUBDOMAIN_SUFFIX_SEPARATOR}${TANGO_SUBDOMAIN_SUFFIX}"
+					#eval "export ${__service^^}_SUBDOMAIN=${__subdomain}"
 				fi
 			fi
 
-			[ "${TANGO_DOMAIN}" = '.*' ] && __hostname="${__subdomain}" || __hostname="${__subdomain}${TANGO_SUBDOMAIN_SEPARATOR}${TANGO_DOMAIN}"
+			if [ "${TANGO_DOMAIN}" = '.*' ]; then
+				__hostname="${__subdomain}" 
+			else
+				__hostname="${__subdomain}${TANGO_SUBDOMAIN_SEPARATOR}${TANGO_DOMAIN}"
+				__subdomain="${__subdomain}${TANGO_SUBDOMAIN_SEPARATOR}"
+			fi
+			
+			eval "export ${__service^^}_SUBDOMAIN=${__subdomain}"
+
+			#[ "${TANGO_DOMAIN}" = '.*' ] && __hostname="${__subdomain}" || __hostname="${__subdomain}${TANGO_SUBDOMAIN_SEPARATOR}${TANGO_DOMAIN}"
 			eval "export ${__service^^}_HOSTNAME=${__hostname}"
 			__add_declared_variables "${__service^^}_HOSTNAME"
 

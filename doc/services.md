@@ -5,8 +5,8 @@
 ## Tango concepts
 
 * A service is a containerized application (i.e sabnzbd, calibreweb, cloud9, codeserver,...), accessible through HTTP, configured and managed by tango. At core level, a service is a yml definition of a docker-compose file.
-* A module is a ready-to-use service with a yml predefined compose file, some configuration variable (see [modules catalogue](/pool/modules/))
-* Tango leverage services exposition mechanisms with traefik2. Tango automaticly set up all traefik2 rules and route to access to services.
+* A module is a ready-to-use service with a markdown description, a yml predefined compose file and a set of configurabl variables in an environment file *(see [modules catalogue](/pool/modules/))*
+* Tango leverage services exposition mechanisms using traefik2. Tango automaticly set up all traefik2 rules and routes to provide access to services.
 
 ----
 ## Services management
@@ -26,22 +26,24 @@
     ./tango info <service>
     ```
 
-* A service is manageable with these commands ONLY if a matching module was attached to the current tango context (simple way, see [Modules](#modules) below) OR if the service was manually defined as a default service inside a dedicated context docker-compose yml file and enabled (advanced way, see [Services creation](#services-creation)).
+* A service is manageable with these commands  only
+    * if a matching module was attached to the current tango context *(simple way, see [Modules](#modules) below)*.
+    * OR if the service was manually defined as a default service inside a dedicated context docker-compose yml file and enabled *(advanced way, see [Services creation](#services-creation))*.
 
-* A service managed by tango will automaticly have an HTTPS route setted with this format : `https://<SERVICE_SUBDOMAIN>.<TANGO_DOMAIN>:<PORT>`
+* A service managed by tango will automaticly have an HTTP and an HTTPS route setted with this format : `https://<SERVICE_SUBDOMAIN>.<TANGO_DOMAIN>:<PORT>`
     * By default `SERVICE_SUBDOMAIN` is the service name
     * `TANGO_DOMAIN` is the one specified by `TANGO_DOMAIN` variable or by command line option `--domain`
-    * By default `PORT`is defined by the default area network
-    * this sample will generate https://firefox.domain.org:port on a random port
-    ```
-    ./tango --domain=domain.org --freeport up firefox
-    ```
+    * By default `PORT` is port of the matching network area. (The network area named 'main' by default)
+    * Sample which generate https://firefox.domain.org:port on a random port
+        ```
+        ./tango --domain=domain.org --freeport  up firefox
+        ```
 
 
 ----
 ## Modules 
 
-* A module is a ready-to-use service with a provided yml compose file, some configuration variable and that can be managed by tango (see [modules catalogue](/pool/modules/))
+* A module is a ready-to-use service with a markdown description file, a yml predefined compose file and a set of configurabl variables in an environment file and that can be managed by tango (see [modules catalogue](/pool/modules/))
 
 * List of known modules :
     ```
