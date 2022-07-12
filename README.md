@@ -141,7 +141,7 @@ Tango is a command line tool written in bash.
 
 * Tango can manage a context by executing its cli command on it. By default tango commands are executed in tango context itself.
 
-* see [contexts](/doc/contexts.md)
+* see [contexts](/doc/context.md)
 
 
 
