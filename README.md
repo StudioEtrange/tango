@@ -48,7 +48,7 @@ Tango is a command line tool written in bash.
     ./tango install
     ```
 
-### Minimal standalone context sample usage
+### Quickstart for a standalone context
 
 * Launch a single firefox service
 
@@ -56,7 +56,9 @@ Tango is a command line tool written in bash.
     ./tango --module firefox --domain domain.org --freeport up
     ./tango --module firefox --domain domain.org --freeport info
     ```
-* `--module firefox` : A ready-to-use service attached to be manageable by tango commands. (see [available modules](/pool/modules/))
+    * Tango generate for each services an URI with the service name as subdomain name. Here : `https://firefox.mydomain.org:port`
+
+* `--module firefox` : A ready-to-use service attached to current tango context be manageable by tango commands. (see [available modules](/pool/modules/))
 
 * `up` : tango command to generate a docker compose file including the selected services AND launch them.
 
@@ -67,9 +69,8 @@ Tango is a command line tool written in bash.
     ./tango --module firefox --domain domain.org --port main@80@443 info
     ```
 
-* Tango generate for each services an URI with the service name as subdomain name. Here : `https://firefox.mydomain.org:port`
 
-* `--domain domain.org` : Specify your domain name.
+* `--domain domain.org` : Specify your wildcard domain name that point to your host
     * Alternative `--domain auto-nip` : for testing puprose if you do not have your own domain name [domain name generation](/doc/dns.md#solution-1--using-nipio-the-simplest)
     ```
     ./tango --module firefox --domain auto-nip --port main@80@443 up
@@ -133,6 +134,8 @@ Tango is a command line tool written in bash.
 
 ----
 ### Application context
+
+* Tango can manage different context. It has a default tango context or you can create separate context by creating applications.
 
 * An application is the definition of a context made of a set of services, a configuration file, default services within a given folder.
 

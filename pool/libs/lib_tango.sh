@@ -217,7 +217,6 @@ __create_env_files() {
 	local __target="$1"
 	local __source_list="$2"
 
-	#[ "${__source_list}" = "" ] && __source_list="default modules app user"
 	[ "${__source_list}" = "" ] && __source_list="default app modules user"
 
 	local __file=

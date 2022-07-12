@@ -2,6 +2,8 @@
 
 ## Tango concepts
 
+* Tango can manage different context. It has a default tango context or you can create separate context by creating applications.
+
 * An application is the definition of a context made by a set of services, a configuration file, default services within a given folder.
 
 * Tango can manage an application context by executing its cli command within the application concept. By default tango commands are executed in tango context itself.
