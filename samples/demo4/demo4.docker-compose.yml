@@ -6,13 +6,13 @@ volumes:
       type: none
       o: bind
       device: ${WEB2_PATH}
-    name: ${TANGO_APP_NAME}_web2_data
+    name: ${TANGO_CTX_NAME}_web2_data
 
 services:
   
   web2:
     image: httpd:${WEB2_VERSION:-latest}
-    container_name: ${TANGO_APP_NAME}_web2
+    container_name: ${TANGO_CTX_NAME}_web2
     depends_on: 
       - service_init
     restart: unless-stopped

@@ -1,7 +1,7 @@
 services:
   cloud9:
     image: ${CLOUD9_IMAGE_FIXED_VAR}:${CLOUD9_VERSION_FIXED_VAR:-latest}
-    container_name: ${TANGO_APP_NAME}_cloud9
+    container_name: ${TANGO_CTX_NAME}_cloud9
     depends_on: 
       - service_init
     restart: unless-stopped

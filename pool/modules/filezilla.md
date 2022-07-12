@@ -12,5 +12,5 @@
 
 | inside path | host path variables | default host path values | desc |
 |-|-|-|-|
-| `/config` | `APP_DATA_PATH/CALIBREWEB_DATA_PATH` | `data/filezilla` | contains filezilla config |
+| `/config` | `CTX_DATA_PATH/CALIBREWEB_DATA_PATH` | `data/filezilla` | contains filezilla config |
 | `/storage` | `FILEZILLA_HOSTFILES_PATH` | `$(pwd)` | underlying host files seen by default in filezilla left panel |

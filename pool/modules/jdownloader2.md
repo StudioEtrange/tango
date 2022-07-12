@@ -13,5 +13,5 @@
 
 | inside path | host path variables | default host path values | desc |
 |-|-|-|-|
-| `/config` | `APP_DATA_PATH/JDOWNLOADER2_DATA_PATH` | `data/jdownloader2` | contains jdownloader2 config |
+| `/config` | `CTX_DATA_PATH/JDOWNLOADER2_DATA_PATH` | `data/jdownloader2` | contains jdownloader2 config |
 | `/output` | `DOWNLOAD_PATH/JDOWNLOADER2_DOWNLOAD_PATH` | `download/jdownloader2` | contains downloaded files |

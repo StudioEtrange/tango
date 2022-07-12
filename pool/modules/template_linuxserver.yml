@@ -5,13 +5,13 @@ volumes:
       type: none
       o: bind
       device: ${CODESERVER_DATA_PATH}
-    name: ${TANGO_APP_NAME}_codeserver_data
+    name: ${TANGO_CTX_NAME}_codeserver_data
 
 
 services:
   codeserver:
     image: ${CODESERVER_IMAGE_FIXED_VAR}:${CODESERVER_VERSION_FIXED_VAR:-latest}
-    container_name: ${TANGO_APP_NAME}_codeserver
+    container_name: ${TANGO_CTX_NAME}_codeserver
     depends_on: 
       - service_init
     restart: unless-stopped

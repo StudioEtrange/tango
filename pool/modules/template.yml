@@ -5,19 +5,19 @@ volumes:
       type: none
       o: bind
       device: ${TEMPLATE_DATA_PATH}
-    name: ${TANGO_APP_NAME}_template_data
+    name: ${TANGO_CTX_NAME}_template_data
   template_media:
     driver: local
     driver_opts:
       type: none
       o: bind
       device: ${TEMPLATE_MEDIA_PATH}
-    name: ${TANGO_APP_NAME}_template_media
+    name: ${TANGO_CTX_NAME}_template_media
 
 services:
   template:
     image: ${TEMPLATE_IMAGE_FIXED_VAR}:${TEMPLATE_VERSION_FIXED_VAR:-latest}
-    container_name: ${TANGO_APP_NAME}_template
+    container_name: ${TANGO_CTX_NAME}_template
     depends_on: 
       - service_init
     restart: unless-stopped

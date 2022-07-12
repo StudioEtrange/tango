@@ -90,14 +90,14 @@ Tango is a command line tool written in bash.
 
     ```
     * tango management
-        install : deploy this app
+        install : deploy tango
         up [service [-b]] [--module module] [--plugin plugin] [--freeport] : launch services.
         down [service] [--module module] [--all] : down services.
         restart [service] [--module module] [--plugin plugin] [--freeport] : restart services.
         info [service] [--module module] [--plugin plugin] [--freeport] [-v] : give info.
         status [service] : see service status
         logs [service] [-f] : see service logs
-        modules|services|plugins list : list available modules, plugins or default defined services within tango context or your application context.
+        modules|services|plugins list : list available modules, plugins or default defined services within your current context.
 
     * advanced management
         update <service> [--module module] : pull last version of the defined docker tag image for the service. Do not update running service.
@@ -133,17 +133,15 @@ Tango is a command line tool written in bash.
 
 
 ----
-### Application context
+### Contexts
 
-* Tango can manage different context. It has a default tango context or you can create separate context by creating applications.
+* Tango can manage different context. It has a default 'tango'.
 
-* An application is the definition of a context made of a set of services, a configuration file, default services within a given folder.
+* A context is a set of services, a configuration file, default services within a given folder.
 
-* Tango can manage an application context by executing its cli command within the application concept. By default tango commands are executed in tango context itself.
+* Tango can manage a context by executing its cli command on it. By default tango commands are executed in tango context itself.
 
-* Tango will execute its command using items defined inside the application folder to generate a docker-compose file.
-
-* see [applications](/doc/applications.md)
+* see [contexts](/doc/context.md)
 
 
 
@@ -158,7 +156,7 @@ Tango is a command line tool written in bash.
     * Command line variables
     * User environment file variables
     * Modules environment file variables
-    * Current app environment file variables
+    * Current context environment file variables
     * Default tango environment file variables
 
 * see details in [variables documentation](/doc/variables.md)

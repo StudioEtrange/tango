@@ -5,19 +5,19 @@ volumes:
       type: none
       o: bind
       device: ${FILEZILLA_DATA_PATH}
-    name: ${TANGO_APP_NAME}_filezilla_data
+    name: ${TANGO_CTX_NAME}_filezilla_data
   filezilla_hostfiles:
     driver: local
     driver_opts:
       type: none
       o: bind
       device: ${FILEZILLA_HOSTFILES_PATH}
-    name: ${TANGO_APP_NAME}_filezilla_hostfiles
+    name: ${TANGO_CTX_NAME}_filezilla_hostfiles
 
 services:
   filezilla:
     image: ${FILEZILLA_IMAGE_FIXED_VAR}:${FILEZILLA_VERSION_FIXED_VAR:-latest}
-    container_name: ${TANGO_APP_NAME}_filezilla
+    container_name: ${TANGO_CTX_NAME}_filezilla
     depends_on: 
       - service_init
     restart: unless-stopped

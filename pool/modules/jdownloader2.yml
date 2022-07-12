@@ -5,19 +5,19 @@ volumes:
       type: none
       o: bind
       device: ${JDOWNLOADER2_DATA_PATH}
-    name: ${TANGO_APP_NAME}_jdownloader2_data
+    name: ${TANGO_CTX_NAME}_jdownloader2_data
   jdownloader2_download:
     driver: local
     driver_opts:
       type: none
       o: bind
       device: ${JDOWNLOADER2_DOWNLOAD_PATH}
-    name: ${TANGO_APP_NAME}_jdownloader2_download
+    name: ${TANGO_CTX_NAME}_jdownloader2_download
 
 services:
   jdownloader2:
     image: ${JDOWNLOADER2_IMAGE}:${JDOWNLOADER2_VERSION:-latest}
-    container_name: ${TANGO_APP_NAME}_jdownloader2
+    container_name: ${TANGO_CTX_NAME}_jdownloader2
     depends_on:
       - service_init
     restart: unless-stopped

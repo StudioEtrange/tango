@@ -54,9 +54,9 @@ case ${ACTION} in
 	# 			if [ -f "$TANGO_SCRIPTS_ROOT/$ARGUMENT" ]; then
 	# 			 	. $TANGO_SCRIPTS_ROOT/$ARGUMENT
 	# 			fi
-	# 			if [ ! "${TANGO_NOT_IN_APP}" = "1" ]; then
-	# 				if [ -f "$TANGO_APP_SCRIPTS_ROOT/$ARGUMENT" ]; then
-	# 					. $TANGO_APP_SCRIPTS_ROOT/$ARGUMENT
+	# 			if [ ! "${TANGO_NOT_IN_ANY_CTX}" = "1" ]; then
+	# 				if [ -f "$TANGO_CTX_SCRIPTS_ROOT/$ARGUMENT" ]; then
+	# 					. $TANGO_CTX_SCRIPTS_ROOT/$ARGUMENT
 	# 				fi
 	# 			fi
 	# 			;;
@@ -64,13 +64,13 @@ case ${ACTION} in
 	# ;;
 
 	install )
-		if [ "$TANGO_NOT_IN_APP" = "1" ]; then
+		if [ "$TANGO_NOT_IN_ANY_CTX" = "1" ]; then
 			# standalone tango
 			__tango_log "INFO" "tango" "Install tango requirements : $STELLA_APP_FEATURE_LIST"
 			$STELLA_API get_features
 		else
 			STELLA_APP_FEATURE_LIST=$(__get_all_properties $(__select_app $TANGO_ROOT); echo $STELLA_APP_FEATURE_LIST)' '$STELLA_APP_FEATURE_LIST
-			__tango_log "INFO" "tango" "Install tango and $TANGO_APP_NAME requirements : $STELLA_APP_FEATURE_LIST"
+			__tango_log "INFO" "tango" "Install tango and $TANGO_CTX_NAME requirements : $STELLA_APP_FEATURE_LIST"
 			$STELLA_API get_features
 		fi
 		
@@ -133,15 +133,15 @@ case ${ACTION} in
 	gen )
 		__tango_log "INFO" "tango" "Compose & env files and files & folders are generated"
 		echo "---------==---- INFO  ----==---------"
-		echo "* Tango current app name : ${TANGO_APP_NAME}"
-		echo "L-- standalone app : $([ "${TANGO_NOT_IN_APP}" = "1" ] && echo NO || echo YES)"
+		echo "* Tango current context name : ${TANGO_CTX_NAME}"
+		echo "L-- standalone context : $([ "${TANGO_NOT_IN_ANY_CTX}" = "1" ] && echo NO || echo YES)"
 		echo "L-- instance mode : ${TANGO_INSTANCE_MODE}"
 		echo "L-- tango root : ${TANGO_ROOT}"
 		echo "L-- tango env file : ${TANGO_ENV_FILE}"
 		echo "L-- tango compose file : ${TANGO_COMPOSE_FILE}"
-		echo "L-- app root : ${TANGO_APP_ROOT}"
-		echo "L-- app env file : ${TANGO_APP_ENV_FILE}"
-		echo "L-- app compose file : ${TANGO_APP_COMPOSE_FILE}"
+		echo "L-- selected context root : ${TANGO_CTX_ROOT}"
+		echo "L-- selected context env file : ${TANGO_CTX_ENV_FILE}"
+		echo "L-- selected context compose file : ${TANGO_CTX_COMPOSE_FILE}"
 		echo "L-- user env file : ${TANGO_USER_ENV_FILE}"
 		echo "L-- user compose file : ${TANGO_USER_COMPOSE_FILE}"
 
@@ -155,7 +155,7 @@ case ${ACTION} in
 
 		echo "---------==---- PATHS ----==---------"
 		echo "Format : [host path] is mapped to {inside container path}"
-		echo "App data path : [$APP_DATA_PATH] is mapped to {/data}"
+		echo "Context data path : [$CTX_DATA_PATH] is mapped to {/data}"
 		echo "Plugins data path : [$PLUGINS_DATA_PATH] is mapped to {/plugins_data}"
 		echo "Data path of internal tango data : [$TANGO_DATA_PATH] is mapped to {/internal_data}"
 		echo "Artefact folders : [$TANGO_ARTEFACT_FOLDERS] are mapped to {${TANGO_ARTEFACT_MOUNT_POINT:-/artefact}} subfolders"

@@ -15,4 +15,4 @@ A template showing usage of docker image by jlesage, with romvault as sample
 
 | inside path | host path variables | default host path values | desc |
 |-|-|-|-|
-| `/config` | `APP_DATA_PATH/ROMVAULT_DATA_PATH` | `data/romvault` | contains romvault config |
+| `/config` | `CTX_DATA_PATH/ROMVAULT_DATA_PATH` | `data/romvault` | contains romvault config |
