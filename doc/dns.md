@@ -13,9 +13,9 @@
 
 * Use these special values as domain :
     * `TANGO_DOMAIN=auto-nip` or `--domain=auto-nip` : you can access your services deployed by tango from internet.
-    * `TANGO_DOMAIN=auto-lan-nip` or `--domain=auto-lan-nip` : you can access your services deployed by tango only from local network. WARN this method may not work if your DNS server/forwarder configuration have DNS rebinding protection and resolving adress as local private ip address is blocked (https://en.wikipedia.org/wiki/DNS_rebinding) 
+    * `TANGO_DOMAIN=auto-nip-lan` or `--domain=auto-nip-lan` : you can access your services deployed by tango only from local network. WARN this method may not work if your DNS server/forwarder configuration have DNS rebinding protection and resolving adress as local private ip address is blocked (https://en.wikipedia.org/wiki/DNS_rebinding) 
 
-* NOTE : everywhere you see in tango doc and samples you can replace any `domain.org` value with `auto-nip` or `auto-lan-nip`
+* NOTE : everywhere you see in tango doc and samples you can replace any `domain.org` value with `auto-nip` or `auto-nip-lan`
 
 ### long explanation :
 
@@ -25,9 +25,7 @@
 
 * When you set domain values with sepcial values, tango will internaly set your domain
     *  `auto-nip` : `<YOUR_PUBLIC_IP_ADRESS>.nip.io`
-    *  `auto-lan-nip` : `<YOUR_CURRENT_LOCAL_IP_ADRESS>.nip.io`
-
-* WARN : 
+    *  `auto-nip-lan` : `<YOUR_CURRENT_LOCAL_IP_ADRESS>.nip.io`
 
 * nlp.io informations :
     * https://nip.io/

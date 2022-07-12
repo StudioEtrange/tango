@@ -14,10 +14,10 @@ Tango is a command line tool written in bash.
 * Generate and run a fully configured docker-compose file.
 * Pick services from a list of preconfigured available modules (calibre, cloud9, codeserver,...) to be composed.
 * Entirely configurable through environment variables and files.
-* All Traefik2 settings are generated for the services.
+* Use Traefik2 as a reverse proxy to set up network route to access the services.
 * Take care automaticly of HTTPS certificate generation using Let's encrypt.
 
-* Advanced pecial features :
+* Advanced special features :
     * Can isolate a specific service network into a VPN (aka attach a vpn to only one container).
     * Context isolation into a specific folder of all configuration files needed for an application.
 
@@ -56,14 +56,14 @@ Tango is a command line tool written in bash.
     ./tango --module firefox --domain domain.org --freeport up
     ./tango --module firefox --domain domain.org --freeport info
     ```
-    * Tango generate for each services an URI with the service name as subdomain name. Here : `https://firefox.mydomain.org:port`
+    * Tango generate for each services an URI with the service name as subdomain name. Here : `https://firefox.domain.org:port`
 
 * `--module firefox` : A ready-to-use service attached to current tango context be manageable by tango commands. (see [available modules](/pool/modules/))
 
 * `up` : tango command to generate a docker compose file including the selected services AND launch them.
 
 * `--freeport` : pick for you available HTTP ports for accessing the service. If you are on a local network area, do not forget to forward these ports to your tango IP hosts.
-    * Alternative : use command line option --port main@<port>@<secured port> to choose ports by yourself (i.e --port main@80@443). Secured port is the HTTPS version of an HTTP port.
+    * Alternative : use command line option `--port main@<port>@<secured port>` to choose ports by yourself (i.e --port main@80@443). Secured port is the HTTPS version of an HTTP port.
     ```
     ./tango --module firefox --domain domain.org --port main@80@443 up
     ./tango --module firefox --domain domain.org --port main@80@443 info
@@ -127,7 +127,7 @@ Tango is a command line tool written in bash.
 * A module is a ready-to-use service with a yml predefined compose file, some configuration variable (see [modules catalogue](/pool/modules/))
 * Tango leverage services exposition mechanisms with traefik2. Tango automaticly set up all traefik2 rules and route to access to services.
 
-* see details in [variables documentation](/doc/services.md)
+* *see details in [services documentation](/doc/services.md)*
 
 
 
@@ -141,7 +141,7 @@ Tango is a command line tool written in bash.
 
 * Tango can manage a context by executing its cli command on it. By default tango commands are executed in tango context itself.
 
-* see [contexts](/doc/context.md)
+* *see details in [contexts](/doc/context.md)*
 
 
 
