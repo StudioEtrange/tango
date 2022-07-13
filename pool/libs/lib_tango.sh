@@ -721,7 +721,7 @@ __set_certificates_all() {
 
 
 # attach existing volumes to compose service
-# use <SERVICE>_ADDITIONAL_VOLUMES variable <named volume|path|#variable path name>:<path|#variable path name>
+# use <SERVICE>_ADDITIONAL_VOLUMES variable <named volume|path|#variable path name>:<path|#variable path name>[:ro|rw]
 __add_volume_service_all() {
 	local _t=
 	local _mapping_service=
@@ -734,7 +734,6 @@ __add_volume_service_all() {
 
 				[ ! "${_VOLUME_OUTSIDE_PATH}" = "" ] && _mapping_service="${_VOLUME_OUTSIDE_PATH}:"
 				if [ ! "${_VOLUME_OUTSIDE_PATH_VARIABLE}" = "" ]; then
-					#_mapping_service="${!_VOLUME_OUTSIDE_PATH_VARIABLE}:"
 					_mapping_service="\${${_VOLUME_OUTSIDE_PATH_VARIABLE}}:"
 					# add variable name to variables list passed in env file, because it can be initialized out of tango
 					__add_declared_variables "${_VOLUME_OUTSIDE_PATH_VARIABLE}"
@@ -742,11 +741,12 @@ __add_volume_service_all() {
 
 				[ ! "${_VOLUME_INSIDE_PATH}" = "" ] && _mapping_service="${_mapping_service}${_VOLUME_INSIDE_PATH}"
 				if [ ! "${_VOLUME_INSIDE_PATH_VARIABLE}" = "" ]; then
-					#_mapping_service="${_mapping_service}${!_VOLUME_INSIDE_PATH_VARIABLE}"
 					_mapping_service="${_mapping_service}\${${_VOLUME_INSIDE_PATH_VARIABLE}}"
 					# add variable name to variables list passed in env file, because it can be initialized out of tango
 					__add_declared_variables "${_VOLUME_INSIDE_PATH_VARIABLE}"
 				fi
+
+				[ ! "${_VOLUME_MODE}" = "" ] && _mapping_service="${_mapping_service}:${_VOLUME_MODE}"
 				
 				__add_volume_mapping_service "${_s,,}" "${_mapping_service}"
 
@@ -1942,8 +1942,8 @@ __filter_and_scale_items() {
 #		<plugin>[%<auto exec at launch into service1>][%!<manual exec into service2>][#arg1][#arg2]
 #		<middleware_name>[:<position>:[<position number>]]
 #		<network area>@<port>[@<secure port>]
-#		<named volume|path|#variable path name>:<path|#variable path name>
-#				ex : FOO_ADDITIONAL_VOLUMES=calibredb_books:/books /foo:#INTERNAL_PRESS_PATH
+#		<named volume|path|#variable path name>:<path|#variable path name>[:ro|rw]
+#				ex : FOO_ADDITIONAL_VOLUMES=calibredb_books:/books /foo:#INTERNAL_PRESS_PATH:ro
 #					 TANGO_VOLUMES=calibredb_press:#PRESS_PATH volume:#VOLUME_PATH
 # __result_prefix : variable prefix to store result
 __parse_item() {
@@ -2006,6 +2006,8 @@ __parse_item() {
 			# volume paths variables names
 			eval ${__result_prefix}_OUTSIDE_PATH_VARIABLE=
 			eval ${__result_prefix}_INSIDE_PATH_VARIABLE=
+			# rw/ro modes
+			eval ${__result_prefix}_MODE=
 		;;
 
 	esac
@@ -2030,12 +2032,11 @@ __parse_item() {
 		volume)
 
 			if [ ! -z "${__item##*:*}" ]; then
-				__tango_log "ERROR" "tango" "parse_item : error while parsing volume definition ${__item}. Syntax : <named volume|path|#variable path name>:<path|#variable path name>"
+				__tango_log "ERROR" "tango" "parse_item : error while parsing volume definition ${__item}. Syntax : <named volume|path|#variable path name>:<path|#variable path name>[:ro|rw]"
 				exit 1
 			fi
 			__item=(${__item//:/ })
-			#eval ${__result_prefix}_NAME="${__item[0]}"
-			#eval ${__result_prefix}_EXTENDED_DEF="${__item[1]}"
+
 
 			# volume path variable name
 			# symbol : #
@@ -2054,6 +2055,9 @@ __parse_item() {
 				eval ${__result_prefix}_INSIDE_PATH="${__item[1]}"
 			fi
 
+			if [ -n "${__item[2]}" ]; then
+				eval ${__result_prefix}_MODE="${__item[2]}"
+			fi
 		
 			;;
 
@@ -2085,23 +2089,6 @@ __parse_item() {
 
 	case ${__type} in
 
-		# volume)
-		# 	# volume path variable name
-		# 	# symbol : #
-		# 	if [ -z "${__item##*#*}" ]; then
-		# 		local __variable_path_name="$(echo $__item | sed 's,^.*#\([^:\^]*\).*$,\1,')"
-		# 		eval ${__result_prefix}_PATH_VARIABLE="${__variable_path_name}"
-		# 	fi
-
-		# 	# volume path
-		# 	# symbol : :
-		# 	if [ -z "${__item##*:*}" ]; then
-		# 		local __path="$(echo $__item | sed 's,^.*:\([^#\^]*\).*$,\1,')"
-		# 		eval ${__result_prefix}_PATH="${__path}"
-		# 	fi
-
-			
-		# ;;
 
 		plugin|module)
 			

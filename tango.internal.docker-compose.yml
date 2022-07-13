@@ -171,7 +171,6 @@ services:
       - error
     restart: unless-stopped
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
       #- ./traefik-conf.yml:/etc/traefik/traefik.yml
       - letsencrypt:/letsencrypt
       - traefikconfig:/traefikconfig
@@ -247,7 +246,7 @@ services:
       - "--providers.rest=true"
       - "--providers.rest.insecure=false"
       - "--providers.docker=true"
-      - "--providers.docker.endpoint=unix:///var/run/docker.sock"
+      - "--providers.docker.endpoint=${DOCKER_ENGINE_ENDPOINT}"
       - "--providers.docker.constraints=Label(`${TANGO_INSTANCE_NAME}.managed`,`true`)"
       - "--providers.docker.exposedByDefault=false"
       - "--providers.file.directory=/traefikconfig"
