@@ -11,6 +11,8 @@ for t in ${TANGO_REQUIREMENTS_LIST}; do
 		exit 1
 	fi
 done
+# NOTES about different awk flavour.
+# awk flavour diffenences
 if ! awk 'BEGIN{ if(ENVIRON["HOME"]) exit 0; else exit 1;}'; then
 	echo "** ERROR : Your current version of awk do not support ENVIRON. Please install a compatible awk flavour like GNU awk."
 	exit 1

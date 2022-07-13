@@ -409,7 +409,7 @@ __parse_env_file() {
 # The mechanism works like in shell script variable syntax in some ways : assignation, declaration, resolution order and comment symbol (#)
 #   Usage : substitute_var_env_file "<file_path>"
 #   Input file content:
-#			FOO=10
+#			N=10
 #			The number is {{N}}
 #			# FOO={{N}}
 #			A=1
@@ -419,7 +419,7 @@ __parse_env_file() {
 #			Y=4
 #			X={{Y}}
 #   Result file content:
-#			FOO=10
+#			N=10
 #			# The number is 10
 #			# FOO=10
 #			A=1
@@ -434,14 +434,16 @@ __substitute_key_in_file() {
 
 	local _temp=$(mktmp)
 
-	awk -F= '
+	awk --traditional -F= '
 
  		function parsekey(str) {
 			# if there is a value assignation to a key into this string
 			# update val array
-			if (match(str,/^([^=#]*)=(.*)/,tmp)) {
-				val[tmp[1]]=tmp[2];
-			}
+			if (match(str,/^([^=#]*)=/)) {
+            	tmp=substr(str, RSTART, RLENGTH-1);
+                val[tmp]=substr(str, RSTART+RLENGTH);
+            }
+			
 		}
 
 		# fill the key array which contains all existing key
@@ -492,9 +494,10 @@ __substitute_env_var_in_file() {
 
 	awk '
 		/{{\$[a-zA-Z_]+[a-zA-Z0-9_]*}}/ {
-				if (match($0,/{{\$([a-zA-Z_]+[a-zA-Z0-9_]*)/,tmp)) {
-						if (tmp[1] in ENVIRON) gsub("{{\\$"tmp[1]"}}", ENVIRON[tmp[1]],$0);
-						else gsub("{{\\$"tmp[1]"}}","{{MISSING_"tmp[1]"}}",$0)
+				if (match($0,/{{\$[a-zA-Z_]+[a-zA-Z0-9_]*}}/)) {
+						tmp=substr($0,RSTART+3,RLENGTH-5)
+                        if (tmp in ENVIRON) gsub("{{\\$"tmp"}}",ENVIRON[tmp],$0);
+                        else gsub("{{\\$"tmp"}}","{{MISSING_"tmp"}}",$0)
 				}
 		}
 
@@ -3069,7 +3072,9 @@ __tango_curl() {
 		local __id="$TANGO_CTX_NAME_$($STELLA_API md5 "$@")"
 		docker stop ${__id} 1>&2 2>/dev/null
 		docker rm ${__id} 1>&2 2>/dev/null
-		# At this point network TANGO_CTX_NETWORK_NAME may not exists yet
+		# TODO use $PROXY inside docker run command
+		[ ! "$STELLA_HTTP_PROXY" = "" ] && PROXY="-e HTTP_PROXY=${STELLA_HTTP_PROXY} -e HTTPS_PROXY=${STELLA_HTTPS_PROXY} -e http_proxy=${STELLA_HTTP_PROXY} -e https_proxy=${STELLA_HTTPS_PROXY} -e NO_PROXY=${NO_PROXY} -e no_proxy=${no_proxy}"
+		# NOTE TODO : At this point network TANGO_CTX_NETWORK_NAME may not exists yet
 		if docker run --name ${__id} --user "${TANGO_USER_ID}:${TANGO_GROUP_ID}" --network "${TANGO_CTX_NETWORK_NAME}" --rm curlimages/curl:7.70.0 "$@"; then
 			docker rm ${__id} 1>&2 2>/dev/null
 		else
