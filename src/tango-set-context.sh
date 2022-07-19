@@ -125,12 +125,14 @@ case ${ACTION} in
 
 		# modules -----
 		# extract declared services modules from user, ctx and default env files
-		# only if external environement variable TANGO_SERVICES_MODULES was not defined
+		# only if no external environement variable TANGO_SERVICES_MODULES was defined
 		# 	take value from TANGO_SERVICES_MODULES_ORIGINAL_VAR which contains non scaled TANGO_SERVICES_MODULES original values (without command line values) from a previous launch (usefull when TANGO_ALTER_GENERATED_FILES is OFF)
 		#   OR from TANGO_SERVICES_MODULES
 		if [ "${TANGO_SERVICES_MODULES}" = "" ]; then
+			# read value from TANGO_SERVICES_MODULES_ORIGINAL_VAR
 			TANGO_SERVICES_MODULES="$(env -i bash --noprofile --norc -c ". ${GENERATED_ENV_FILE_FOR_BASH}; [ \"\$TANGO_SERVICES_MODULES_ORIGINAL_VAR\" = \"\" ] && echo \$TANGO_SERVICES_MODULES || echo \$TANGO_SERVICES_MODULES_ORIGINAL_VAR")"
-			# store original TANGO_SERVICES_MODULES variable from env file
+		else
+			# store original TANGO_SERVICES_MODULES shell environment variable
 			TANGO_SERVICES_MODULES_ORIGINAL_VAR="${TANGO_SERVICES_MODULES}"
 		fi
 
@@ -153,9 +155,14 @@ case ${ACTION} in
 			# filter and scale module list
 			__filter_and_scale_items "module"
 			
+			#__process_dependencies TODO CONTINUE HERE
+
 			[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __create_env_files "bash" "default ctx modules user"
+
+			
 		fi
 		
+
 
 
 		# plugins -----
@@ -263,13 +270,17 @@ case ${ACTION} in
 		__add_declared_variables "GENERATED_ENV_FILE_FREEPORT"
 		__add_declared_variables "TANGO_NOT_IN_ANY_CTX"
 
-		# contains list of modules names (including scaled modules)
+		# contains list of modules instances names (including scaled modules)
 		__add_declared_variables "TANGO_SERVICES_MODULES"
-		# contains list of modules in full definition format (including scaled modules)
+		# contains list of modules in full definition format (including scaled module)
 		__add_declared_variables "TANGO_SERVICES_MODULES_FULL"
+		# contains list of modules which are dependencies of other modules
+		__add_declared_variables "TANGO_SERVICES_MODULES_LINKS"
 		# contains list of modules names which have been scaled to a number of instances
 		__add_declared_variables "TANGO_SERVICES_MODULES_SCALED"
-		# contains original TANGO_SERVICES_MODULES variable from env files (not from command line)
+		# contains list of modules in full definition format which have been scaled to a number of instances
+		__add_declared_variables "TANGO_SERVICES_MODULES_SCALED_FULL"
+		# contains original TANGO_SERVICES_MODULES variable from environment files (not from command line)
 		__add_declared_variables "TANGO_SERVICES_MODULES_ORIGINAL_VAR"
 		__add_declared_variables "TANGO_PLUGINS"
 		__add_declared_variables "TANGO_PLUGINS_FULL"
@@ -474,6 +485,8 @@ case ${ACTION} in
 		__add_declared_variables "TANGO_HOSTNAME"
 		if [ "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
 			# TODO catch error curl
+			# TODO active current proxy
+			# TODO tango curl docker version use a docker network which may not exist yet
 			TANGO_EXTERNAL_IP="$(__tango_curl --connect-timeout 2 -skL ipinfo.io/ip)"
 			__tango_log "INFO" "tango" "Declared being exposed on internet, external IP detected : $TANGO_EXTERNAL_IP"
 		else

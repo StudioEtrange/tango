@@ -248,6 +248,9 @@ services:
       - "--providers.docker=true"
       - "--providers.docker.endpoint=${DOCKER_ENGINE_ENDPOINT}"
       - "--providers.docker.constraints=Label(`${TANGO_INSTANCE_NAME}.managed`,`true`)"
+      # traefik will route network trafic to managed containers using this network if there is multiple network available to reach managed containers
+      - "--providers.docker.network=default"
+      # If set to false, containers that do not have a traefik.enable=true label are ignored
       - "--providers.docker.exposedByDefault=false"
       - "--providers.file.directory=/traefikconfig"
       - "--certificatesresolvers.tango=true"

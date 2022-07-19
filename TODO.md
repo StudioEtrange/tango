@@ -20,8 +20,16 @@
             -v $(pwd)/temp:/data goacme/lego --server https://acme-staging-v02.api.letsencrypt.org/directory --email nomorgan@gmail.com --dns ovh --domains 'mozilla.chimere-harpie.org' --path /data --accept-tos --dns.resolvers 1.1.1.1:53 --dns.resolvers 8.8.8.8:53 run
 
 
-
-
+* [ ] 2022 07 when in shared mode (TANGO_INSTANCE_MODE=shared) and launching a SAME service in two isolated context, the first launched service is deleted when launching the second
+```
+cd $HOME
+export TANGO_INSTANCE_MODE=shared
+mkdir ctx1
+mkdir ctx2
+cd tango
+./tango --ctx ctx1 --ctxroot $HOME/ctx1 --module firefox  --domain chimere-harpie.org --freeport up firefox
+./tango --ctx ctx2 --ctxroot $HOME/ctx2 --module firefox  --domain chimere-harpie.org --freeport up firefox 
+```
 
 * [ ] implementation of __set_priority_router_all force TANGO_SUBSERVICES_ROUTER to have same family subrouter following each other in the list - REVIEW the implementation
 

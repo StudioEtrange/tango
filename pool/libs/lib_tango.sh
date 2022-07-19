@@ -273,7 +273,7 @@ __create_env_files() {
 								# except expression beginngin with SHARED_VAR_
 								# use sed implementation of negative lookbehind https://stackoverflow.com/a/26110465
 								#sed -e "/FIXED_VAR/!s/${m}\([^a-zA-Z0-9]*\)/${i}\1/g" -e "/FIXED_VAR/!s/${m^^}\([^a-zA-Z0-9]*\)/${i^^}\1/g" <(echo \# --- PART FROM modules env file ${TANGO_CTX_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_CTX_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
-								sed -E "{/FIXED_VAR/! {s/#/##/g; s/(SHARED_VAR_)(${m})/\1_#_/g; s/(SHARED_VAR_)(${m^^})/\1-#-/g; s/${m}([^a-zA-Z0-9]*)/${i}\1/g; s/${m^^}([^a-zA-Z0-9]*)/${i^^}\1/g; s/(SHARED_VAR_)_#_/\1${m}/g; s/(SHARED_VAR_)-#-/\1${m^^}/g; s/##/#/g} }" <(echo \# --- PART FROM modules env file ${TANGO_CTX_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_CTX_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
+								sed -E "{/FIXED_VAR/! {s/#/##/g; s/(SHARED_VAR_)(${m})/\1_#_/g; s/(SHARED_VAR_)(${m^^})/\1-#-/g; s/${m}([^a-zA-Z0-9]*)/${i}\1/g; s/${m^^}([^a-zA-Z0-9]*)/${i^^}\1/g; s/(SHARED_VAR_)_#_/\1${m}/g; s/(SHARED_VAR_)-#-/\1${m^^}/g; s/##/#/g} }" <(echo \# --- PART FROM module env file ${TANGO_CTX_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_CTX_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
 							else
 								if [ -f "${TANGO_MODULES_ROOT}/${m}.env" ]; then
 									__tango_log "DEBUG" "tango" "create_env_files for $__target : tango module ${m} instance ${i} : add env file : ${TANGO_MODULES_ROOT}/${m}.env"
@@ -282,7 +282,7 @@ __create_env_files() {
 									# except expression beginngin with SHARED_VAR_
 									# use sed implementation of negative lookbehind https://stackoverflow.com/a/26110465
 									#sed -e "/FIXED_VAR/!s/${m}\([^a-zA-Z0-9]*\)/${i}\1/g" -e "/FIXED_VAR/!s/${m^^}\([^a-zA-Z0-9]*\)/${i^^}\1/g" <(echo \# --- PART FROM modules env file ${TANGO_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
-									sed -E "{/FIXED_VAR/! {s/#/##/g; s/(SHARED_VAR_)(${m})/\1_#_/g; s/(SHARED_VAR_)(${m^^})/\1-#-/g; s/${m}([^a-zA-Z0-9]*)/${i}\1/g; s/${m^^}([^a-zA-Z0-9]*)/${i^^}\1/g; s/(SHARED_VAR_)_#_/\1${m}/g; s/(SHARED_VAR_)-#-/\1${m^^}/g; s/##/#/g} }"  <(echo \# --- PART FROM modules env file ${TANGO_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
+									sed -E "{/FIXED_VAR/! {s/#/##/g; s/(SHARED_VAR_)(${m})/\1_#_/g; s/(SHARED_VAR_)(${m^^})/\1-#-/g; s/${m}([^a-zA-Z0-9]*)/${i}\1/g; s/${m^^}([^a-zA-Z0-9]*)/${i^^}\1/g; s/(SHARED_VAR_)_#_/\1${m}/g; s/(SHARED_VAR_)-#-/\1${m^^}/g; s/##/#/g} }"  <(echo \# --- PART FROM module env file ${TANGO_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
 								else
 									__tango_log "DEBUG" "tango" "create_env_files for $__target : scaled module $m do not have an env file (${TANGO_CTX_MODULES_ROOT}/${m}.env nor ${TANGO_MODULES_ROOT}/${m}.env do not exists) might be an error"
 								fi
@@ -300,11 +300,11 @@ __create_env_files() {
 					# ctx modules overrides tango modules
 					if [ -f "${TANGO_CTX_MODULES_ROOT}/${s}.env" ]; then
 						__tango_log "DEBUG" "tango" "create_env_files for $__target : ctx module ${s} : add env file : ${TANGO_CTX_MODULES_ROOT}/${s}.env"
-						cat <(echo \# --- PART FROM modules env file ${TANGO_CTX_MODULES_ROOT}/${s}.env) <(echo) <(echo) "${TANGO_CTX_MODULES_ROOT}/${s}.env" <(echo) >> "${__file}"
+						cat <(echo \# --- PART FROM module env file ${TANGO_CTX_MODULES_ROOT}/${s}.env) <(echo) <(echo) "${TANGO_CTX_MODULES_ROOT}/${s}.env" <(echo) >> "${__file}"
 					else
 						if [ -f "${TANGO_MODULES_ROOT}/${s}.env" ]; then
 							__tango_log "DEBUG" "tango" "create_env_files for $__target : tango module ${s} : add env file : ${TANGO_MODULES_ROOT}/${s}.env"
-							cat <(echo \# --- PART FROM modules env file ${TANGO_MODULES_ROOT}/${s}.env) <(echo) <(echo) "${TANGO_MODULES_ROOT}/${s}.env" <(echo) >> "${__file}"
+							cat <(echo \# --- PART FROM module env file ${TANGO_MODULES_ROOT}/${s}.env) <(echo) <(echo) "${TANGO_MODULES_ROOT}/${s}.env" <(echo) >> "${__file}"
 						else
 							__tango_log "DEBUG" "tango" "create_env_files for $__target : module $s do not have an env file (${TANGO_CTX_MODULES_ROOT}/${s}.env nor ${TANGO_MODULES_ROOT}/${s}.env do not exists) maybe abnormal or not"
 						fi
@@ -534,10 +534,10 @@ __create_docker_compose_file() {
 	# define network area
 	__set_network_area_all
 
-	# add module to compose file and set module to a default area network
+	# add module to compose file and set module to a default logical area network
 	__set_module_all
 
-	# declare all active service depending on traefik AND as a "tango" depdenciess in compose file
+	# declare all active service depending on traefik AND as a "tango" depdency in compose file
 	__set_active_services_all
 
 	# manage times volume
@@ -649,7 +649,7 @@ __translate_path() {
 
 # MANAGE FEATURES FOR ALL CONTAINTERS -----------------
 
-# declare all active service depending on traefik AND as a "tango" depdenciess in compose file
+# declare all active service depending on traefik AND as a "tango" depdency in compose file
 __set_active_services_all() {
 	for s in ${TANGO_SERVICES_ACTIVE}; do
 		if __check_docker_compose_service_exist "${s}"; then
@@ -1490,21 +1490,32 @@ __set_module_all() {
 
 
 	__tango_log "DEBUG" "tango" "set_module_all : process scaled modules list : ${TANGO_SERVICES_MODULES_SCALED}"
-	local __instances_list_full=
-	local __scaled_modules_processed=
+	local __module_instances_list_full=
+	local __instances_names_list_processed=
+
+	# NOTE : we cannot use TANGO_SERVICES_MODULES_SCALED_FULL because __set_module need the instance name not the module name
 	for m in ${TANGO_SERVICES_MODULES_SCALED}; do
-		__instances_list_full="${m^^}_INSTANCES_LIST_FULL"
-		for i in ${!__instances_list_full}; do
+		__module_instances_list_full="${m^^}_INSTANCES_LIST_FULL"
+		__instances_names_list_processed="${__instances_names_list_processed} ${!__module_instances_list_full}"
+		for i in ${!__module_instances_list_full}; do
 			__set_module "$i" "${m}"
-			__scaled_modules_processed="${__scaled_modules_processed} ${i}"
 		done
 	done
 
 	
 	# remove from list scaled modules already processed
-	local __array_list_full=( $($STELLA_API filter_list_with_list "${TANGO_SERVICES_MODULES_FULL}" "${__scaled_modules_processed}") )
+	local __array_list_full=( $($STELLA_API filter_list_with_list "${TANGO_SERVICES_MODULES_FULL}" "${TANGO_SERVICES_MODULES_SCALED_FULL}") )
 	__tango_log "DEBUG" "tango" "set_module_all : process other modules : ${__array_list_full[*]}"
 	for m in ${__array_list_full[*]}; do
+		__set_module "${m}"
+	done
+	__instances_names_list_processed="${__instances_names_list_processed} ${TANGO_SERVICES_MODULES_SCALED}"
+
+	# TODO CONTINUE HERE : TANGO_SERVICES_MODULES_SCALED contents should be added to TANGO_SERVICES_MODULES (and in cascade to TANGO_SERVICES_AVAILABLE and TANGO_SERVICES_ACTIVE) so that when calling create_env_file dependencies env file are also included (and dependencies module also became TANGO_SERVICES_DEPENDS_ON_TRAEFIK)
+	# process modules dependencies not already processed
+	local __array_list_dep=( $($STELLA_API filter_list_with_list "${TANGO_SERVICES_MODULES_LINKS}" "${__instances_names_list_processed}") )
+	__tango_log "DEBUG" "tango" "set_module_all : process dependencies modules : ${__array_list_dep[*]}"
+	for m in ${__array_list_dep[*]}; do
 		__set_module "${m}"
 	done
 }
@@ -1536,7 +1547,7 @@ __set_module() {
 			else
 				# we replace all ocurrence of module name with an instance name
 				# except into lines containing FIXED_VAR expression anywhere
-				# except expression beginngin with SHARED_VAR_
+				# and except expression beginning with SHARED_VAR_
 				# use sed implementation of negative lookbehind https://stackoverflow.com/a/26110465
 				__tango_log "DEBUG" "tango" "set_module : ${__module} is an instance of scaled module : $_ORIGINAL_NAME"
 				#yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_CTX_MODULES_ROOT}/${_ORIGINAL_NAME}.yml" | sed -e "/FIXED_VAR/!s/${_ORIGINAL_NAME}\([^a-zA-Z0-9]*\)/${_MODULE_NAME}\1/g" -e "/FIXED_VAR/!s/${_ORIGINAL_NAME^^}\([^a-zA-Z0-9]*\)/${_MODULE_NAME^^}\1/g")
@@ -1550,7 +1561,7 @@ __set_module() {
 			else
 				# we replace all ocurrence of module name with an instance name
 				# except into lines containing FIXED_VAR expression anywhere
-				# except expression beginngin with SHARED_VAR_
+				# and except expression beginning with SHARED_VAR_
 				# use sed implementation of negative lookbehind https://stackoverflow.com/a/26110465
 				__tango_log "DEBUG" "tango" "set_module : ${__module} is an instance of scaled module : $_ORIGINAL_NAME"
 				#yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_MODULES_ROOT}/${_ORIGINAL_NAME}.yml" | sed -e "/FIXED_VAR/!s/${_ORIGINAL_NAME}\([^a-zA-Z0-9]*\)/${_MODULE_NAME}\1/g" -e "/FIXED_VAR/!s/${_ORIGINAL_NAME^^}\([^a-zA-Z0-9]*\)/${_MODULE_NAME^^}\1/g")
@@ -1610,11 +1621,12 @@ __set_module() {
 	# dependencies
 	__tango_log "DEBUG" "tango" "set_module : ${__module} declared depends on : ${_MODULE_LINKS}"
 	local __dep_disabled="$($STELLA_API filter_list_with_list "${_MODULE_LINKS}" "${TANGO_SERVICES_DISABLED}" "FILTER_KEEP")"
-	[ ! -z "${__dep_disabled}" ] && echo " ** WARN : if ${__module} is enabled, these disabled services will be reactivated as dependencies : ${__dep_disabled}"
+	[ -n "${__dep_disabled}" ] && __tango_log "WARN" "tango" "when this module ${__module} is enabled, these dependencies will be enabled even they were explicity disabled : ${__dep_disabled}"
 	for d in ${_MODULE_LINKS}; do
 		__add_service_dependency "${__module}" "${d,,}"
 	done
 
+	# vpn
 	local _vpn=
 	__tango_log "DEBUG" "tango" "set_module : ${__module} declared to be attached to vpn id : ${_MODULE_VPN_ID}"
 	if [ ! "${_MODULE_VPN_ID}" = "" ]; then 
@@ -1743,7 +1755,7 @@ __exec_plugin() {
 }
 
 
-# add items activated through command line
+# cumulate items activated through command line AND shell environment variable
 # if item was activated twice through environnment variable AND command line
 # keeping only command line declaration which override the other
 # type : module | plugin
@@ -1811,6 +1823,7 @@ __filter_and_scale_items() {
 	local __ctx_folder=
 	local __tango_folder=
 	local __file_ext=
+	local __list_dep=
 	case ${__type} in
 		module )
 			__list_full="${TANGO_SERVICES_MODULES}"
@@ -1835,10 +1848,12 @@ __filter_and_scale_items() {
 	local __name
 	local __full
 	local __var
+	local __d
 	local __array_list_names=( $__list_names )
 	local __array_list_full=( $__list_full )
-	__list_names=
+	local __list_instances_names=
 	__list_full=
+
 	for index in ${!__array_list_names[*]}; do
 	
 		__item_exists=
@@ -1871,7 +1886,7 @@ __filter_and_scale_items() {
 					for s in ${PLUGIN_LINKS_AUTO_EXEC}; do
 						TANGO_PLUGINS_BY_SERVICE_FULL_AUTO_EXEC["${s}"]="${TANGO_PLUGINS_BY_SERVICE_FULL_AUTO_EXEC[$s]} ${__full}"
 					done
-					__list_names="${__list_names} ${__name}"
+					__list_instances_names="${__list_instances_names} ${__name}"
 					__list_full="${__list_full} ${__full}"
 				;;
 
@@ -1885,29 +1900,45 @@ __filter_and_scale_items() {
 							__add_declared_variables "${__name^^}_IS_SCALABLE"
 
 							TANGO_SERVICES_MODULES_SCALED="${TANGO_SERVICES_MODULES_SCALED} ${__name}"
+							TANGO_SERVICES_MODULES_SCALED_FULL="${TANGO_SERVICES_MODULES_SCALED_FULL} ${__name}${MODULE_EXTENDED_DEF}"
+
 							__var="$(__get_scaled_item_instances_list "${__name}" "$MODULE_INSTANCES_NB")"
 							eval "export ${__name^^}_INSTANCES_LIST=\"${__var}\""
 							__add_declared_variables "${__name^^}_INSTANCES_LIST"
 							eval "export ${__name^^}_INSTANCES_NB=${MODULE_INSTANCES_NB}"
 							__add_declared_variables "${__name^^}_INSTANCES_NB"
+							
+							# dependencies : cumulate with dependencies declared with variable _LINKS
+							if [ -n "${MODULE_LINKS}" ]; then
+								for i in ${__var}; do
+									eval "export ${i^^}_LINKS=\"${MODULE_LINKS} ${i^^}_LINKS\""
+									__add_declared_variables "${i^^}_LINKS"
+								done
+							fi
 
-							__list_names="${__list_names} ${__var}"
-							__var="${__var// /$MODULE_EXTENDED_DEF }"
-							__list_full="${__list_full} ${__var}"
-							__list_full="${__list_full}${MODULE_EXTENDED_DEF}"
-
-							eval "export ${__name^^}_INSTANCES_LIST_FULL=\"${__var}${MODULE_EXTENDED_DEF}\""
+							__list_instances_names="${__list_instances_names} ${__var}"
+							__var="${__var// /$MODULE_WITHOUT_SCALE_EXTENDED_DEF }"
+							eval "export ${__name^^}_INSTANCES_LIST_FULL=\"${__var}${MODULE_WITHOUT_SCALE_EXTENDED_DEF}\""
 							__add_declared_variables "${__name^^}_INSTANCES_LIST_FULL"
 							
+							__list_full="${__list_full} ${__name}"
+							__list_full="${__list_full}${MODULE_EXTENDED_DEF}"
+
 							__tango_log "DEBUG" "tango" "filter_and_scale_items : module ${__name} is scaled to ${MODULE_INSTANCES_NB} instances"
 						else
 							__tango_log "ERROR" "tango" "Trying to scale ${__name} to ${MODULE_INSTANCES_NB}, but this module have not be designed to be scaled (no ${__name}.scalable file found)."
 							exit 1
 						fi
 					else
-						__list_names="${__list_names} ${__name}"
+						__list_instances_names="${__list_instances_names} ${__name}"
 						__list_full="${__list_full} ${__full}"
+
+						# dependencies : cumulate with dependencies declared with variable _LINKS TODO CONTINUE HERE
+						__d="${__name^^}_LINKS"
+						[ -n "${MODULE_LINKS}" ] && eval "export ${__name^^}_LINKS=\"${MODULE_LINKS} ${!__d}\""
+						__add_declared_variables "${__name^^}_LINKS"
 					fi
+					__list_dep="${__list_dep} ${MODULE_LINKS}"
 				;;
 			esac
 			
@@ -1916,25 +1947,57 @@ __filter_and_scale_items() {
 		fi
 	done
 
-	# FULL list conserve existing items in full format
-	# standard list conserve existing items with only names
+
+
+	# FULL list conserve existing items in full declarative format
+	# standard list conserve existing items with only intances names
 	case ${__type} in
 		module )
+			TANGO_SERVICES_MODULES_LINKS="$($STELLA_API list_filter_duplicate "${__list_dep}")"
 			TANGO_SERVICES_MODULES_FULL="${__list_full}"
-			TANGO_SERVICES_MODULES="${__list_names}"
+			TANGO_SERVICES_MODULES="${__list_instances_names}"
+
+			#__recursive_module_links "${TANGO_SERVICES_MODULES_LINKS}"
+			#exit TODO CONTINUE HERE
+
 			__tango_log "DEBUG" "tango" "filter_and_scale_items : existing modules full format list : ${TANGO_SERVICES_MODULES_FULL}"
-			__tango_log "DEBUG" "tango" "filter_and_scale_items : existing modules only names list : ${TANGO_SERVICES_MODULES}"
+			__tango_log "DEBUG" "tango" "filter_and_scale_items : existing modules instances names : ${TANGO_SERVICES_MODULES}"
+			__tango_log "DEBUG" "tango" "filter_and_scale_items : modules which are dependencies of others : ${TANGO_SERVICES_MODULES_LINKS}"
 			
 		;;
 		plugin )
 			TANGO_PLUGINS_FULL="${__list_full}"
-			TANGO_PLUGINS="${__list_names}"
+			TANGO_PLUGINS="${__list_instances_names}"
 			__tango_log "DEBUG" "tango" "filter_and_scale_items : existing plugins full format list : ${TANGO_PLUGINS_FULL}"
-			__tango_log "DEBUG" "tango" "filter_and_scale_items : existing plugins only names list : ${TANGO_PLUGINS}"
+			__tango_log "DEBUG" "tango" "filter_and_scale_items : existing plugins : ${TANGO_PLUGINS}"
 		;;
 	esac
 
 }
+
+# TODO CONTINUE HERE
+# __process_dependencies() {
+# 	__tango_log "DEBUG" "tango" "__process_dependencies"
+
+# }
+
+# A=1
+# __recursive_module_links() {
+# 	local __list="$1"
+# 	local __sublist=
+# 	local __linked=
+
+# 	for m in ${__list}; do
+# 		__linked="${m^^}_LINKS"
+# 		echo ${__linked}
+# 		for d in ${!__linked}; do
+# 		echo $d
+# 			__sublist="${__sublist} $d"
+# 		done
+# 	done
+# 	((A++))
+# 	[ $A -gt 2 ] && echo "${__list} ${__sublist}" || echo "${__list} ${__sublist} $(__recursive_module_links "${__sublist}")"
+# }
 
 # type : module | plugin | middleware | volume | ports
 # item format :
@@ -1958,6 +2021,7 @@ __parse_item() {
 	# item name and extended part
 	local __name=
 	local __ext=
+	local __wo_scale_ext=
 
 	# name
 	eval ${__result_prefix}_NAME=
@@ -1977,6 +2041,8 @@ __parse_item() {
 			eval ${__result_prefix}_LINKS=
 		;;
 		module)
+			# extended part of module definition (everything except name AND nb instances)
+			eval ${__result_prefix}_WITHOUT_SCALE_EXTENDED_DEF=
 			# item is in CTX or TANGO folder
 			eval ${__result_prefix}_OWNER=
 			# scale module to nb instances
@@ -2027,7 +2093,10 @@ __parse_item() {
 			eval ${__result_prefix}_NAME="${__name}"
 			__ext="$(echo $__item | sed 's,^\([^~@%\^]*\)\(.*\)$,\2,')"
 			eval ${__result_prefix}_EXTENDED_DEF="${__ext}"
+			__wo_scale_ext="$(echo $__item | sed -e 's,^\([^~@%\^]*\)\(.*\)$,\2,' -e 's,\^[^~@#%]*,,')"
+			eval ${__result_prefix}_WITHOUT_SCALE_EXTENDED_DEF="${__wo_scale_ext}"
 			;;
+
 
 		volume)
 

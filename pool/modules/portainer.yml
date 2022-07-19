@@ -1,0 +1,56 @@
+volumes:
+  portainer_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PORTAINER_DATA_PATH}
+    name: ${TANGO_CTX_NAME}_portainer_data
+
+services:
+  portainer:
+    image: ${PORTAINER_IMAGE}:${PORTAINER_VERSION:-latest}
+    container_name: ${TANGO_CTX_NAME}_portainer
+    depends_on: 
+      - service_init
+      - dcksocketproxy
+    restart: unless-stopped
+    #privileged: true
+    security_opt:
+      - no-new-privileges:true
+    user: ${TANGO_USER_ID}:${TANGO_GROUP_ID}
+    volumes:
+      - portainer_data:/data
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      # service : portainer -------------------------
+      - "traefik.http.services.portainer.loadbalancer.server.port=9000"
+      - "traefik.http.services.portainer.loadbalancer.server.scheme=http"
+      - "traefik.http.services.portainer.loadbalancer.passhostheader=true"
+      # middlewares definition : portainer
+      # service router : portainer
+      - "traefik.http.routers.portainer.entrypoints=${PORTAINER_ENTRYPOINTS:-entry_main_http}"
+      - "traefik.http.routers.portainer.rule=HostRegexp(`{subdomain:${PORTAINER_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.portainer.priority=${PORTAINER_PRIORITY}"
+      - "traefik.http.routers.portainer.service=portainer"
+      - "traefik.http.routers.portainer-secure.entrypoints=${PORTAINER_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
+      - "traefik.http.routers.portainer-secure.rule=HostRegexp(`{subdomain:${PORTAINER_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.portainer-secure.priority=${PORTAINER_PRIORITY}"
+      - "traefik.http.routers.portainer-secure.service=portainer"
+      - "traefik.http.routers.portainer-secure.tls=true"
+      - "traefik.http.routers.portainer-secure.tls.domains[0].main=${PORTAINER_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      # service router middlewares : portainer
+      - "traefik.http.routers.portainer.middlewares=error-middleware"
+      - "traefik.http.routers.portainer-secure.middlewares=error-middleware"
+    networks:
+      - default
+      - dcksocketproxy
+    command:
+      -H tcp://dcksocketproxy:2375
+    expose:
+      # service portainer HTTP
+      - 9000/tcp
+      # service portainer HTTPS
+      - 9443/tcp
+  

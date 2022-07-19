@@ -43,6 +43,26 @@
 
 * Plugins : https://pilot.traefik.io/plugins
 
+* exemple of docker compose keycloak forward auth traefik 2 https://github.com/htpcBeginner/docker-traefik/blob/master/docker-compose.yml
+
+
+* docker provider network and traefik https://doc.traefik.io/traefik/providers/docker/#network
+     * `--providers.docker.network=mynetwork` traefik launch option : it defines mynetwork as the default network used ny traefik to route network trafic to containers. Can be usefull if there is several neetworks and you want to select one. WARN : to route trafic using a specific network, traefik instance AND routed containers MUST be connected to this network ! 
+        i.e in a compose file
+        traefk:
+            ...
+            networks:
+                - mynetwork
+    * docker label "traefik.docker.network=mynetwork" 
+        * if setted on a container it will override value defined by the previous launch option and tell traefik to use mynetwork to route network trafic to this container. Can be usefull if there is several neetworks and you want to select one. WARN : to route trafic using a specific network, traefik instance AND the routed container MUST be connected to this network ! 
+        i.e in a compose file
+        apache:
+            ...
+            networks:
+                - mynetwork
+        * if setted on traefik instance itself, not sure of what its purpose and effect. Maybe useless to set it on traefik instance. Or it is to route trafic to traefik api http service.
+   
+
 ### Nginx
 
 * various preconfigured services for nginx : https://github.com/linuxserver/reverse-proxy-confs
