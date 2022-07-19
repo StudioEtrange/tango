@@ -434,7 +434,7 @@ __substitute_key_in_file() {
 
 	local _temp=$(mktmp)
 
-	awk --traditional -F= '
+	awk -F= '
 
  		function parsekey(str) {
 			# if there is a value assignation to a key into this string
