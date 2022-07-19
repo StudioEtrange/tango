@@ -3544,3 +3544,16 @@ __tango_log_run_with_output() {
 	fi
 	"$@"
 }
+
+
+__tango_get_version() {
+	if [ ! "${TANGO_VERSION}" = "" ]; then
+		echo "${TANGO_VERSION}"
+	elif [ -d "$STELLA_APP_ROOT/.git" ]; then
+		$STELLA_API git_project_version "$STELLA_APP_ROOT" "LONG"
+	elif [ -f "$STELLA_APP_ROOT/VERSION" ]; then
+			cat "$STELLA_APP_ROOT/VERSION"
+	else
+		echo "DEV"
+	fi
+}

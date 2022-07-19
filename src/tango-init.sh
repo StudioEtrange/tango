@@ -1,7 +1,9 @@
 #!/bin/bash
 TANGO_CURRENT_FILE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 TANGO_CURRENT_RUNNING_DIR="$( cd "$( dirname "." )" && pwd )"
+
 export WORKING_DIR="${TANGO_CURRENT_RUNNING_DIR}"
+export TANGO_VERSION=
 
 # TANGO system requirements
 TANGO_REQUIREMENTS_LIST="awk sed docker"
@@ -57,3 +59,7 @@ for f in ${TANGO_ROOT}/pool/libs/*; do
 	[ -f "${f}" ] && . ${f}
 done
 
+if [ "$1" = "-v" ]; then
+	__tango_get_version
+	exit 0
+fi

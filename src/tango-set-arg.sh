@@ -13,6 +13,7 @@ usage() {
 	echo "L     status [service] : see service status."
 	echo "L     logs [service] [-f] : see service logs."
 	echo "L     modules|services|plugins list : list available modules, plugins or default defined services within current selected context."
+	echo "L 	-v : print Tango version."
 	echo "|"
 	echo "o-- advanced management :"
 	echo "L     update <service> : pull last version of the defined docker tag image for the service. Do not update running service."
