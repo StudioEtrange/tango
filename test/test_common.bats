@@ -10,8 +10,6 @@ setup() {
 	TEST_TEMP_DIR="$(temp_make)"
 
 
-
-
 	TEST_FILE_1="${TEST_TEMP_DIR}/test_1"
 	(cat <<'EOL'
 A=1

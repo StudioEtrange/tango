@@ -9,7 +9,7 @@ volumes:
 
 services:
   kcc:
-    image: ${KCC_DOCKER_IMAGE}:${KCC_DOCKER_VERSION}
+    image: ${KCC_DOCKER_IMAGE_FIXED_VAR}:${KCC_DOCKER_VERSION_FIXED_VAR}
     container_name: ${TANGO_CTX_NAME}_kcc
     depends_on:
       - service_init
@@ -20,8 +20,8 @@ services:
     environment:
       - PUID=${TANGO_USER_ID:-0}
       - PGID=${TANGO_GROUP_ID:-0}
-      - KCC_VERSION=${KCC_GIT_VERSION}
-      - REPO_GIT=${KCC_REPO_GIT}
+      - KCC_VERSION=${KCC_GIT_VERSION_FIXED_VAR}
+      - REPO_GIT=${KCC_REPO_GIT_FIXED_VAR}
     labels:
       - "${TANGO_INSTANCE_NAME}.managed=true"
       - "traefik.enable=true"

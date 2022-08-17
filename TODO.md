@@ -1,5 +1,11 @@
 #  TODO 
 
+
+* [ ] 2022 07 31 test :
+```
+TUTU_LINKS="22 23" ./tango --module portainer%dcksocketproxy%filezilla%firefox --module firefox^2~vpn_1%cloud9 --domain chimere-harpie.org --freeport gen -d
+```
+
 * [ ] 2022 01 30 - DNS challenge mode AND cloudflare 
     * __check_lets_encrypt_settings
     * __set_letsencrypt_service_all
@@ -106,3 +112,9 @@ cd tango
     * https://github.com/kasmtech/workspaces-images
     * https://github.com/kasmtech/workspaces-core-images
     * https://hub.docker.com/u/kasmweb
+
+
+* veloren
+    * https://book.veloren.net/
+    * https://veloren.net/
+    * https://gitlab.com/veloren/veloren

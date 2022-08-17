@@ -13,7 +13,6 @@ services:
     container_name: ${TANGO_CTX_NAME}_portainer
     depends_on: 
       - service_init
-      - dcksocketproxy
     restart: unless-stopped
     #privileged: true
     security_opt:

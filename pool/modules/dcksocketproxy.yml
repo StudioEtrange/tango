@@ -9,7 +9,7 @@ networks:
 
 services:
   dcksocketproxy:
-    image: ${DCKSOCKETPROXY_IMAGE}:${DCKSOCKETPROXY_VERSION:-latest}
+    image: ${DCKSOCKETPROXY_IMAGE_FIXED_VAR}:${DCKSOCKETPROXY_VERSION_FIXED_VAR:-latest}
     container_name: ${TANGO_CTX_NAME}_dcksocketproxy
     depends_on:
       - service_init

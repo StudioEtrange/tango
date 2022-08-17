@@ -173,6 +173,7 @@ __update_env_files() {
 		fi
 	done
 
+	
 }
 
 # extract declared variable names from various env files (tango, ctx and user env files)
@@ -621,16 +622,22 @@ __translate_path() {
 		export TANGO_KEY_FILES="$($STELLA_API trim "${__tmp}")"
 	fi
 
+	# TODO REMOVE THIS USELESS
 	# at this step all path variable managed by tango through TANGO_PATH_LIST (and sublist) should be already absolute
 	for __variable in ${VARIABLES_LIST}; do
 		case ${__variable} in
 			*_PATH) 
+				#if [ ! "${!__variable}" = "" ]; then
 					case ${!__variable} in
 						/*);;
 						*)
 							__tango_log "WARN" "tango" "not absolute path variable found : ${__variable} [${!__variable}]. Maybe not managed by tango ? If you want to, add it to TANGO_PATH_LIST"
 						;;
 					esac
+					
+					# convert to absolute USELESS ?
+					#export ${__variable}="$($STELLA_API rel_to_abs_path "${!__variable}" "${TANGO_CTX_ROOT}")"
+				#fi
 			;;
 		esac
 	done
@@ -931,7 +938,7 @@ __set_letsencrypt_service_all() {
 				# set letsencrypt debug server if needed
 				yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.caserver=${LETS_ENCRYPT_SERVER_DEBUG}"
 			fi
-			__tango_log "INFO" "tango" "ACME protocol use ${ACME_CHALLENGE} challenge to validate letsencrypt certificates"
+			__tango_log "INFO" "tango" "ACME protocol use ${ACME_CHALLENGE} challenge to valid letsencrypt certificates"
 
 			case ${ACME_CHALLENGE} in
 				HTTP )
@@ -941,7 +948,7 @@ __set_letsencrypt_service_all() {
 					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.httpchallenge.entrypoint=entry_main_http"
 				;;
 				DNS )
-					__tango_log "INFO" "tango" "ACME protocol ask ${ACME_DNS_PROVIDER} dns provider to validate letsencrypt certificates"
+					__tango_log "INFO" "tango" "ACME protocol ask ${ACME_DNS_PROVIDER} dns provider to valid letsencrypt certificates"
 					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.dnschallenge=true"
 					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.dnschallenge.provider=${ACME_DNS_PROVIDER}"
 					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53"
@@ -952,7 +959,7 @@ __set_letsencrypt_service_all() {
 						cloudflare)
 							
 							# get ipv4 cloudflare ip - TODO do we need to get ipv6 ip and allow them ?
-							__cloudflare_ip=$(__tango_curl --connect-timeout 2 -fkSLs "https://www.cloudflare.com/ips-v4" | tr '\n' ',')
+							__cloudflare_ip=$(__tango_curl -fkSLs "https://www.cloudflare.com/ips-v4" | tr '\n' ',')
 
 							# To delay DNS check and reduce LE hitrate
 							yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.dnschallenge.delayBeforeCheck=90"
@@ -1491,7 +1498,7 @@ __set_module_all() {
 		__module_instances_list_full="${m^^}_INSTANCES_LIST_FULL"
 		__instances_names_list_processed="${__instances_names_list_processed} ${!__module_instances_list_full}"
 		for i in ${!__module_instances_list_full}; do
-			__set_module_instance "$i"
+			__set_module_instance "$i" "${m}"
 		done
 	done
 
@@ -1502,7 +1509,7 @@ __set_module_all() {
 		__module_instances_list_full="${m^^}_INSTANCES_LIST_FULL"
 		__instances_names_list_processed="${__instances_names_list_processed} ${!__module_instances_list_full}"
 		for i in ${!__module_instances_list_full}; do
-			__set_module_instance "$i"
+			__set_module_instance "$i" "${m}"
 		done
 	done
 	
@@ -1512,7 +1519,7 @@ __set_module_all() {
 		__module_instances_list_full="${m^^}_INSTANCES_LIST_FULL"
 		__instances_names_list_processed="${__instances_names_list_processed} ${!__module_instances_list_full}"
 		for i in ${!__module_instances_list_full}; do
-			__set_module_instance "$i"
+			__set_module_instance "$i" "${m}"
 		done
 	done
 
@@ -1540,69 +1547,51 @@ __set_module_all() {
 __set_module_instance() {
 	# instance name in full format
 	local __instance_full="$1"
-	
+	# optional - name of the module which have been scaled
+	local __original_module_name="$2"
 
-	__tango_log "DEBUG" "tango" "set_module_instance : process instance : ${__instance_full}"
+	__tango_log "DEBUG" "tango" "set_module_instance : process module instance : ${__instance_full}"
 
 	__parse_item "module" "${__instance_full}" "_INSTANCE"
-	__tango_log "DEBUG" "tango" "set_module_instance : parsed name : ${_INSTANCE_NAME}"
+	__tango_log "DEBUG" "tango" "set_module_instance : parse module name : ${_INSTANCE_NAME}"
 	local __instance="${_INSTANCE_NAME}"
+	local __owner="${_INSTANCE_OWNER}"
+
+	if [ ! ${__original_module_name} = "" ]; then
+		__parse_item "module" "${__original_module_name}" "_ORIGINAL"
+		__tango_log "DEBUG" "tango" "set_module_instance : parse original module name : ${_ORIGINAL_NAME}"
+		 __owner="${_ORIGINAL_OWNER}"
+	fi
 
 
-	local __original_module_name="${__instance^^}_INSTANCE_MODULE"
-	__original_module_name="${!__original_module_name}"
 
-	__parse_item "module" "${__original_module_name}" "_MODULE"
-	__tango_log "DEBUG" "tango" "set_module_instance : parse original module name : ${_MODULE_NAME}"
-	local __owner="${_MODULE_OWNER}"
-
-
-	local __dep=
-	local __mod=
-	local __str=
 	# add yml to docker compose file
 	case ${__owner} in
 		CTX )
-			__tango_log "DEBUG" "tango" "set_module_instance : ${__instance} is an instance of module : $_MODULE_NAME"
 			__tango_log "DEBUG" "tango" "set_module_instance : ${__instance} is an instance of a ctx module"
-		
-			# we replace all occurrence of module name with an instance name
-			# except into lines containing FIXED_VAR expression anywhere
-			# and except expression beginning with SHARED_VAR_
-			# use sed implementation of negative lookbehind https://stackoverflow.com/a/26110465
-
-			# we also replace all occurence of dependencies instances
-			__dep="${__instance^^}_INSTANCE_DEPENDENCIES"
-			__dep="${!__dep}"
-			__tango_log "DEBUG" "tango" "set_module_instance : ${__instance} dependencies instances : ${__dep}"
-			if [ ! "${__dep}" = "" ]; then
-				for d in ${__dep}; do
-					__mod="${d^^}_INSTANCE_MODULE"
-					__str="${__str} s/(SHARED_VAR_)(${!__mod})/\1_#DEP#_/g; s/(SHARED_VAR_)(${!__mod^^})/\1-#DEP#-/g; s/${!__mod}([^a-zA-Z0-9]*)/${d}\1/g; s/${!__mod^^}([^a-zA-Z0-9]*)/${d^^}\1/g; s/(SHARED_VAR_)_#DEP#_/\1${!__mod}/g; s/(SHARED_VAR_)-#DEP#-/\1${!__mod^^}/g;"
-				done
+			if [ "${_ORIGINAL_NAME}" = "" ]; then
+				yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_CTX_MODULES_ROOT}/${_INSTANCE_NAME}.yml")
+			else
+				# we replace all ocurrence of module name with an instance name
+				# except into lines containing FIXED_VAR expression anywhere
+				# and except expression beginning with SHARED_VAR_
+				# use sed implementation of negative lookbehind https://stackoverflow.com/a/26110465
+				__tango_log "DEBUG" "tango" "set_module_instance : ${__instance} is an instance of module : $_ORIGINAL_NAME"				
+				yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_CTX_MODULES_ROOT}/${_ORIGINAL_NAME}.yml" | sed -E "{/FIXED_VAR/! {s/#/##/g; s/(SHARED_VAR_)(${_ORIGINAL_NAME})/\1_#_/g; s/(SHARED_VAR_)(${_ORIGINAL_NAME^^})/\1-#-/g; s/${_ORIGINAL_NAME}([^a-zA-Z0-9]*)/${_INSTANCE_NAME}\1/g; s/${_ORIGINAL_NAME^^}([^a-zA-Z0-9]*)/${_INSTANCE_NAME^^}\1/g; s/(SHARED_VAR_)_#_/\1${_ORIGINAL_NAME}/g; s/(SHARED_VAR_)-#-/\1${_ORIGINAL_NAME^^}/g; s/##/#/g} }")
 			fi
-			yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_CTX_MODULES_ROOT}/${_MODULE_NAME}.yml" | sed -E "{/FIXED_VAR/! {s/#/##/g; s/(SHARED_VAR_)(${_MODULE_NAME})/\1_#_/g; s/(SHARED_VAR_)(${_MODULE_NAME^^})/\1-#-/g; s/${_MODULE_NAME}([^a-zA-Z0-9]*)/${_INSTANCE_NAME}\1/g; s/${_MODULE_NAME^^}([^a-zA-Z0-9]*)/${_INSTANCE_NAME^^}\1/g; s/(SHARED_VAR_)_#_/\1${_MODULE_NAME}/g; s/(SHARED_VAR_)-#-/\1${_MODULE_NAME^^}/g; s/##/#/g} }")
 		;;
 		TANGO )
-			__tango_log "DEBUG" "tango" "set_module_instance : ${__instance} is an instance of module : $_MODULE_NAME"
 			__tango_log "DEBUG" "tango" "set_module_instance : ${__instance} is an instance of a tango module"
-	
-			# we replace all ocurrence of module name with an instance name
-			# except into lines containing FIXED_VAR expression anywhere
-			# and except expression beginning with SHARED_VAR_
-			# use sed implementation of negative lookbehind https://stackoverflow.com/a/26110465
-			
-			# we also replace all occurence of dependencies instances
-			__dep="${__instance^^}_INSTANCE_DEPENDENCIES"
-			__dep="${!__dep}"
-			__tango_log "DEBUG" "tango" "set_module_instance : ${__instance} dependencies instances : ${__dep}"
-			if [ ! "${__dep}" = "" ]; then
-				for d in ${__dep}; do
-					__mod="${d^^}_INSTANCE_MODULE"
-					__str="${__str} s/(SHARED_VAR_)(${!__mod})/\1_#DEP#_/g; s/(SHARED_VAR_)(${!__mod^^})/\1-#DEP#-/g; s/${!__mod}([^a-zA-Z0-9]*)/${d}\1/g; s/${!__mod^^}([^a-zA-Z0-9]*)/${d^^}\1/g; s/(SHARED_VAR_)_#DEP#_/\1${!__mod}/g; s/(SHARED_VAR_)-#DEP#-/\1${!__mod^^}/g;"
-				done
+			if [ "${_ORIGINAL_NAME}" = "" ]; then
+				yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_MODULES_ROOT}/${_INSTANCE_NAME}.yml")
+			else
+				# we replace all ocurrence of module name with an instance name
+				# except into lines containing FIXED_VAR expression anywhere
+				# and except expression beginning with SHARED_VAR_
+				# use sed implementation of negative lookbehind https://stackoverflow.com/a/26110465
+				__tango_log "DEBUG" "tango" "set_module_instance : ${__instance} is an instance of module : $_ORIGINAL_NAME"
+				yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_MODULES_ROOT}/${_ORIGINAL_NAME}.yml" | sed -E "{/FIXED_VAR/! {s/#/##/g; s/(SHARED_VAR_)(${_ORIGINAL_NAME})/\1_#_/g; s/(SHARED_VAR_)(${_ORIGINAL_NAME^^})/\1-#-/g; s/${_ORIGINAL_NAME}([^a-zA-Z0-9]*)/${_INSTANCE_NAME}\1/g; s/${_ORIGINAL_NAME^^}([^a-zA-Z0-9]*)/${_INSTANCE_NAME^^}\1/g; s/(SHARED_VAR_)_#_/\1${_ORIGINAL_NAME}/g; s/(SHARED_VAR_)-#-/\1${_ORIGINAL_NAME^^}/g; s/##/#/g} }")
 			fi
-			yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_MODULES_ROOT}/${_MODULE_NAME}.yml" | sed -E "{/FIXED_VAR/! {s/#/##/g; s/(SHARED_VAR_)(${_MODULE_NAME})/\1_#_/g; s/(SHARED_VAR_)(${_MODULE_NAME^^})/\1-#-/g; ${__str} s/${_MODULE_NAME}([^a-zA-Z0-9]*)/${_INSTANCE_NAME}\1/g; s/${_MODULE_NAME^^}([^a-zA-Z0-9]*)/${_INSTANCE_NAME^^}\1/g; s/(SHARED_VAR_)_#_/\1${_MODULE_NAME}/g; s/(SHARED_VAR_)-#-/\1${_MODULE_NAME^^}/g; s/##/#/g} }")
 		;;
 	esac
 
@@ -1653,6 +1642,10 @@ __set_module_instance() {
 					
 	fi	
 
+	# dependencies
+	local __l="${_ORIGINAL_NAME^^}_MODULE_DEPENDENCIES"
+	__tango_log "DEBUG" "tango" "set_module_instance : ${__instance} instance depends needs instance of modules named : ${!__l}"
+	
 	# vpn
 	local _vpn=
 	__tango_log "DEBUG" "tango" "set_module_instance : ${__instance} declared to be attached to vpn id : ${_INSTANCE_VPN_ID}"
@@ -1663,55 +1656,44 @@ __set_module_instance() {
 }
 
 # get a list of instances name for a scaled item
-# for a module named 'mod' with MOD_INSTANCES_NAMES="foo bar"
-#		__get_scaled_item_instances_list "mod" "4"   --> "mod_foo mod_bar mod_instance_3 mod_instance_4"
-#		__get_scaled_item_instances_list "mod" "1"   --> "mod_foo"
-#		__get_scaled_item_instances_list "alpha" "1" --> "alpha"
-#		__get_scaled_item_instances_list "alpha" "2" --> "alpha_instance_1 alpha_instance_2"
+# for a module named 'mod' with MOD_INSTANCES_LIST="foo bar"
+#		__get_scaled_item_instances_list "mod" "4"   --> "foo bar mod_instance_3 mod_instance_4"
+#		__get_scaled_item_instances_list "mod" "1"   --> "foo"
+#		__get_scaled_item_instances_list "too" "1"   --> "too"
+#		__get_scaled_item_instances_list "too" "2"   --> "too_instance_1 too_instance_2"
 __get_scaled_item_instances_list() {
 	local __item_name="$1"
 	local __instances_nb="$2"
 
 	local __instances_list=
 	local __list=
-	local __size=
+	local __size=0
 	local __nb=
 
 	if [ ${__instances_nb} -le 0 ]; then
 		echo -n
 	else
 		# predefined instances list
-		__instances_list="${__item_name^^}_INSTANCES_NAMES"
+		__instances_list="${__item_name^^}_INSTANCES_LIST"
 		__instances_list="${!__instances_list}"
 
-		#for i in ${__instances_list}; do ((__size ++)); done
-		#https://stackoverflow.com/a/67870984
-		IFS=" " read -r -a words <<< "${__instances_list}"
-		__size="${#words[@]}"
-
-		
-		if [ ${__instances_nb} -eq 1 ]; then
-			if [ "${__instances_list}" = "" ]; then
-				__list="${__item_name}"
-				echo -n "${__list}"
-				return
-			fi
-		fi
-
+		for i in ${__instances_list}; do ((__size ++)); done
 		if [ ${__instances_nb} -gt ${__size} ]; then
-			for i in ${__instances_list}; do
-				__list="${__list} ${__item_name}_${i}"
-			done
+			
 			__nb=$(( __instances_nb - ${__size} ))
 			for i in $(seq $((__size+1)) $((__size+__nb)) ); do
-				__list="${__list} ${__item_name}_instance_${i}"
+				if [ ${__instances_nb} -eq 1 ]; then
+					__instances_list="${__item_name}"
+				else
+					__instances_list="${__instances_list} ${__item_name}_instance_${i}"
+				fi
 			done
-			__list="$($STELLA_API trim "${__list}")"
-			echo -n "${__list}"
+			__instances_list="$($STELLA_API trim "${__instances_list}")"
+			echo -n "${__instances_list}"
 		else
 			__nb=0
 			for i in ${__instances_list}; do
-				__list="${__list} ${__item_name}_${i}"
+				__list="${__list} ${i}"
 				((__nb++))
 				[ ${__nb} -eq ${__instances_nb} ] && break
 			done
@@ -1905,30 +1887,20 @@ __is_module_scalable() {
 
 __check_modules_definition() {
 	
-	# FIRST CHECK : no _MODULE_DEPENDENCIES variable in modules environment files
+	# FIRST CHECK : no _MODULE_MODULE_DEPENDENCIES variable in modules environment files
 	# check if there is any LINKS declaration in module environment files, because it is not permitted
 	for f in ${TANGO_MODULES_ROOT}/*.env; do
-		[[  $(<$f) =~ ^[a-zA-Z_]+[a-zA-Z0-9_]*_MODULE_DEPENDENCIES= ]] && __tango_log "ERROR" "tango" "tango module $(basename ${f} .env) use illegal _MODULE_DEPENDENCIES= variable in $f. Use a $(basename ${f} .env).deps file instead" && exit 1
+		[[  $(<$f) =~ ^[a-zA-Z_]+[a-zA-Z0-9_]*_MODULE_MODULE_DEPENDENCIES= ]] && __tango_log "ERROR" "tango" "tango module $(basename ${f} .env) use illegal _MODULE_MODULE_DEPENDENCIES= variable in $f. Use a $(basename ${f} .env).deps file instead" && exit 1
 	done
 	if [ ! "${TANGO_NOT_IN_ANY_CTX}" = "1" ]; then
 		for f in ${TANGO_CTX_MODULES_ROOT}/*.env; do
-			[[  $(<$f) =~ ^[a-zA-Z_]+[a-zA-Z0-9_]*_MODULE_DEPENDENCIES= ]] && __tango_log "ERROR" "tango" "$TANGO_CTX_NAME module $(basename ${f} .env) use illegal _MODULE_DEPENDENCIES= variable in $f. Use a $(basename ${f} .env).deps file instead" && exit 1
+			[[  $(<$f) =~ ^[a-zA-Z_]+[a-zA-Z0-9_]*_MODULE_MODULE_DEPENDENCIES= ]] && __tango_log "ERROR" "tango" "$TANGO_CTX_NAME module $(basename ${f} .env) use illegal _MODULE_MODULE_DEPENDENCIES= variable in $f. Use a $(basename ${f} .env).deps file instead" && exit 1
 		done
 	fi
 
-	# SECOND CHECK : warn if files are missing
-	for f in ${TANGO_MODULES_ROOT}/*.yml; do
-		[ ! -f "${f//.*/}.md" ] && __tango_log "WARN" "tango" "missing description file (.md) for tango module ${f//.*/}.md in $TANGO_MODULES_ROOT"
-		[ ! -f "${f//.*/}.env" ] && __tango_log "WARN" "tango" "missing an env file (.env) for tango module ${f//.*/}.md in $TANGO_MODULES_ROOT"
-	done
-	if [ ! "${TANGO_NOT_IN_ANY_CTX}" = "1" ]; then
-		for f in ${TANGO_CTX_MODULES_ROOT}/*.yml; do
-			[ ! -f "${f//.*/}.md" ] && __tango_log "WARN" "tango" "missing description file (.md) for $TANGO_CTX_NAME module ${f//.*/}.md in $TANGO_CTX_MODULES_ROOT"
-			[ ! -f "${f//.*/}.env" ] && __tango_log "WARN" "tango" "missing an env file (.env) for $TANGO_CTX_NAME module ${f//.*/}.md in $TANGO_CTX_MODULES_ROOT"
-		done
-	fi
+	# TODO : SECOND CHECK : warn if .md file is missing
 
-	
+	# TODO : LAST CHECK : detect unknow files
 }
 
 # load all modules dependencies declared with .deps files
@@ -1951,7 +1923,7 @@ __load_modules_dependencies() {
 				if [ -n "${__dep}" ]; then
 					__m_links_varname="${__m^^}_MODULE_DEPENDENCIES"
 					__links="$($STELLA_API trim "${__dep} ${!__m_links_varname}")"
-					__tango_log "DEBUG" "tango" "module $__m have dependencies : ${__links}"
+					__tango_log "DEBUG" "tango" "tango module $__m have dependencies : ${__links}"
 					eval "export ${__m_links_varname}=\"${__links}\""
 					__add_declared_variables "${__m_links_varname}"
 				fi
@@ -2065,10 +2037,6 @@ __process_modules_dependencies() {
 		__var="$(__get_scaled_item_instances_list "${l}" "${!__linked_module_nb}")"
 		eval "export ${l^^}_INSTANCES_LIST=\"${__var}\""
 		__add_declared_variables "${l^^}_INSTANCES_LIST"
-		for i in ${__var}; do
-			eval "export ${i^^}_INSTANCE_MODULE=\"${l}\""
-			__add_declared_variables "${i^^}_INSTANCE_MODULE"
-		done
 
 		# we remove duplicate because some instance names could already be in the list, because of scaled modules which were not dependencies
 		TANGO_SERVICES_MODULES="$($STELLA_API list_filter_duplicate "${TANGO_SERVICES_MODULES} ${__var}")"
@@ -2110,10 +2078,6 @@ __process_modules_dependencies() {
 			p=$((p+1))
 			eval "export ${i^^}_INSTANCE_LINKED=\"${__parent_instance}\""
 			__add_declared_variables "${i^^}_INSTANCE_LINKED"
-
-			__tmp="${__parent_instance^^}_INSTANCE_DEPENDENCIES"
-			eval "export ${__tmp}=\"$($STELLA_API trim "${!__tmp} ${i}")\""
-			__add_declared_variables "${__tmp}"
 
 			# linked modules extended definition inherit in priority order from :
 			# 		extended def from declaration of module (ANY DECLARED MODULE WHICH ARE ALSO DEPENDENCIES WILL ERASE EXTENDED DEF INHERITED FROM ANY PARENT)
@@ -2259,72 +2223,67 @@ __parse_and_scale_modules_declaration() {
 		__full="${__array_list_full[$index]}"
 
 		if __item_definition_exists "module" "${__name}"; then
-			__parse_item "module" "${__array_list_full[$index]}" "__ITEM"
+			__parse_item "module" "${__array_list_full[$index]}" "__MODULE"
 		
 				
 			if __is_module_scalable "${__name}"; then
 				eval "export ${__name^^}_IS_SCALABLE=1"
 				__add_declared_variables "${__name^^}_IS_SCALABLE"
 			else
-				if [ ${__ITEM_INSTANCES_NB} -gt 1 ]; then
-					__tango_log "ERROR" "tango" "Trying to scale ${__name} to ${__ITEM_INSTANCES_NB}, but this module have not be designed to be scaled (no ${__name}.scalable file found)."
+				if [ ${__MODULE_INSTANCES_NB} -gt 1 ]; then
+					__tango_log "ERROR" "tango" "Trying to scale ${__name} to ${__MODULE_INSTANCES_NB}, but this module have not be designed to be scaled (no ${__name}.scalable file found)."
 					exit 1
 				fi
 			fi
 
-			if [ ${__ITEM_INSTANCES_NB} -gt 1 ]; then
+			if [ ${__MODULE_INSTANCES_NB} -gt 1 ]; then
 				TANGO_SERVICES_MODULES_SCALED="${TANGO_SERVICES_MODULES_SCALED} ${__name}"
 			fi			
 
-			__var="$(__get_scaled_item_instances_list "${__name}" "${__ITEM_INSTANCES_NB}")"
+			__var="$(__get_scaled_item_instances_list "${__name}" "${__MODULE_INSTANCES_NB}")"
 			eval "export ${__name^^}_INSTANCES_LIST=\"${__var}\""
 			__add_declared_variables "${__name^^}_INSTANCES_LIST"
-			for i in ${__var}; do
-				eval "export ${i^^}_INSTANCE_MODULE=\"${__name}\""
-				__add_declared_variables "${i^^}_INSTANCE_MODULE"
-			done
-
-
+			
 			__list_instances_names="${__list_instances_names} ${__var}"
 
-			eval "export ${__name^^}_INSTANCES_LIST_FULL=\"${__var// /$__ITEM_EXTENDED_DEF_WITHOUT_SCALE }${__ITEM_EXTENDED_DEF_WITHOUT_SCALE}\""
+			eval "export ${__name^^}_INSTANCES_LIST_FULL=\"${__var// /$__MODULE_EXTENDED_DEF_WITHOUT_SCALE }${__MODULE_EXTENDED_DEF_WITHOUT_SCALE}\""
 			__add_declared_variables "${__name^^}_INSTANCES_LIST_FULL"
 			
 			__list_full="${__list_full} ${__name}"
-			__list_full="${__list_full}${__ITEM_EXTENDED_DEF}"
+			__list_full="${__list_full}${__MODULE_EXTENDED_DEF}"
 
-			__tango_log "DEBUG" "tango" "filter_and_scale_items : module ${__name} have ${__ITEM_INSTANCES_NB} instances"
+			__tango_log "DEBUG" "tango" "filter_and_scale_items : module ${__name} have ${__MODULE_INSTANCES_NB} instances"
 			
 	
 			# instances nb
-			eval "export ${__name^^}_INSTANCES_NB=${__ITEM_INSTANCES_NB}"
+			eval "export ${__name^^}_INSTANCES_NB=${__MODULE_INSTANCES_NB}"
 			__add_declared_variables "${__name^^}_INSTANCES_NB"
 
 			# dependencies : 
 			# module name have dependencies stored in _MODULE_DEPENDENCIES var
 			# cumulate with dependencies declared with previous variable _MODULE_DEPENDENCIES
 			__links="${__name^^}_MODULE_DEPENDENCIES"
-			[ -n "${__ITEM_DEPENDENCIES}" ] && eval "export ${__links}=\"$($STELLA_API list_filter_duplicate "${__ITEM_DEPENDENCIES} ${!__links}")\""
+			[ -n "${__MODULE_MODULE_DEPENDENCIES}" ] && eval "export ${__links}=\"$($STELLA_API list_filter_duplicate "${__MODULE_MODULE_DEPENDENCIES} ${!__links}")\""
 			__add_declared_variables "${__links}"
 
-			eval "export ${__name^^}_MODULE_EXTENDED_DEF=\"${__ITEM_EXTENDED_DEF}\""
+			eval "export ${__name^^}_MODULE_EXTENDED_DEF=\"${__MODULE_EXTENDED_DEF}\""
 			__add_declared_variables "${__name^^}_MODULE_EXTENDED_DEF"
 			for i in ${__var}; do
-				eval "export ${i^^}_INSTANCE_EXTENDED_DEF=\"${__ITEM_EXTENDED_DEF}\""
+				eval "export ${i^^}_INSTANCE_EXTENDED_DEF=\"${__MODULE_EXTENDED_DEF}\""
 				__add_declared_variables "${i^^}_INSTANCE_EXTENDED_DEF"
 			done
 
-			eval "export ${__name^^}_MODULE_EXTENDED_DEF_WITHOUT_SCALE=\"${__ITEM_EXTENDED_DEF_WITHOUT_SCALE}\""
+			eval "export ${__name^^}_MODULE_EXTENDED_DEF_WITHOUT_SCALE=\"${__MODULE_EXTENDED_DEF_WITHOUT_SCALE}\""
 			__add_declared_variables "${__name^^}_MODULE_EXTENDED_DEF_WITHOUT_SCALE"
 			for i in ${__var}; do
-				eval "export ${i^^}_INSTANCE_EXTENDED_DEF_WITHOUT_SCALE=\"${__ITEM_EXTENDED_DEF_WITHOUT_SCALE}\""
+				eval "export ${i^^}_INSTANCE_EXTENDED_DEF_WITHOUT_SCALE=\"${__MODULE_EXTENDED_DEF_WITHOUT_SCALE}\""
 				__add_declared_variables "${i^^}_INSTANCE_EXTENDED_DEF_WITHOUT_SCALE"
 			done
 
-			eval "export ${__name^^}_MODULE_EXTENDED_DEF_WITHOUT_SCALE_DEP=\"${__ITEM_EXTENDED_DEF_WITHOUT_SCALE_DEP}\""
+			eval "export ${__name^^}_MODULE_EXTENDED_DEF_WITHOUT_SCALE_DEP=\"${__MODULE_EXTENDED_DEF_WITHOUT_SCALE_DEP}\""
 			__add_declared_variables "${__name^^}_MODULE_EXTENDED_DEF_WITHOUT_SCALE_DEP"
 			for i in ${__var}; do
-				eval "export ${i^^}_INSTANCE_EXTENDED_DEF_WITHOUT_SCALE_DEP=\"${__ITEM_EXTENDED_DEF_WITHOUT_SCALE_DEP}\""
+				eval "export ${i^^}_INSTANCE_EXTENDED_DEF_WITHOUT_SCALE_DEP=\"${__MODULE_EXTENDED_DEF_WITHOUT_SCALE_DEP}\""
 				__add_declared_variables "${i^^}_INSTANCE_EXTENDED_DEF_WITHOUT_SCALE_DEP"
 			done
 			
@@ -2408,7 +2367,7 @@ __parse_item() {
 			# network area to bind item to
 			eval ${__result_prefix}_NETWORK_AREA=
 			# links list : services dependencies for module
-			eval ${__result_prefix}_DEPENDENCIES=
+			eval ${__result_prefix}_MODULE_DEPENDENCIES=
 			# vpn id to bind item to
 			eval ${__result_prefix}_VPN_ID=
 		;;
@@ -2563,7 +2522,7 @@ __parse_item() {
 						eval ${__result_prefix}_LINKS_AUTO_EXEC='"'${__tmp_list_exec}'"'
 					;;
 					module)
-						eval ${__result_prefix}_DEPENDENCIES='"'${__service_dependency_list}'"'
+						eval ${__result_prefix}_MODULE_DEPENDENCIES='"'${__service_dependency_list}'"'
 					;;
 				esac
 				
@@ -3498,25 +3457,15 @@ __tango_curl() {
 		local __id="$TANGO_CTX_NAME_$($STELLA_API md5 "$@")"
 		docker stop ${__id} 1>&2 2>/dev/null
 		docker rm ${__id} 1>&2 2>/dev/null
-
-		local PROXY
+		# TODO use $PROXY inside docker run command
 		[ ! "$STELLA_HTTP_PROXY" = "" ] && PROXY="-e HTTP_PROXY=${STELLA_HTTP_PROXY} -e HTTPS_PROXY=${STELLA_HTTPS_PROXY} -e http_proxy=${STELLA_HTTP_PROXY} -e https_proxy=${STELLA_HTTPS_PROXY} -e NO_PROXY=${NO_PROXY} -e no_proxy=${no_proxy}"
-		local __port
-		[ ! "${STELLA_PROXY_PORT}" = "" ] && __port=":${STELLA_PROXY_PORT}"
-		local __user
-		[ ! "${STELLA_PROXY_USER}" = "" ] && __user="--proxy-user ${STELLA_PROXY_USER}:${STELLA_PROXY_PASS}"
-
-		local __network
-		if docker network inspect ${TANGO_CTX_NETWORK_NAME} >/dev/null 2>&1; then
-			__network="--network ${TANGO_CTX_NETWORK_NAME}"
-		fi
-		if docker run --name ${__id} --user "${TANGO_USER_ID}:${TANGO_GROUP_ID}" ${__network} ${PROXY} --rm curlimages/curl:7.70.0 --noproxy "${STELLA_NO_PROXY}" --proxy "${STELLA_PROXY_HOST}${__port}" ${__user} "$@"; then
+		# NOTE TODO : At this point network TANGO_CTX_NETWORK_NAME may not exists yet
+		if docker run --name ${__id} --user "${TANGO_USER_ID}:${TANGO_GROUP_ID}" --network "${TANGO_CTX_NETWORK_NAME}" --rm curlimages/curl:7.70.0 "$@"; then
 			docker rm ${__id} 1>&2 2>/dev/null
 		else
 			docker rm ${__id} 1>&2 2>/dev/null
 			type curl &>/dev/null && curl "$@"
 		fi
-
 	else
 		type curl &>/dev/null && curl "$@"
 	fi
@@ -3525,22 +3474,10 @@ __tango_curl() {
 # launch a git command from a docker image in priority if docker is available or from git from host if not
 __tango_git() {
 	if __is_docker_client_available; then
-		local __id="$TANGO_CTX_NAME_$($STELLA_API md5 "$@")"
-		docker stop ${__id} 1>&2 2>/dev/null
-		docker rm ${__id} 1>&2 2>/dev/null
-
-		local PROXY
-		[ ! "$STELLA_HTTP_PROXY" = "" ] && PROXY="-e HTTP_PROXY=${STELLA_HTTP_PROXY} -e HTTPS_PROXY=${STELLA_HTTPS_PROXY} -e http_proxy=${STELLA_HTTP_PROXY} -e https_proxy=${STELLA_HTTPS_PROXY} -e NO_PROXY=${NO_PROXY} -e no_proxy=${no_proxy}"
-		local __network
-		if docker network inspect ${TANGO_CTX_NETWORK_NAME} >/dev/null 2>&1; then
-			__network="--network ${TANGO_CTX_NETWORK_NAME}"
-		fi
-		if docker run --user "${TANGO_USER_ID}:${TANGO_GROUP_ID}" ${__network} ${PROXY} --rm -it -v $(pwd):/git alpine/git:latest "$@"; then
-			docker rm ${__id} 1>&2 2>/dev/null
-		else
-			docker rm ${__id} 1>&2 2>/dev/null
-			type git &>/dev/null && git "$@"
-		fi
+		# https://hub.docker.com/r/alpine/git
+		# TODO network may not exists yet : test if exist first
+		# TODO inject http proxy
+		docker run --user "${TANGO_USER_ID}:${TANGO_GROUP_ID}" --network "${TANGO_CTX_NETWORK_NAME}" --rm -it -v $(pwd):/git alpine/git:latest "$@"
 	else
 		type git &>/dev/null && git "$@"
 	fi

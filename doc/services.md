@@ -54,7 +54,7 @@
 
 ### Attach a module
 
-* Declare a module as attached to current tango context
+* Declare a module attached to current tango context
     * When a module is declared attached to tango, tango can manage it
     * use `--module` command line option OR variable list `TANGO_SERVICES_MODULES`
     * `--module` is a repeatable command line option
@@ -77,6 +77,7 @@
     ```
     ./tango --module cloud9%sabnzbd%transmission up cloud9 
     ```
+    * Modules dependencies are shared on all instances of the same module. It is not possible to launch one instance of a module with a set of dependencies and another instance of the module with another set of dependencies.
 
 * Declaration : network (advanced configuration)
     * by default the service is attached to the default tango network area (named main)

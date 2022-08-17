@@ -95,7 +95,7 @@ case ${ACTION} in
 		#					these variables are updated inside env files
 		#					it is not needed to export these variables
 		
-		# order priority :
+		# order priority at the end will be :
 		# 	- new and computed variables at runtime
 		#	- shell env variables
 		#	- command line
@@ -116,6 +116,8 @@ case ${ACTION} in
 		__add_declared_variables "ASSOCIATIVE_ARRAY_LIST"
 
 		
+		__check_modules_definition
+
 		# create bash env file using only user, ctx and default files
 		# bash env files priority :
 		# 	- user env file
@@ -125,7 +127,7 @@ case ${ACTION} in
 
 		# modules -----
 		# extract declared services modules from user, ctx and default env files
-		# only if no external environement variable TANGO_SERVICES_MODULES was defined
+		# only if no shell environement variable TANGO_SERVICES_MODULES was defined
 		# 	take value from TANGO_SERVICES_MODULES_ORIGINAL_VAR which contains non scaled TANGO_SERVICES_MODULES original values (without command line values) from a previous launch (usefull when TANGO_ALTER_GENERATED_FILES is OFF)
 		#   OR from TANGO_SERVICES_MODULES
 		if [ "${TANGO_SERVICES_MODULES}" = "" ]; then
@@ -143,25 +145,75 @@ case ${ACTION} in
 			__add_item_declaration_from_cmdline "module"
 		fi
 		
-		# take care of modules env files by recreating bash env file using user, ctx, modules and default files
-		# bash env files priority :
+
+
+
+
+
+
+		# get modules dependencies information 
+
+		# we need to extract modules dependencies declared with _MODULE_DEPENDENCIES from shell, user, ctx, and default environment variables :
+		# first, we save modules dependencies list from shell environment variables
+		__save_modules_links_shell_env_var="$(declare -p | grep _MODULE_DEPENDENCIES=)"
+		# second, we need to extract modules dependencies declared with _MODULE_DEPENDENCIES variables
+		#  from 
 		# 			- user env file
-		# 			- modules env file
 		# 			- ctx env file
 		# 			- default env file
-		if [ ! "${TANGO_SERVICES_MODULES}" = "" ]; then
-			#  we need to extract modules instances list names before __filter_and_scale_items for eventually scaled modules to come
-			eval "$(env -i bash --noprofile --norc -c ". ${GENERATED_ENV_FILE_FOR_BASH}; declare +x | grep _INSTANCES_LIST=")"
-			# filter and scale module list
-			__filter_and_scale_items "module"
-			
-			#__process_dependencies TODO CONTINUE HERE
+		eval "$(env -i bash --noprofile --norc -c ". ${GENERATED_ENV_FILE_FOR_BASH}; declare -p | grep _MODULE_DEPENDENCIES=")"
+		# third, we erase values with values from shell environment variables
+		eval "${__save_modules_links_shell_env_var}"
 
-			[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __create_env_files "bash" "default ctx modules user"
+
+		# load all modules dependencies declared with .deps files
+		__load_modules_dependencies
 
 			
-		fi
+
+
 		
+		# get scaling information of modules 
+
+		# we need to extract modules instances names list from shell, user, ctx and default environment variables
+		# before __parse_and_scale_modules_declaration for eventually scaled modules to come
+
+		# first, we save modules instances list from shell environment variables
+		__save_instances_list_shell_env_var="$(declare -p | grep _INSTANCES_NAMES=)"
+		# second, we extract modules instances list names from
+		# 			- user env file
+		# 			- ctx env file
+		# 			- default env file
+		eval "$(env -i bash --noprofile --norc -c ". ${GENERATED_ENV_FILE_FOR_BASH}; declare -p | grep _INSTANCES_NAMES=")"
+		# third, we erase values with value from shell environment variables
+		eval "${__save_instances_list_shell_env_var}"
+
+
+		# parse and scale module list
+		__parse_and_scale_modules_declaration
+
+		# process all module dependencies 
+		__process_modules_dependencies
+
+
+		if [ ! "$TANGO_SERVICES_MODULES" = "" ]; then
+			# take care of modules env files by recreating bash env file using user, ctx, modules and default files after having scaled modules and processed modules dependencies
+			# bash env files priority :
+			# 			- user env file
+			# 			- modules env file
+			# 			- ctx env file
+			# 			- default env file
+			[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __create_env_files "bash" "default ctx modules user"		
+		fi
+
+
+
+
+
+
+
+
+
 
 
 
@@ -178,7 +230,7 @@ case ${ACTION} in
 			__add_item_declaration_from_cmdline "plugin"
 		fi
 		# check plugins exist and build list and map
-		[ ! "${TANGO_PLUGINS}" = "" ] && __filter_and_scale_items "plugin"
+		[ ! "${TANGO_PLUGINS}" = "" ] && __parse_plugins_declaration
 		
 
 
@@ -186,7 +238,7 @@ case ${ACTION} in
 		# ports ------
 		# test if some ports are declared by command line
 		# parse for each network area if a value is setted
-		# --port option override NETWORK_PORT_area_name variable even shell environment variable
+		# --port option override NETWORK_PORT_area_name variable and shell environment variable
 		if [ ! "${PORT}" = "" ]; then
 			PORT="${PORT//:/ }"
 			for p in ${PORT}; do
@@ -217,7 +269,7 @@ case ${ACTION} in
 
 		
 
-		# STEP 2 ------ process command line and shell env variables
+		# STEP 2 ------ process command line and shell environment variables
 
 
 		[ "${TANGO_USER_ID}" = "" ] && [ ! "${PUID}" = "" ] && TANGO_USER_ID="${PUID}"
@@ -272,14 +324,12 @@ case ${ACTION} in
 
 		# contains list of modules instances names (including scaled modules)
 		__add_declared_variables "TANGO_SERVICES_MODULES"
-		# contains list of modules in full definition format (including scaled module)
+		# contains list of modules in full definition format
 		__add_declared_variables "TANGO_SERVICES_MODULES_FULL"
-		# contains list of modules which are dependencies of other modules
-		__add_declared_variables "TANGO_SERVICES_MODULES_LINKS"
-		# contains list of modules names which have been scaled to a number of instances
+		# contains list of modules names which are linked dependencies
+		__add_declared_variables "TANGO_SERVICES_MODULES_LINKED"
+		# contains list of modules names which have been scaled to a number of instances >1
 		__add_declared_variables "TANGO_SERVICES_MODULES_SCALED"
-		# contains list of modules in full definition format which have been scaled to a number of instances
-		__add_declared_variables "TANGO_SERVICES_MODULES_SCALED_FULL"
 		# contains original TANGO_SERVICES_MODULES variable from environment files (not from command line)
 		__add_declared_variables "TANGO_SERVICES_MODULES_ORIGINAL_VAR"
 		__add_declared_variables "TANGO_PLUGINS"
@@ -292,7 +342,8 @@ case ${ACTION} in
 		done
 		
 		# update env var 
-		# env var values priority order :
+		# __update_env_files will update all values using current shell environment variables and values from command line
+		# env var values priority order will be:
 		#	- shell env variables
 		#	- command line
 		# 	- user env file
@@ -302,12 +353,7 @@ case ${ACTION} in
 		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __update_env_files "ingest with env variables from shell and command line"
 		# load env var
 		# even if files have not been modified, we want to load previously saved variables
-		# NOTE : first load_env_vars before other steps
 		__load_env_vars
-		
-		
-
-
 
 
 		# STEP 3 ------ process hardcoded default values, and computed runtime variable not fixed with command line nor shell env var nor env files
@@ -485,7 +531,6 @@ case ${ACTION} in
 		__add_declared_variables "TANGO_HOSTNAME"
 		if [ "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
 			# TODO catch error curl
-			# TODO active current proxy
 			# TODO tango curl docker version use a docker network which may not exist yet
 			TANGO_EXTERNAL_IP="$(__tango_curl --connect-timeout 2 -skL ipinfo.io/ip)"
 			__tango_log "INFO" "tango" "Declared being exposed on internet, external IP detected : $TANGO_EXTERNAL_IP"
