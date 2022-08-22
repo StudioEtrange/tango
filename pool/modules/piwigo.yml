@@ -1,0 +1,55 @@
+volumes:
+  piwigo_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PIWIGO_DATA_PATH}
+    name: ${TANGO_CTX_NAME}_piwigo_data
+  piwigo_media:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PIWIGO_MEDIA_PATH}
+    name: ${TANGO_CTX_NAME}_piwigo_media
+
+services:
+  piwigo:
+    image: ${PIWIGO_IMAGE_FIXED_VAR}:${PIWIGO_VERSION_FIXED_VAR:-latest}
+    container_name: ${TANGO_CTX_NAME}_piwigo
+    depends_on: 
+      - service_init
+    restart: unless-stopped
+    volumes:
+      - piwigo_data:/config
+      - piwigo_media:/gallery
+    environment:
+      - PUID=${TANGO_USER_ID:-0}
+      - PGID=${TANGO_GROUP_ID:-0}
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      # service : piwigo -------------------------
+      - "traefik.http.services.piwigo.loadbalancer.server.port=80"
+      - "traefik.http.services.piwigo.loadbalancer.server.scheme=http"
+      - "traefik.http.services.piwigo.loadbalancer.passhostheader=true"
+      # middlewares : piwigo
+      # service router : piwigo
+      - "traefik.http.routers.piwigo.entrypoints=${PIWIGO_ENTRYPOINTS:-entry_main_http}"
+      - "traefik.http.routers.piwigo.rule=HostRegexp(`{subdomain:${PIWIGO_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.piwigo.priority=${PIWIGO_PRIORITY}"
+      - "traefik.http.routers.piwigo.service=piwigo"
+      - "traefik.http.routers.piwigo-secure.entrypoints=${PIWIGO_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
+      - "traefik.http.routers.piwigo-secure.rule=HostRegexp(`{subdomain:${PIWIGO_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.piwigo-secure.priority=${PIWIGO_PRIORITY}"
+      - "traefik.http.routers.piwigo-secure.service=piwigo"
+      - "traefik.http.routers.piwigo-secure.tls=true"
+      - "traefik.http.routers.piwigo-secure.tls.domains[0].main=${PIWIGO_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      # service router middlewares : piwigo
+      - "traefik.http.routers.piwigo.middlewares=error-middleware"
+      - "traefik.http.routers.piwigo-secure.middlewares=error-middleware"
+    networks:
+      - default
+    expose:
+      - 80/tcp
