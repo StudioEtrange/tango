@@ -1,9 +1,10 @@
 #  TODO 
 
+* [ ] 20220819 : implemetn add environment to service
 
-* [ ] 2022 07 31 test :
+* [X] 2022 07 31 test :
 ```
-TUTU_LINKS="22 23" ./tango --module portainer%dcksocketproxy%filezilla%firefox --module firefox^2~vpn_1%cloud9 --domain chimere-harpie.org --freeport gen -d
+./tango --module portainer%dcksocketproxy%filezilla%firefox --module firefox^2~vpn_1%cloud9 --domain chimere-harpie.org --freeport gen -d
 ```
 
 * [ ] 2022 01 30 - DNS challenge mode AND cloudflare 

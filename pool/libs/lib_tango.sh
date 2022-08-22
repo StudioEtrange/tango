@@ -780,25 +780,26 @@ __add_volume_definition_all() {
 
 
 
-# attach middlewares to services
+# attach middlewares to services and subservices
 # use <SERVICE>_ADDITIONAL_MIDDLEWARES variable with : as separator for priority (FOO_ADDITIONAL_MIDDLEWARES="midd1:LAST midd2 midd3:POS:4")
 # :FIRST or :LAST(default) or POS:N 
 __add_middleware_service_all() {
 	local _t=
-	#local __midd=
+	local _parent_s=
+	
 	for _s in $(compgen -A variable | grep _ADDITIONAL_MIDDLEWARES$); do
 		_s="${_s%_ADDITIONAL_MIDDLEWARES}"
-		if __check_docker_compose_service_exist "${_s,,}"; then
+		
+		
+		if __check_traefik_router_exist "${_s,,}"; then
 			_t="${_s}_ADDITIONAL_MIDDLEWARES"
 			for _v in ${!_t}; do
-				#__midd=(${_v//:/ })
 				__parse_item "middleware" "${_v}" "_MIDDLEWARE"
-				#__attach_middleware_to_service "${_s,,}" "${__midd[0]}" "${__midd[1]} ${__midd[2]}"
 				__attach_middleware_to_service "${_s,,}" "${_MIDDLEWARE_NAME}" "${_MIDDLEWARE_POSITION} ${_MIDDLEWARE_POS_NUMBER}"
 				__tango_log "DEBUG" "tango" "add_middleware_service_all : attach middleware : ${_v} to compose service : ${_s,,}."
 			done
 		else
-			__tango_log "WARN" "tango" "add_middleware_service_all : service compose ${_s,,} declared with ${_s}_ADDITIONAL_MIDDLEWARES do not exist."
+			__tango_log "WARN" "tango" "add_middleware_service_all : traefik router ${_s,,} do not exist and can add these additional middlewares : ${_t} : ${!_t}."
 		fi
 	done
 }
@@ -807,19 +808,20 @@ __add_middleware_service_all() {
 # NOTE in general case we add variable inside all services just by using __add_declared_variable
 # but those variables are shared by all services. If we want different values for each service of a variable we need to add them
 # through compose env file
-# use <SERVICE>_SPECIFIC_ENVVAR variable
+# <service_name>_ADDITIONAL_ENVVAR=<var=exp> <var=exp>
+# FOO_ADDITIONAL_ENVVAR=A=1 B=2
 __add_environment_service_all() {
 
 	local _t=
-	for _s in $(compgen -A variable | grep _SPECIFIC_ENVVAR$); do
-		_s="${_s%_SPECIFIC_ENVVAR}"
+	for _s in $(compgen -A variable | grep _ADDITIONAL_ENVVAR$); do
+		_s="${_s%_ADDITIONAL_ENVVAR}"
 		if __check_docker_compose_service_exist "${_s,,}"; then
-			_t="${_s}_SPECIFIC_ENVVAR"
+			_t="${_s}_ADDITIONAL_ENVVAR"
 			for _e in ${!_t}; do
 				yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${_s,,}.environment[+]" "${_e}"
 			done
 		else
-			__tango_log "WARN" "tango" "add_environment_service_all : service compose ${_s,,} declared with ${_s}_SPECIFIC_ENVVAR  do not exist."
+			__tango_log "WARN" "tango" "add_environment_service_all : service compose ${_s,,} declared with ${_s}_ADDITIONAL_ENVVAR  do not exist."
 		fi
 	done
 
@@ -2615,9 +2617,9 @@ __parse_item() {
 
 }
 
-# list available modules or plugins or scripts
-# type : module | plugin | script
-# mode : all (default) | ctx | tango
+# list available modules or plugins
+# type : module | plugin
+# mode : all (default) | ctx
 __list_items() {
 	local __type="${1}"
 	local __mode="${2:-all}"
@@ -2628,7 +2630,7 @@ __list_items() {
 	case ${__type} in
 		module ) __ctx_folder="${TANGO_CTX_MODULES_ROOT}"; __tango_folder="${TANGO_MODULES_ROOT}"; __file_ext='*.yml';;
 		plugin ) __ctx_folder="${TANGO_CTX_PLUGINS_ROOT}"; __tango_folder="${TANGO_PLUGINS_ROOT}"; __file_ext='*';;
-		script ) __ctx_folder="${TANGO_CTX_SCRIPTS_ROOT}"; __tango_folder="${TANGO_SCRIPTS_ROOT}"; __file_ext='*';;
+		#script ) __ctx_folder="${TANGO_CTX_SCRIPTS_ROOT}"; __tango_folder="${TANGO_SCRIPTS_ROOT}"; __file_ext='*';;
 	esac
 
 	local __result=""
@@ -3007,7 +3009,7 @@ __add_volume_for_time() {
 }
 
 
-# attach a middleware to a service and its optional secured version in compose file
+# attach a middleware to a service or a subservice and its optional secured version in compose file
 # It will add middleware to secured version ONLY if secured version exists
 # option FIRST or LAST(default) or POS N (N start at 1 for first position) for middleware position
 # __attach_middleware_to_service "airdcppweb" "error-middleware" "LAST" add : - "traefik.http.routers.airdcppweb-secure.middlewares=error-middleware"
@@ -3042,6 +3044,7 @@ __detach_middleware_from_service() {
 }
 
 
+# modify middlewares for services or subservices
 __modify_services_middlewares() {
 	local __service="$1"
 	local __middleware_name="$2"
@@ -3052,10 +3055,7 @@ __modify_services_middlewares() {
 	local __secure=
 	local __flag_pos=
 
-	if ! __check_traefik_router_exist "$__service"; then
-		__tango_log "WARN" "tango" "modify_services_middlewares : SKIP $__service do not exist"
-		return
-	fi
+	
 	for o in ${__opt}; do
 		[ "${__flag_pos}" = "1" ] && __pos="$o" && __flag_pos="0" && continue
 		case $o in
@@ -3156,12 +3156,25 @@ __modify_services_middlewares() {
 		;;
 	esac
 
+	
+	
+	# test if its a subservice or a service
+	__parent="$(__get_subservice_parent "${__service}")"
+	[ "${__parent}" = "" ] && __parent="${__service}"
+	if ! __check_traefik_router_exist "$__service"; then
+		__tango_log "WARN" "tango" "modify_services_middlewares : SKIP $__service traefik router do not exist"
+		return
+	fi
+
+	if ! __check_docker_compose_service_exist "$__parent"; then
+		__tango_log "WARN" "tango" "modify_services_middlewares : SKIP $__parent service do not exist"
+		return
+	fi
+
 	__middlewares_list="${__middlewares_list// /,}"
 	# remove previous value
 	sed -i -e '/^[^#]*traefik\.http\.routers\.'${__service}'\.middlewares=/d' "${GENERATED_DOCKER_COMPOSE_FILE}"
 	# set new value
-	__parent="$(__get_subservice_parent "${__service}")"
-	[ "${__parent}" = "" ] && __parent="${__service}"
 	[ ! "${__middlewares_list}" = "" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__parent}.labels[+]" "traefik.http.routers.${__service}.middlewares=${__middlewares_list}"
 
 	if [ "$__secure" = "1" ]; then

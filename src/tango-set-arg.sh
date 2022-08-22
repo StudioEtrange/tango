@@ -38,7 +38,7 @@ usage() {
 
 # COMMAND LINE
 PARAMETERS="
-ACTION=										'action' 			a				'update info gen shell exec up down status install logs restart services modules plugins scripts cert vendor letsencrypt' '1'
+ACTION=										'action' 			a				'update info gen shell exec up down status install logs restart services modules plugins cert vendor letsencrypt' '1'
 TARGET=										'target' 			s				''	'0'
 ARGUMENT=									'argument' 			s				''	'0'
 "

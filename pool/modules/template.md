@@ -42,9 +42,9 @@
 |FOO|1|foo|
 |WIDTH|1280|width|
 |HEIGHT|768|height|
-|TEMPLATE_DATA_PATH|template|template data|path|
+|TEMPLATE_DATA_PATH|template|template data path|
 |MEDIA_PATH|
-|TEMPLATE_MEDIA_PATH|template_media|path|
+|TEMPLATE_MEDIA_PATH|template_media path|
 
 # Volumes
 

@@ -25,7 +25,7 @@ TANGO_CTX_ENV_FILE="${TANGO_CTX_ROOT}/${TANGO_CTX_NAME}.env"
 TANGO_CTX_COMPOSE_FILE="${TANGO_CTX_ROOT}/${TANGO_CTX_NAME}.docker-compose.yml"
 TANGO_CTX_MODULES_ROOT="${TANGO_CTX_ROOT}/pool/modules"
 TANGO_CTX_PLUGINS_ROOT="${TANGO_CTX_ROOT}/pool/plugins"
-TANGO_CTX_SCRIPTS_ROOT="${TANGO_CTX_ROOT}/pool/scripts"
+#TANGO_CTX_SCRIPTS_ROOT="${TANGO_CTX_ROOT}/pool/scripts"
 
 
 # workspace folder
@@ -40,7 +40,7 @@ TANGO_MODULES_AVAILABLE="$(__list_items "module" "tango")"
 # available plugins from tango
 TANGO_PLUGINS_AVAILABLE="$(__list_items "plugin" "tango")"
 # available scripts from tango
-TANGO_SCRIPTS_AVAILABLE="$(__list_items "script" "tango")"
+#TANGO_SCRIPTS_AVAILABLE="$(__list_items "script" "tango")"
 if [ "${TANGO_NOT_IN_ANY_CTX}" = "1" ]; then
 	TANGO_CTX_ENV_FILE=
 	TANGO_CTX_COMPOSE_FILE=
@@ -56,7 +56,7 @@ else
 	# available plugins from current ctx
 	TANGO_CTX_PLUGINS_AVAILABLE="$(__list_items "plugin" "ctx")"
 	# available scripts from current ctx
-	TANGO_CTX_SCRIPTS_AVAILABLE="$(__list_items "script" "ctx")"
+	#TANGO_CTX_SCRIPTS_AVAILABLE="$(__list_items "script" "ctx")"
 fi
 
 # TANGO USER FILES 
@@ -530,8 +530,6 @@ case ${ACTION} in
 		TANGO_HOSTNAME="$(hostname)"
 		__add_declared_variables "TANGO_HOSTNAME"
 		if [ "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
-			# TODO catch error curl
-			# TODO tango curl docker version use a docker network which may not exist yet
 			TANGO_EXTERNAL_IP="$(__tango_curl --connect-timeout 2 -skL ipinfo.io/ip)"
 			__tango_log "INFO" "tango" "Declared being exposed on internet, external IP detected : $TANGO_EXTERNAL_IP"
 		else

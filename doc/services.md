@@ -116,10 +116,10 @@
 ----
 ## Tweaking a service
 
-* Adding specific shell environment variable inside a specific service with `<SERVICE>_SPECIFIC_ENVVAR` variable
+* Adding specific shell environment variable inside a specific service with `<SERVICE>_ADDITIONAL_ENVVAR` variable
     * Syntax `VAR=VAL`
     ```
-    FOO_SPECIFIC_ENVVAR="A=1 B=2"
+    FOO_ADDITIONAL_ENVVAR="A=1 B=2"
     ```
 
 * Attach existing traefik middlewares to a service with `<SERVICE>_ADDITIONAL_MIDDLEWARES` variable list

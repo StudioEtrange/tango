@@ -1,6 +1,13 @@
-# codeserver
 
-A template showing usage of docker image by Linuxserver.io, with codeserver as sample
+
+* https://docs.linuxserver.io/images/docker-piwigo
+
+
+# Photoprism 
+
+# TODO implement module and review this doc
+
+* Application piwigo is a random application
 
 |Categories|Links|
 |-|-|
@@ -11,7 +18,7 @@ A template showing usage of docker image by Linuxserver.io, with codeserver as s
 ||https://github.com/linuxserver/docker-piwigo/pkgs/container/piwigo|
 |doc links|http://piwigo.org/|
 
-# howto
 
-* To activate use : `TANGO_SERVICES_MODULES+=codeserver` or `--module=codeserver`
-* Advanced usage : `TANGO_DOMAIN="domain.com" CODESERVER_ADDITIONAL_VOLUMES="$HOME:/workspace" ./tango up codeserver --module=codeserver`
+# Samples
+
+`./tango --module piwigo --domain domain.org --freeport up`
