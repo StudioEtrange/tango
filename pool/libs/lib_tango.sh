@@ -1915,7 +1915,9 @@ __check_modules_definition() {
 	if [ ! "${TANGO_NOT_IN_ANY_CTX}" = "1" ]; then
 		if [ -d ${TANGO_CTX_MODULES_ROOT} ]; then
 			for f in ${TANGO_CTX_MODULES_ROOT}/*.env; do
-				[[  $(<$f) =~ ^[a-zA-Z_]+[a-zA-Z0-9_]*_MODULE_DEPENDENCIES= ]] && __tango_log "ERROR" "tango" "$TANGO_CTX_NAME module $(basename ${f} .env) use illegal _MODULE_DEPENDENCIES= variable in $f. Use a $(basename ${f} .env).deps file instead" && exit 1
+				if [ -f ${f} ]; then
+					[[  $(<$f) =~ ^[a-zA-Z_]+[a-zA-Z0-9_]*_MODULE_DEPENDENCIES= ]] && __tango_log "ERROR" "tango" "$TANGO_CTX_NAME module $(basename ${f} .env) use illegal _MODULE_DEPENDENCIES= variable in $f. Use a $(basename ${f} .env).deps file instead" && exit 1
+				fi
 			done
 		fi
 	fi
@@ -1928,8 +1930,10 @@ __check_modules_definition() {
 	if [ ! "${TANGO_NOT_IN_ANY_CTX}" = "1" ]; then
 		if [ -d ${TANGO_CTX_MODULES_ROOT} ]; then
 			for f in ${TANGO_CTX_MODULES_ROOT}/*.yml; do
-				[ ! -f "${f//.*/}.md" ] && __tango_log "WARN" "tango" "missing description file (.md) for $TANGO_CTX_NAME module ${f//.*/}.md in $TANGO_CTX_MODULES_ROOT"
-				[ ! -f "${f//.*/}.env" ] && __tango_log "WARN" "tango" "missing an env file (.env) for $TANGO_CTX_NAME module ${f//.*/}.md in $TANGO_CTX_MODULES_ROOT"
+				if [ -f ${f} ]; then
+					[ ! -f "${f//.*/}.md" ] && __tango_log "WARN" "tango" "missing description file (.md) for $TANGO_CTX_NAME module ${f//.*/}.md in $TANGO_CTX_MODULES_ROOT"
+					[ ! -f "${f//.*/}.env" ] && __tango_log "WARN" "tango" "missing an env file (.env) for $TANGO_CTX_NAME module ${f//.*/}.md in $TANGO_CTX_MODULES_ROOT"
+				fi
 			done
 		fi
 	fi
@@ -3630,7 +3634,7 @@ __manage_path() {
 	# if xxx_PATH not setted
 	if [ "${!__var_path}" = "" ]; then
 			__path="${__var_path,,}"
-			__tango_log "WARN" "tango" "manage_path : ${__var_path} do not have any value setted, using value : ${__path} as folder name (path is ${!__default_root}/${__path})"
+			__tango_log "INFO" "tango" "manage_path : ${__var_path} do not have any value setted, using value : ${__path} as folder name (path is ${!__default_root}/${__path})"
 			__tmp="${__default_root}_SUBPATH_CREATE"
 			eval "${__tmp}=\"${!__tmp} FOLDER $(echo ${__path} | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\$/\\$/g') \""
 			# export this path will update its value inside env files
