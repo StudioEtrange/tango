@@ -444,7 +444,6 @@ case ${ACTION} in
 		# TANGO_PATH_LIST list of generic path variables
 
 		# CTX_DATA_PATH			 			path to store data relative to ctx
-		# CTX_DATA_PATH_DEFAULT 			default path relative to ctx workspace folder (TANGO_CTX_WORK_ROOT)
 		# CTX_DATA_PATH_SUBPATH_LIST		list of subpath variables relative to ctx data
 		# CTX_DATA_PATH_SUBPATH_CREATE		instructions to create subpath relative to ctx data (internal variable)
 
@@ -452,7 +451,6 @@ case ${ACTION} in
 		TANGO_CTX_WORK_ROOT_SUBPATH_CREATE=
 		
 		# TANGO_DATA_PATH 					path to store data relative to internal tango services - hardcoded according to TANGO_INSTANCE_MODE (internal variable)
-		# TANGO_DATA_PATH_DEFAULT			N/A (hardcoced TANGO_DATA_PATH)
 		# TANGO_DATA_PATH_SUBPATH_LIST		N/A (hardcoded TANGO_DATA_PATH_SUBPATH_CREATE)
 		# TANGO_DATA_PATH_SUBPATH_CREATE 	instructions to create subpath relative to tango data (internal variable) 
 		TANGO_DATA_PATH_SUBPATH_CREATE=

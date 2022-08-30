@@ -21,7 +21,7 @@
 |TANGO_DOMAIN|domain used to access tango. It is a regexp. `.*` stands for any domain or host ip.|`.*`|`mydomain.org`|
 |TANGO_USER_ID|unix user which will run services and acces to files.|current user : `id -u`|`1000`|
 |TANGO_GROUP_ID|unix group which will run services and acces to files.|current group : `id -g`|`1000`|
-|CTX_DATA_PATH|path on host for services configuration and data files.|`$(pwd)/workspace/tango/data`. Last part `data` can be defined by `CTX_DATA_PATH_DEFAULT`|`/myctx/data`|
+|CTX_DATA_PATH|path on host for services configuration and data files.|`$(pwd)/workspace/tango/data`. |`/myctx/data`|
 |TANGO_USER_ID|unix user which will run services and acces to files.|current user : `id -u`|`1000`|
 
 For full list see `tango.internal.env` file
@@ -215,8 +215,7 @@ For full list see `tango.internal.env` file
 * `CTX_DATA_PATH` is a special path variable with a purpose to store and share data of the current context services in one unique location. It s added to TANGO_PATH_LIST if not already done. Its default definition is
     ```
     TANGO_PATH_LIST=CTX_DATA_PATH
-    CTX_DATA_PATH=
-    CTX_DATA_PATH_DEFAULT=data
+    CTX_DATA_PATH=data
     ```
 
 * `TANGO_DATA_PATH` is a special path variable wich store generic tango data like letsencrypt data or traefik conf. Its value depends of tango instance mode (`isolated` or `shared`)
