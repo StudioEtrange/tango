@@ -91,7 +91,7 @@ Tango is a command line tool written in bash.
 In most cases, you will have to use only tango management commands below.
 
     * tango management.
-        install : deploy Tango.
+        install : install/update Tango dependencies.
         up [service [-b]] [--module module] [--plugin plugin] [--freeport] : launch services.
         down [service] [--module module] [--all] : down services.
         restart [service] [--module module] [--plugin plugin] [--freeport] : restart services.

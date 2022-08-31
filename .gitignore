@@ -4,3 +4,4 @@
 generated*
 **/letsencrypt/
 **/traefikconfig/
+**/traefiklog/

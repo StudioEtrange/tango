@@ -44,38 +44,10 @@ case ${ACTION} in
 		esac 
 	;;
 
-	# scripts )
-	# 	case ${TARGET} in
-	# 		list )
-	# 			echo "Available scripts : $(__list_items "script")"
-	# 			;;
 
-	# 		exec )
-	# 			if [ -f "$TANGO_SCRIPTS_ROOT/$ARGUMENT" ]; then
-	# 			 	. $TANGO_SCRIPTS_ROOT/$ARGUMENT
-	# 			fi
-	# 			if [ ! "${TANGO_NOT_IN_ANY_CTX}" = "1" ]; then
-	# 				if [ -f "$TANGO_CTX_SCRIPTS_ROOT/$ARGUMENT" ]; then
-	# 					. $TANGO_CTX_SCRIPTS_ROOT/$ARGUMENT
-	# 				fi
-	# 			fi
-	# 			;;
-	# 	esac 
-	# ;;
 
 	install )
-		if [ "$TANGO_NOT_IN_ANY_CTX" = "1" ]; then
-			# standalone tango
-			__tango_log "INFO" "tango" "Install tango requirements : $STELLA_APP_FEATURE_LIST"
-			$STELLA_API get_features
-		else
-			STELLA_APP_FEATURE_LIST=$(__get_all_properties $(__select_app $TANGO_ROOT); echo $STELLA_APP_FEATURE_LIST)' '$STELLA_APP_FEATURE_LIST
-			__tango_log "INFO" "tango" "Install tango and $TANGO_CTX_NAME requirements : $STELLA_APP_FEATURE_LIST"
-			$STELLA_API get_features
-		fi
-		
-		
-		
+		__install_tango_dependencies
 	;;
 
 	update )
@@ -157,11 +129,12 @@ case ${ACTION} in
 		echo "Format : [host path] is mapped to {inside container path}"
 		echo "Context data path : [$CTX_DATA_PATH] is mapped to {/data}"
 		echo "Plugins data path : [$PLUGINS_DATA_PATH] is mapped to {/plugins_data}"
-		echo "Data path of internal tango data : [$TANGO_DATA_PATH] is mapped to {/internal_data}"
+		echo "Data path of internal tango data : [$TANGO_DATA_PATH]"
 		echo "Artefact folders : [$TANGO_ARTEFACT_FOLDERS] are mapped to {${TANGO_ARTEFACT_MOUNT_POINT:-/artefact}} subfolders"
-		echo "Lets encrypt store file : [$TANGO_DATA_PATH/letsencrypt/acme.json] {/internal_data/letsencrypt/acme.json}"
-		echo "Traefik dynamic conf files directory [$TANGO_DATA_PATH/traefikconfig] {/internal_data/traefikconfig}"
-
+		echo "Lets encrypt store file : [${LETS_ENCRYPT_DATA_PATH}/acme.json] mapped inside traefik to {/letsencrypt/acme.json}"
+		echo "Traefik dynamic conf files directory [${TRAEFIK_CONFIG_DATA_PATH}] mapped inside traefik to {/traefikconfig}"
+		echo "Traefik log directory [${TRAEFIK_LOG_PATH}] mapped inside traefik to {/traefiklog}"
+		
 		__print_info_services "${TANGO_SERVICES_ACTIVE}"
 	;;
 

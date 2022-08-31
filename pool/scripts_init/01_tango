@@ -3,5 +3,5 @@
 # TODO : turn this as harcoded inside tango ?
 #        and remove scripts_init functionnality
 # echo "---------==---- PATHS ----==---------"
-chmod 600 /internal_data/letsencrypt/acme.json
+#chmod 600 /internal_data/letsencrypt/acme.json
 

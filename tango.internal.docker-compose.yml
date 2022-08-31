@@ -23,13 +23,13 @@ volumes:
       device: ${PLUGINS_DATA_PATH}
     name: ${TANGO_CTX_NAME}_plugins_data
   # volumes that can be shared between each ctx
-  internal_data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${TANGO_DATA_PATH}
-    name: ${TANGO_INSTANCE_NAME}_internal_data
+  # internal_data:
+  #   driver: local
+  #   driver_opts:
+  #     type: none
+  #     o: bind
+  #     device: ${TANGO_DATA_PATH}
+  #   name: ${TANGO_INSTANCE_NAME}_internal_data
   letsencrypt:
     driver: local
     driver_opts:
@@ -44,7 +44,13 @@ volumes:
       o: bind
       device: ${TRAEFIK_CONFIG_DATA_PATH}
     name: ${TANGO_INSTANCE_NAME}_traefikconfig
-
+  traefiklog:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${TRAEFIK_LOG_PATH}
+    name: ${TANGO_INSTANCE_NAME}_traefiklog
 # See detail variable here : https://github.com/StudioEtrange/openvpn-client
 # NOTE : cap_add, security_opt are required for this image to function
 x-vpn: &default-vpn
@@ -118,7 +124,7 @@ services:
       - volume_init
     volumes:
       - data:/data
-      - internal_data:/internal_data
+      #- internal_data:/internal_data
       #- artefact:${TANGO_ARTEFACT_MOUNT_POINT:-/artefact}
     env_file:
       - ${GENERATED_ENV_FILE_FOR_COMPOSE}
@@ -174,6 +180,7 @@ services:
       #- ./traefik-conf.yml:/etc/traefik/traefik.yml
       - letsencrypt:/letsencrypt
       - traefikconfig:/traefikconfig
+      - traefiklog:/traefiklog
     labels:
       - "${TANGO_INSTANCE_NAME}.managed=true"
       - "traefik.enable=true"

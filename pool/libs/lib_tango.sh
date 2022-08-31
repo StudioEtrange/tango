@@ -3690,6 +3690,14 @@ __manage_path() {
 
 }
 
+# set right permission on certificates file store
+__fix_letsencrypt_permission() {
+	if [ -f "${LETS_ENCRYPT_DATA_PATH}/acme.json" ]; then
+		docker run -it --rm --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} -v "${LETS_ENCRYPT_DATA_PATH}":"/letsencrypt" ${TANGO_SHELL_IMAGE} bash -c "chmod 600 \"/letsencrypt/acme.json\"" >/dev/null 1>&2 
+	fi
+}
+
+
 # create all path according to _SUBPATH_CREATE variables content
 # see __create_path
 __create_path_all() {
@@ -3803,6 +3811,55 @@ __create_path() {
 
 
 
+__install_tango_dependencies() {
+
+
+	$STELLA_API feature_remove docker-compose
+	$STELLA_API feature_remove jq
+	$STELLA_API feature_remove yq
+	$STELLA_API feature_remove xidel
+
+	STELLA_LOG_STATE="ON"
+	if [ "$TANGO_NOT_IN_ANY_CTX" = "1" ]; then
+		# standalone tango
+		__tango_log "INFO" "tango" "Install tango requirements : $STELLA_APP_FEATURE_LIST"
+		$STELLA_API get_features
+	else
+		STELLA_APP_FEATURE_LIST=$(__get_all_properties $(__select_app $TANGO_ROOT); echo $STELLA_APP_FEATURE_LIST)' '$STELLA_APP_FEATURE_LIST
+		__tango_log "INFO" "tango" "Install tango and $TANGO_CTX_NAME requirements : $STELLA_APP_FEATURE_LIST"
+		$STELLA_API get_features
+	fi
+	STELLA_LOG_STATE="OFF"
+
+
+}
+
+
+__check_tango_dependencies() {
+
+	# NOTE : cannot use 'type' command because 'type' detect the bash function docker-compose which override the command
+	if ! which docker-compose 1>/dev/null 2>&1; then
+		__tango_log "ERROR" "tango" "missing tango dependency docker-compose, please install tango first"
+		exit 1
+	fi
+
+	if ! which jq 1>/dev/null 2>&1; then
+		__tango_log "ERROR" "tango" "missing tango dependency jq, please install tango first"
+		exit 1
+	fi
+
+	if ! which xidel 1>/dev/null 2>&1; then
+		__tango_log "ERROR" "tango" "missing tango dependency xidel, please install tango first"
+		exit 1
+	fi
+
+	if ! which yq 1>/dev/null 2>&1; then
+		__tango_log "ERROR" "tango" "missing tango dependency yq, please install tango first"
+		exit 1
+	fi
+
+
+}
 
 
 # test if mandatory paths exists
@@ -3851,7 +3908,17 @@ __check_lets_encrypt_settings() {
 					[ ! "${NETWORK_PORT_MAIN}" = "80" ] && __tango_log "$__log" "tango" "main area network HTTP port is not 80 but ${NETWORK_PORT_MAIN}. You need to use DNS challenge for let's encrypt. Set ACME_CHALLENGE variable." && __exit=1
 					[ ! "${NETWORK_PORT_MAIN_SECURE}" = "443" ] && __tango_log "$__log" "tango" "main area network HTTPS port is not 443 but ${NETWORK_PORT_MAIN_SECURE}. You need to use DNS challenge for let's encrypt. Set ACME_CHALLENGE variables" && __exit=1
 				;;
-			esac	
+			esac
+
+			# check permission on acme.json file
+			if [ -f "${LETS_ENCRYPT_DATA_PATH}/acme.json" ]; then
+				local __tmp="$(stat -c "%a" "${LETS_ENCRYPT_DATA_PATH}/acme.json")"
+				if [ ! "${__tmp}" = "600" ]; then 
+					__tango_log "$__log" "tango" "Lets encrypt store file have wrong permission, must be 600 instead of ${__tmp} ${LETS_ENCRYPT_DATA_PATH}/acme.json." && __exit=1
+				fi
+			else
+				__tango_log "$__log" "tango" "Lets encrypt store file do not exist ${LETS_ENCRYPT_DATA_PATH}/acme.json !" && __exit=1
+			fi
 		;;
 	esac
 

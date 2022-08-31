@@ -5,7 +5,7 @@ usage() {
 	echo "USAGE :"
 	echo "----------------"
 	echo "o-- tango management :"
-	echo "L     install : deploy Tango."
+	echo "L     install : deploy/update Tango dependencies."
 	echo "L     up [service [-b]] [--module module] [--plugin plugin] [--freeport|--port port]: launch all available services or one service"
 	echo "L     down [service] [--module module] [--all]: down all services or one service. Except shared internal service when in shared mode (--all force stop shared service)."
 	echo "L     restart [service] [--module module] [--plugin plugin] [--freeport|--port port]: restart all services or one service."

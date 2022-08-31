@@ -1,6 +1,10 @@
 #  TODO 
 
-* [ ] 20220819 : implemetn add environment to service
+* [ ] migrate from docker-compose (v1.x) to "docker compose" (v2.x)
+    * https://docs.docker.com/compose/cli-command-compatibility/
+    * install method linux : https://github.com/docker/compose (report it to stella)
+
+* [X] 20220819 : implement add environment to service : __add_environment_service_all()
 
 * [X] 2022 07 31 test :
 ```

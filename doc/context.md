@@ -43,7 +43,7 @@
 * A context is defined by a tree folders and optional files, follow the provided template files and rename them with the context name
     * [ctx/pool/modules/](/pool/ctx/pool/modules/) : modules definitions of the context
     * [ctx/pool/plugins/](/pool/ctx/pool/plugins/)  : plugins definitions of the context
-    * [ctx.docker-compose.yml](/pool/ctx/ctx.docker-compose.yml) : yml compose file of the context that will be included in generated docker-compose file.
+    * [ctx.docker-compose.yml](/pool/ctx/ctx.docker-compose.yml) : yml compose file of the context that will be included (and merged) in generated docker-compose file.
     * [ctx.env](/pool/ctx/ctx.env) : dedicated context variables used while generating docker-compose file.
 
 ----

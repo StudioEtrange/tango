@@ -493,13 +493,14 @@ case ${ACTION} in
 		LETS_ENCRYPT_DATA_PATH="${TANGO_DATA_PATH}/letsencrypt"
 		LETS_ENCRYPT_TEST_DATA_PATH="${TANGO_DATA_PATH}/letsencrypt-test"
 		TRAEFIK_CONFIG_DATA_PATH="${TANGO_DATA_PATH}/traefikconfig"
-		TANGO_DATA_PATH_SUBPATH_CREATE="${TANGO_DATA_PATH_SUBPATH_CREATE} FOLDER letsencrypt letsencrypt-test traefikconfig FILE letsencrypt/acme.json traefikconfig/generated.${TANGO_CTX_NAME}.tls.yml"
+		TRAEFIK_LOG_PATH="${TANGO_DATA_PATH}/traefiklog"
+		TANGO_DATA_PATH_SUBPATH_CREATE="${TANGO_DATA_PATH_SUBPATH_CREATE} FOLDER letsencrypt letsencrypt-test traefikconfig traefiklog FILE letsencrypt/acme.json traefikconfig/generated.${TANGO_CTX_NAME}.tls.yml"
 		GENERATED_TLS_FILE_PATH="${TANGO_DATA_PATH}/traefikconfig/generated.${TANGO_CTX_NAME}.tls.yml"
 		
 		PLUGINS_DATA_PATH="${CTX_DATA_PATH}/plugins"
 		__tango_log "DEBUG" "tango" "    L [PLUGINS_DATA_PATH=$PLUGINS_DATA_PATH]"
 		CTX_DATA_PATH_SUBPATH_CREATE="${CTX_DATA_PATH_SUBPATH_CREATE} FOLDER plugins"
-		__tango_log "DEBUG" "tango" "ADD hardcoded paths instructions to create letsencrypt, traefik config and plugins data folders"
+		__tango_log "DEBUG" "tango" "ADD hardcoded paths instructions to create letsencrypt, traefik config, traefik log and plugins data folders"
 		__tango_log "DEBUG" "tango" "    L TANGO_DATA_PATH_SUBPATH_CREATE=$TANGO_DATA_PATH_SUBPATH_CREATE"
 		__tango_log "DEBUG" "tango" "    L CTX_DATA_PATH_SUBPATH_CREATE=$CTX_DATA_PATH_SUBPATH_CREATE"
 
@@ -516,6 +517,9 @@ case ${ACTION} in
 		__add_declared_variables "LETS_ENCRYPT_DATA_PATH"
 		__add_declared_variables "LETS_ENCRYPT_TEST_DATA_PATH"
 		__add_declared_variables "TRAEFIK_CONFIG_DATA_PATH"
+		__add_declared_variables "TRAEFIK_LOG_PATH"
+
+
 
 
 		# NETWORK ---------
