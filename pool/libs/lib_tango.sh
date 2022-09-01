@@ -8,13 +8,6 @@
 #		NO_EXEC_PLUGINS do not run attached plugins
 #		BUILD	build image before starting
 #
-# TODO up --no-recreate ? 
-#	each time compose file is modified the container is recreated
-#	maybe we want this, because we start or restart a service after modifying a configuration
-# 	if there are existing containers for a service, 
-#	and the service’s configuration or image was changed after the container’s creation,
-#	docker-compose up picks up the changes by stopping and recreating the containers 
-#	(preserving mounted volumes). To prevent Compose from picking up changes, use the --no-recreate flag.
 __service_up() {
 	local __service="$1"
 	local __opt="$2"
@@ -27,21 +20,52 @@ __service_up() {
 		[ "$o" = "NO_EXEC_PLUGINS" ] && __no_exec_plugins="1"
 	done
 
+
+
+	__tango_log "DEBUG" "tango" "service_up : first stopping services"
+	case "${__service}" in
+		"") 
+			__service_down_all
+		;;
+		vpn)
+			__tango_log "INFO" "tango" "Will stop all vpn services"
+			__service_down "vpn $VPN_SERVICES_LIST"
+		;;
+		*) 
+			__service_down "${__service}"
+		;;
+	esac
+	
+	__tango_log "DEBUG" "tango" "service_up : remove volumes not used in case of path have changed"
+	__compose_volume_remove
+
+
+
 	if $STELLA_API list_contains "${TANGO_SERVICES_MODULES_SCALED}" "${__service}"; then
 		__instances="${__service^^}_INSTANCES_LIST"
 		__tango_log "DEBUG" "tango" "service_up : starting all instances of scaled ${__service} : ${!__instances}"
-		docker-compose up -d $__build ${!__instances}
+		if docker-compose up -V -d $__build ${!__instances}; then
+			__tango_log "INFO" "tango" "${!__instances} started"
+			for i in ${!__instances}; do
+				[ ! "$__no_exec_plugins" = "1" ] && __exec_auto_plugin_all_by_service ${i}
+				docker-compose logs ${i}
+			done
+		else
+			__tango_log "ERROR" "tango" "service_up : error code $? in docker-compose up"
+			exit 1
+		fi
 		
-		for i in ${!__instances}; do
-			[ ! "$__no_exec_plugins" = "1" ] && __exec_auto_plugin_all_by_service ${i}
-			docker-compose logs ${i}
-		done
 	else
-		docker-compose up -d $__build ${__service:-tango}
+		
+		if docker-compose up -V -d $__build ${__service:-tango}; then
+			__tango_log "INFO" "tango" "${__service:-tango} started"
+		else
+			__tango_log "ERROR" "tango" "service_up : error code $? in docker-compose up"
+		fi
 
 		if [ "${__service}" = "" ]; then
 			[ ! "$__no_exec_plugins" = "1" ] && __exec_auto_plugin_service_active_all
-			docker-compose logs service_init
+			docker-compose logs tango
 		else
 			[ ! "$__no_exec_plugins" = "1" ] && __exec_auto_plugin_all_by_service ${__service}
 			docker-compose logs ${__service}
@@ -52,12 +76,13 @@ __service_up() {
 
 }
 
+# docker-compose services stop all
 # OPTIONS
-#	NO_DELETE do not delete containers just stop them 
-#		NOTE : NO_DELETE will not delete any named or anonymous volumes - this might be a problem when changing volumes paths
+#	NO_DELETE do not delete containers nor volumes, just stop containers
 __service_down_all() {
 	local __opt="$1"
 
+	local __list=
 
 	local __no_delete=
 	for o in ${__opt}; do
@@ -74,28 +99,46 @@ __service_down_all() {
 
 		if [ ! "${ALL}" = "1" ]; then
 			# only non shared service
-			docker stop $(docker ps -q $(__container_filter 'NON_STOPPED LIST_NAMES '${TANGO_CTX_NAME}'_.*'))
-			[ ! "${__no_delete}" = "1" ] && docker rm $(docker ps -q $(__container_filter 'ONLY_STOPPED LIST_NAMES '${TANGO_CTX_NAME}'_.*'))
+			# get all containers running or not
+			__list="$(docker ps -a $(__container_filter 'LIST_NAMES '${TANGO_CTX_NAME}'_.*'))"
+			# stop containers
+			docker stop ${__list}
+			if [ ! "${__no_delete}" = "1" ]; then
+				# remove containers and remove anonymous volumes associated
+				# NOTE : named volumes are not removed here !
+				docker rm -v $(docker ps -a $(__container_filter 'ONLY_STOPPED LIST_NAMES '${TANGO_CTX_NAME}'_.*'))
+			fi
 		else
 			# only shared and non shared service
 			if [ "${__no_delete}" = "1" ]; then
-				docker stop $(docker ps -q $(__container_filter 'NON_STOPPED LIST_NAMES '${TANGO_CTX_NAME}'_.* '${TANGO_INSTANCE_NAME}'_.*'))
+				# get all stopped containers
+				__list="$(docker ps -q $(__container_filter 'NON_STOPPED LIST_NAMES '${TANGO_CTX_NAME}'_.* '${TANGO_INSTANCE_NAME}'_.*'))"
+				# stop containers
+				docker stop ${__list}			
 			else
+				# stop and remove containers
+				# also remove named volumes declared in the `volumes` section of the Compose file and anonymous volumes attached to containers.
 				docker-compose down -v
 			fi
 		fi
 	else
 		if [ "${__no_delete}" = "1" ]; then
-			docker stop $(docker ps -q $(__container_filter 'NON_STOPPED LIST_NAMES '${TANGO_CTX_NAME}'_.* '${TANGO_INSTANCE_NAME}'_.*'))
+			# get all stopped containers
+			__list="$(docker ps -q $(__container_filter 'NON_STOPPED LIST_NAMES '${TANGO_CTX_NAME}'_.* '${TANGO_INSTANCE_NAME}'_.*'))"
+			# stop containers
+			docker stop ${__list}		
 		else
+			# stop and remove containers
+			# also remove named volumes declared in the `volumes` section of the Compose file and anonymous volumes attached to containers.
 			docker-compose down -v
 		fi
 	fi
 }
 
+
+# docker-compose service stop specific service (or all instance of a specific service)
 # OPTIONS
-#	NO_DELETE do not delete containers just stop them 
-#		NOTE : NO_DELETE will not delete any named or anonymous volumes - this might be a problem when changing volumes paths
+#	NO_DELETE do not delete containers nor volumes, just stop containers
 __service_down() {
 	local __service="$1"
 	local __opt="$2"
@@ -108,14 +151,22 @@ __service_down() {
 	if $STELLA_API list_contains "${TANGO_SERVICES_MODULES_SCALED}" "${__service}"; then
 		__instances="${__service^^}_INSTANCES_LIST"
 		__tango_log "DEBUG" "tango" "service_down : stopping all instances of scaled ${__service} : ${!__instances}"
+		# stop containers
 		docker-compose stop ${!__instances}
-		# TODO this delete only anonymous volume associated with the service, not named volumes
-		[ ! "${__no_delete}" = "1" ] && docker-compose rm -f -v ${!__instances}
+		if [ ! "${__no_delete}" = "1" ]; then
+			# remove containers and any anonymous volumes attached to containers
+			# NOTE : named volumes are not removed here !
+			docker-compose rm -f -v ${!__instances}
+		fi
 	else
-
+		# stop containers
 		docker-compose stop ${__service}
-		# TODO this delete only anonymous volume associated with the service, not named volumes
-		[ ! "${__no_delete}" = "1" ] && docker-compose rm -f -v ${__service}
+		if [ ! "${__no_delete}" = "1" ]; then
+			# remove containers and any anonymous volumes attached to containers
+			# NOTE : named volumes are not removed here !
+			docker-compose rm -f -v ${__service}
+		fi
+
 	fi
 }
 
@@ -3432,17 +3483,28 @@ __compose_exec() {
 }
 
 
+__container_print_volumes_info() {
+	local __container_name="$1"
+	
+	if [ "${__container_name}" = "" ]; then 
+		docker ps -a --format '{{ .ID }}' | xargs -I {} docker inspect -f '{{ .Name }}{{ printf "\n" }}{{ range .Mounts }}{{ printf "\n\t" }}{{ .Type }} {{ if eq .Type "bind" }}{{ .Source }}{{ end }}{{ .Name }} => {{ .Destination }}{{ end }}{{ printf "\n" }}' {}
+	else
+		docker ps -a --filter=name=^/${__container_name}$ --format '{{ .ID }}' | xargs -I {} docker inspect -f '{{ .Name }}{{ printf "\n" }}{{ range .Mounts }}{{ printf "\n\t" }}{{ .Type }} {{ if eq .Type "bind" }}{{ .Source }}{{ end }}{{ .Name }} => {{ .Destination }}{{ end }}{{ printf "\n" }}' {}
+	fi
+}
+
+
 # OPTIONS
-# filter user
-#		can be empty or "all" to list all container
-# filter status options
+# filter on status, available options
 # 		NON_RUNNING, NON_STOPPED, ONLY_RUNNING, ONLY_STOPPED are exclusive (can not be cumulated with any other filters)
 #		RUNNING, STOPPED can be cumulated
 #		NON_RUNNING is the same than ONLY_STOPPED
 #		NON_STOPPED is the same than ONLY_RUNNING
+# filter on container names list
 #		LIST_NAMES name1 name2 name3  : will include filter which have these names
 # sample
-#		${DOCKER_CMD} ps -a $(__container_filter "ONLY_RUNNING") --format "{{.Names}}#{{.Status}}#{{.Image}}"
+#		docker ps -a $(__container_filter "ONLY_RUNNING") --format "{{.Names}}#{{.Status}}#{{.Image}}"
+# 		docker ps -a $(__container_filter 'NON_STOPPED LIST_NAMES '${SUFFIX1_}'_.* '${SUFFIX2_}'_.*') --format "{{.Names}}#{{.Status}}#{{.Image}}"
 __container_filter() {
 	local __opt="$1"
 
@@ -3487,10 +3549,35 @@ __container_filter() {
 }
 
 
+# list volume names created by the current docker compose project
+__compose_volume_list() {
+	case ${TANGO_INSTANCE_MODE} in
+		shared )
+			docker volume ls -q --filter=label=com.docker.compose.project="${TANGO_INSTANCE_NAME}"
+		;;
+
+		* )
+			docker volume ls -q --filter=label=com.docker.compose.project="${TANGO_CTX_NAME}"
+		;;
+	esac
+}
+
+# remove all volume managed by the current docker compose project
+__compose_volume_remove() {
+
+	local __vol="$(__compose_volume_list)"
+	
+	if [ "$DEBUG" = "1" ]; then
+		docker volume remove -f $__vol
+	else
+		docker volume remove -f $__vol 1>/dev/null 2>&1
+	fi
+}
+
 docker-compose() {
 	# NOTE we need to specify project directory because when launching from an other directory, docker compose seems to NOT auto load .env file
 	case ${TANGO_INSTANCE_MODE} in
-		shared ) 
+		shared )
 			__tango_log "DEBUG" "tango" "COMPOSE_IGNORE_ORPHANS=1 docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_INSTANCE_NAME}" --project-directory "${TANGO_CTX_ROOT}" "$@""
 			COMPOSE_IGNORE_ORPHANS=1 command docker-compose ${DOCKER_COMPOSE_LOG} -f "${GENERATED_DOCKER_COMPOSE_FILE}" --env-file "${GENERATED_ENV_FILE_FOR_COMPOSE}" --project-name "${TANGO_INSTANCE_NAME}" --project-directory "${TANGO_CTX_ROOT}" "$@"
 			;;
@@ -3810,26 +3897,26 @@ __create_path() {
 }
 
 
-
+# install and update tango dependencies
 __install_tango_dependencies() {
-
-
-	$STELLA_API feature_remove docker-compose
-	$STELLA_API feature_remove jq
-	$STELLA_API feature_remove yq
-	$STELLA_API feature_remove xidel
-
-	STELLA_LOG_STATE="ON"
+	
 	if [ "$TANGO_NOT_IN_ANY_CTX" = "1" ]; then
 		# standalone tango
 		__tango_log "INFO" "tango" "Install tango requirements : $STELLA_APP_FEATURE_LIST"
+		$STELLA_API feature_remove_list "docker-compose jq xidel yq"
+		STELLA_LOG_STATE="ON"
 		$STELLA_API get_features
+		STELLA_LOG_STATE="OFF"
+
 	else
 		STELLA_APP_FEATURE_LIST=$(__get_all_properties $(__select_app $TANGO_ROOT); echo $STELLA_APP_FEATURE_LIST)' '$STELLA_APP_FEATURE_LIST
+		STELLA_APP_FEATURE_LIST="$($STELLA_API list_filter_duplicate "${STELLA_APP_FEATURE_LIST}")"
 		__tango_log "INFO" "tango" "Install tango and $TANGO_CTX_NAME requirements : $STELLA_APP_FEATURE_LIST"
+		$STELLA_API feature_remove_list "docker-compose jq xidel yq"
+		STELLA_LOG_STATE="ON"
 		$STELLA_API get_features
+		STELLA_LOG_STATE="OFF"
 	fi
-	STELLA_LOG_STATE="OFF"
 
 
 }

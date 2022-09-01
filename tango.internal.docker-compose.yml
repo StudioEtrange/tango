@@ -116,6 +116,7 @@ services:
       bash -c "touch /foo/.tango"  
       
   # init service
+  # TODO : useless service ?
   service_init:
     image: ${TANGO_SHELL_IMAGE}
     container_name: ${TANGO_INSTANCE_NAME}_service_init
@@ -124,16 +125,16 @@ services:
       - volume_init
     volumes:
       - data:/data
-      #- internal_data:/internal_data
-      #- artefact:${TANGO_ARTEFACT_MOUNT_POINT:-/artefact}
     env_file:
       - ${GENERATED_ENV_FILE_FOR_COMPOSE}
     networks:
       - default
     command: >
-      bash -c "for f in /pool/tango/scripts_init/*; do [ -f \"$${f}\" ] && $${f}; done &&
-      [ ! \"${TANGO_NOT_IN_ANY_CTX}\" = "1" ] && for f in /pool/${TANGO_CTX_NAME}/scripts_init/*; do [ -f \"$${f}\" ] && $${f}; done
-      "
+      bash -c "echo Hello from service_init."
+      
+#      bash -c "for f in /pool/tango/scripts_init/*; do [ -f \"$${f}\" ] && $${f}; done &&
+#      [ ! \"${TANGO_NOT_IN_ANY_CTX}\" = "1" ] && for f in /pool/${TANGO_CTX_NAME}/scripts_init/*; do [ -f \"$${f}\" ] && $${f}; done
+#      "
 
   # info on services
   service_info:
@@ -160,7 +161,7 @@ services:
     networks:
       - default
     command: >
-      bash -c "echo Launching VPN."
+      bash -c "echo Launching VPN client connections if any."
 
 
   # Router

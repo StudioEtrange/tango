@@ -140,6 +140,8 @@ case ${ACTION} in
 
 	up )
 		[ "${BUILD}" = "1" ] && BUILD="BUILD"
+		
+		
 		__service_up "${TARGET}" "${BUILD}"
 
 		[ "${TARGET}" = "vpn" ] && __tango_log "INFO" "tango" "Will start all vpn services"]
