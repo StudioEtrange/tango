@@ -1,5 +1,67 @@
 #  TODO 
 
+## Modules to create
+
+* whoogle-search
+    * https://github.com/benbusby/whoogle-search
+    * Get Google search results, but without any ads, javascript, AMP links, cookies, or IP address tracking. Easily deployable in one click as a Docker app, and customizable with a single config file. Quick and simple to implement as a primary search engine replacement on both desktop and mobile.
+
+* vaultwarden 
+    * Vaultwarden is an alternative implementation of the Bitwarden server API 
+    * https://github.com/BaptisteBdn/docker-selfhosted-apps/tree/main/vaultwarden
+    * https://github.com/dani-garcia/vaultwarden
+
+* Trillium
+    * Build your personal knowledge base with Trilium Notes
+    * https://github.com/zadam/trilium
+    * https://github.com/BaptisteBdn/docker-selfhosted-apps/tree/main/trilium
+
+* Seafile
+    * Seafile is an open source cloud storage system with privacy protection and teamwork features. Collections of files are called libraries. Each library can be synced separately. A library can also be encrypted with a user chosen password. Seafile also allows users to create groups and easily sharing files into groups.
+    * https://github.com/haiwen/seafile
+    * https://github.com/BaptisteBdn/docker-selfhosted-apps/tree/main/seafile
+    * https://www.seafile.com/en/home/
+
+
+* linuxserver.io server images : https://fleet.linuxserver.io/
+
+* jlesage images :
+    * https://jlesage.github.io/docker-apps/
+    * https://github.com/jlesage?tab=repositories
+    
+* hotio images :
+    * https://hotio.dev/containers/apprise/
+
+
+* KASM : VNC server and client into Webpage
+    * https://github.com/kasmtech/KasmVNC
+    * https://kasmweb.com/docs/latest/index.html
+
+* KASM images :
+    * https://github.com/kasmtech/workspaces-images
+    * https://github.com/kasmtech/workspaces-core-images
+    * https://hub.docker.com/u/kasmweb
+
+
+* veloren
+    * https://book.veloren.net/
+    * https://veloren.net/
+    * https://gitlab.com/veloren/veloren
+
+* [ ] web ssh https://github.com/liftoff/GateOne/
+* [ ] web ssh https://github.com/mobile-shell/mosh
+
+## Various
+
+* [ ] tango plugin restriction
+    * each plugin can work 
+        * only on some specific services
+        * may require app lib
+        * may require stella
+        * may require some var init in tango init or mambo init
+        * TODO implement restriction system on plugin, which may work only if certains criteria are ok
+
+
 * [ ] migrate from docker-compose (v1.x) to "docker compose" (v2.x)
     * https://docs.docker.com/compose/cli-command-compatibility/
     * install method linux : https://github.com/docker/compose (report it to stella)
@@ -45,7 +107,7 @@ cd tango
 * [ ] implementation of __set_priority_router_all force TANGO_SUBSERVICES_ROUTER to have same family subrouter following each other in the list - REVIEW the implementation
 
 * [X] add by default traefik service ? its is added because traefik is a depency of all compose service
-    * [ ] each time we relaunch a single service, traefik is recreated --- is this a problem ? --- use --no-recreate ?
+    * [-] each time we relaunch a single service, traefik is recreated --- is this a problem ? --- use --no-recreate ?
     
 * [ ] modules env file before/after app env file ?
 
@@ -60,9 +122,13 @@ cd tango
     * http.redirection entrypoint priority ?
     * tls ?
 
+* [ ] secure traefik headers
+    * https://mediacenterz.com/ultimate-docker-home-server-avec-traefik-2-letsencrypt-et-oauth-2020/
+    * https://blog.lapaire.org/update-traefik-v2-4-to-v2-5/
+
 * [ ] scripts are sourced when exec => they should not be ? => to inehrit the env var of tango context ? (which is by the way the only main purpose of this 'script' functionality) ==> DEPRECATE script usage ?
 
-* [ ] remove script_init ? (scripts init are always launched with a predefined image) do we really need this as we used ansible in mambo and in init phase we often need to control docker itself and its not really easy to control it from inside a container ?
+* [X] remove script_init ? (scripts init are always launched with a predefined image) do we really need this as we used ansible in mambo and in init phase we often need to control docker itself and its not really easy to control it from inside a container ?
 
 * [ ] Add possibility to reverse proxy to an http link instead of a service 
     * https://gist.github.com/StudioEtrange/c6bb41732063b0151adf5ef592768348
@@ -74,53 +140,4 @@ cd tango
 
 
 
-* [ ] secure traefik headers
-    * https://mediacenterz.com/ultimate-docker-home-server-avec-traefik-2-letsencrypt-et-oauth-2020/
-    * https://blog.lapaire.org/update-traefik-v2-4-to-v2-5/
 
-
-## Modules to create
-
-* vaultwarden 
-    * Vaultwarden is an alternative implementation of the Bitwarden server API 
-    * https://github.com/BaptisteBdn/docker-selfhosted-apps/tree/main/vaultwarden
-    # https://github.com/dani-garcia/vaultwarden
-
-* Trillium
-    * Build your personal knowledge base with Trilium Notes
-    * https://github.com/zadam/trilium
-    * https://github.com/BaptisteBdn/docker-selfhosted-apps/tree/main/trilium
-
-* Seafile
-    * Seafile is an open source cloud storage system with privacy protection and teamwork features. Collections of files are called libraries. Each library can be synced separately. A library can also be encrypted with a user chosen password. Seafile also allows users to create groups and easily sharing files into groups.
-    * https://github.com/haiwen/seafile
-    * https://github.com/BaptisteBdn/docker-selfhosted-apps/tree/main/seafile
-    * https://www.seafile.com/en/home/
-
-
-
-
-* linuxserver.io server images : https://fleet.linuxserver.io/
-
-* jlesage images :
-    * https://jlesage.github.io/docker-apps/
-    * https://github.com/jlesage?tab=repositories
-    
-* hotio images :
-    * https://hotio.dev/containers/apprise/
-
-
-* KASM : VNC server and client into Webpage
-    * https://github.com/kasmtech/KasmVNC
-    * https://kasmweb.com/docs/latest/index.html
-
-* KASM images :
-    * https://github.com/kasmtech/workspaces-images
-    * https://github.com/kasmtech/workspaces-core-images
-    * https://hub.docker.com/u/kasmweb
-
-
-* veloren
-    * https://book.veloren.net/
-    * https://veloren.net/
-    * https://gitlab.com/veloren/veloren

@@ -4,15 +4,6 @@
 # ------------------- BEFORE ACTION ----------------------------
 
 
-case ${ACTION} in
-	# we need nothing
-	install|cert|modules|services|vendor )
-		;;
-	* )
-		# we need tango have been installed first
-		__check_tango_dependencies
-		;;
-esac
 
 
 case ${ACTION} in

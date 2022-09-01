@@ -99,6 +99,10 @@ teardown() {
 	ALPHA_INSTANCES_NAMES=""
 	run __get_scaled_item_instances_list "alpha" "1"
 	assert_output 'alpha'
+
+	ALPHA_INSTANCES_NAMES=""
+	run __get_scaled_item_instances_list "alpha" "2"
+	assert_output 'alpha_instance_1 alpha_instance_2'
 }
 
 @test "__load_modules_dependencies_1" {

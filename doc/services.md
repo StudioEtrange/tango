@@ -130,6 +130,34 @@
     ```
     FOO_ADDITIONAL_MIDDLEWARES="middleware1 middleware2:FIRST middleware3:LAST middleware4:POS:4
     ```
+----
+## Scaling a service
+
+* when scaling a service, N instances are launched in parallel
+    * Syntax : `<module>[^<nb instances>]`
+    * Each instances have a default name in the form `<module>_instance_N`
+    * Each variable of `<module>` will be duplicated N times, renaming each variable name with instance names
+        * for FOO_VAR1=2 and FOO_VAR2=2 with foo scaled 2 times :
+        ```
+        FOO_INSTANCE_1_VAR1=2
+        FOO_INSTANCE_1_VAR2=2
+        FOO_INSTANCE_2_VAR1=2
+        FOO_INSTANCE_2_VAR2=2
+        ```
+
+* override service instances names
+    * Syntax : `<module>_INSTANCES_NAMES`
+    ```
+    FOO_INSTANCES_NAMES=front back
+    ```
+    * Each variable of FOO modules will be renamed with the instances names
+        * for FOO_VAR1=2 and FOO_VAR2=2 with foo scaled 2 times :
+        ```
+        FOO_FRONT_VAR1=2
+        FOO_FRONT_VAR2=2
+        FOO_BACK_VAR1=2
+        FOO_BACK_VAR2=2
+        ```
 
 ----
 ## Plugins 

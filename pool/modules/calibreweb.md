@@ -1,18 +1,17 @@
-# Template
+# Calibreweb
 
-*Application template is a random application*
+*Calibre-Web is a web app providing a clean interface for browsing, reading and downloading eBooks using a valid Calibre database.*
 
 ---
 ## Links
 
 |description|links|
 |-|-|
-|code source| https://github.com/foo/Template|
-|documentation|http://doc.template|
-|docker image code source| https://github.com/foo/docker-template|
-|docker image registry| https://hub.docker.com/r/linuxserver/template|
-||https://gcr.com/linuxserver/template|
-
+|code source|https://github.com/janeczku/calibre-web|
+|documentation|https://github.com/janeczku/calibre-web/wiki|
+|docker image code source|https://github.com/linuxserver/docker-calibre-web|
+|docker image registry|https://hub.docker.com/r/linuxserver/calibre-web|
+||https://github.com/linuxserver/docker-calibre-web/pkgs/container/calibre-web|
 
 ---
 ## Quick samples
@@ -22,7 +21,7 @@
 ---
 ## Information
 
-* This module will import calibre binaries through a [DOCKER_MODS](https://hub.docker.com/r/studioetrange/calibre-mods). Those binaries are used to auto create an empty calibre database `/calibreweb_db` if it does not already exists
+* This module will import calibre binaries through a [DOCKER_MODS](https://hub.docker.com/r/studioetrange/calibre-mods). Those binaries are used to auto create an empty calibre database `/calibreweb_db` if it does not already exists, and add convert utilities.
 
 * Default account at first launch is `admin/admin123` *(do forget me)*
 
@@ -48,6 +47,7 @@
 |named|calibreweb_data|`CALIBREWEB_DATA_PATH`|`/config`|calibreweb config files|
 |named|calibreweb_db|`CALIBREWEB_DB_PATH`|`/db/calibreweb_db`|calibre database|
 
+
 ---
 
 ## Network
@@ -59,12 +59,3 @@
 |calibreweb||main|HTTP/HTTPS|8083|`http://CALIBREWEB_SUBDOMAIN.TANGO_DOMAIN/`|main calibreweb access point|
 ||calibreweb_kobo|main|HTTP/HTTPS|8083|`http://CALIBREWEB_SUBDOMAIN.TANGO_DOMAIN/kobo/`|dedicated access point to kobo|
 
-
-
-### Specific network area
-
-
-|network area name|protocol|default port|default secure port|
-|-|-|-|-|
-|zoneapi||||
-|zone1||||

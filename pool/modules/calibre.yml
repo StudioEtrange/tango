@@ -1,0 +1,60 @@
+volumes:
+  calibre_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${CALIBRE_DATA_PATH}
+    name: ${TANGO_CTX_NAME}_calibre_data
+  calibre_db:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${CALIBRE_DB_PATH}
+    name: ${TANGO_CTX_NAME}_calibre_db
+
+services:
+  calibre:
+    image: ${CALIBRE_IMAGE_FIXED_VAR}:${CALIBRE_VERSION_FIXED_VAR:-latest}
+    container_name: ${TANGO_CTX_NAME}_calibre
+    depends_on:
+      - service_init
+    restart: unless-stopped
+    volumes:
+      # will contain calibre configuration
+      - calibre_data:/config
+      # different paths used by calibre
+      - calibre_db:/db/default
+    environment:
+      - PUID=${TANGO_USER_ID:-0}
+      - PGID=${TANGO_GROUP_ID:-0}
+      # start calibre with this library
+      - 'CLI_ARGS=--with-library=/db/default'
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      # service : calibre -------------------------
+      - "traefik.http.services.calibre.loadbalancer.server.port=8080"
+      - "traefik.http.services.calibre.loadbalancer.server.scheme=http"
+      - "traefik.http.services.calibre.loadbalancer.passhostheader=true"
+      # middlewares definition : calibre
+      # service router : calibre
+      - "traefik.http.routers.calibre.entrypoints=${CALIBRE_ENTRYPOINTS:-entry_main_http}"
+      - "traefik.http.routers.calibre.rule=HostRegexp(`{subdomain:${CALIBRE_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.calibre.priority=${CALIBRE_PRIORITY}"
+      - "traefik.http.routers.calibre.service=calibre"
+      - "traefik.http.routers.calibre-secure.entrypoints=${CALIBRE_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
+      - "traefik.http.routers.calibre-secure.rule=HostRegexp(`{subdomain:${CALIBRE_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.calibre-secure.priority=${CALIBRE_PRIORITY}"
+      - "traefik.http.routers.calibre-secure.service=calibre"
+      - "traefik.http.routers.calibre-secure.tls=true"
+      - "traefik.http.routers.calibre-secure.tls.domains[0].main=${CALIBRE_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      # service router middlewares : calibre
+      - "traefik.http.routers.calibre.middlewares=error-middleware"
+      - "traefik.http.routers.calibre-secure.middlewares=error-middleware"
+      # --------------------------------------------------
+    networks:
+      - default
+    expose:
+      - 8080/tcp

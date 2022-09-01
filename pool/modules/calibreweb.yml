@@ -1,0 +1,87 @@
+
+volumes:
+  calibreweb_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${CALIBREWEB_DATA_PATH}
+    name: ${TANGO_CTX_NAME}_calibreweb_data
+  calibreweb_db:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${CALIBREWEB_DB_PATH}
+    name: ${TANGO_CTX_NAME}_calibreweb_db
+
+services:
+  calibreweb:
+    image: ${CALIBREWEB_IMAGE_FIXED_VAR}:${CALIBREWEB_VERSION_FIXED_VAR:-latest}
+    container_name: ${TANGO_CTX_NAME}_calibreweb
+    depends_on: 
+      - service_init
+    restart: unless-stopped
+    volumes:
+      # will contain calibreweb configuration
+      - calibreweb_data:/config
+      # different paths used by calibreweb
+      - calibreweb_db:/db/calibreweb_db
+    environment:
+      - PUID=${TANGO_USER_ID:-0}
+      - PGID=${TANGO_GROUP_ID:-0}
+      - DOCKER_MODS=studioetrange/calibre-mod:${CALIBRE_MOD_VERSION_FIXED_VAR:-latest}
+      # will create an empty calibre databse if not exists
+      - AUTO_CREATE_DB=/db/calibreweb_db
+      - CALIBRE_CONFIG_DIRECTORY=/config/calibre
+      - CALIBRE_TEMP_DIR=/config/calibre/tmp
+      - CALIBRE_CACHE_DIRECTORY=/config/cache/calibre
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      # service : calibreweb -------------------------
+      - "traefik.http.services.calibreweb.loadbalancer.server.port=8083"
+      - "traefik.http.services.calibreweb.loadbalancer.server.scheme=http"
+      - "traefik.http.services.calibreweb.loadbalancer.passhostheader=true"
+      # middlewares definition : calibreweb
+      #  TODO use this middleware to fix protocol endpoint for kobo to store, image and books
+      # https://github.com/janeczku/calibre-web/issues/1764
+      # https://github.com/janeczku/calibre-web/wiki/Setup-Reverse-Proxy
+      #- "traefik.http.middlewares.calibreweb-kobo-sync-headers.headers.customrequestheaders.X-Scheme=https"
+      # service router : calibreweb
+      - "traefik.http.routers.calibreweb.entrypoints=${CALIBREWEB_ENTRYPOINTS:-entry_main_http}"
+      - "traefik.http.routers.calibreweb.rule=HostRegexp(`{subdomain:${CALIBREWEB_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.calibreweb.priority=${CALIBREWEB_PRIORITY}"
+      - "traefik.http.routers.calibreweb.service=calibreweb"
+      - "traefik.http.routers.calibreweb-secure.entrypoints=${CALIBREWEB_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
+      - "traefik.http.routers.calibreweb-secure.rule=HostRegexp(`{subdomain:${CALIBREWEB_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.calibreweb-secure.priority=${CALIBREWEB_PRIORITY}"
+      - "traefik.http.routers.calibreweb-secure.service=calibreweb"
+      - "traefik.http.routers.calibreweb-secure.tls=true"
+      - "traefik.http.routers.calibreweb-secure.tls.domains[0].main=${CALIBREWEB_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      # service router middlewares : calibreweb
+      - "traefik.http.routers.calibreweb.middlewares=error-middleware"
+      - "traefik.http.routers.calibreweb-secure.middlewares=error-middleware"
+      # sub service : calibreweb_kobo -------------------------
+      # middlewares definition : calibreweb_kobo
+      # sub service router : calibreweb_kobo
+      - "traefik.http.routers.calibreweb_kobo.entrypoints=${CALIBREWEB_ENTRYPOINTS:-entry_main_http}"
+      - "traefik.http.routers.calibreweb_kobo.rule=HostRegexp(`{subdomain:${CALIBREWEB_KOBO_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`) && PathPrefix(`/kobo/`)"
+      - "traefik.http.routers.calibreweb_kobo.priority=${CALIBREWEB_KOBO_PRIORITY}"
+      - "traefik.http.routers.calibreweb_kobo.service=calibreweb"
+      - "traefik.http.routers.calibreweb_kobo-secure.entrypoints=${CALIBREWEB_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
+      - "traefik.http.routers.calibreweb_kobo-secure.rule=HostRegexp(`{subdomain:${CALIBREWEB_KOBO_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`) && PathPrefix(`/kobo/`)"
+      - "traefik.http.routers.calibreweb_kobo-secure.priority=${CALIBREWEB_KOBO_PRIORITY}"
+      - "traefik.http.routers.calibreweb_kobo-secure.service=calibreweb"
+      - "traefik.http.routers.calibreweb_kobo-secure.tls=true"
+      - "traefik.http.routers.calibreweb_kobo-secure.tls.domains[0].main=${CALIBREWEB_KOBO_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      # sub service router middlewares : calibreweb_kobo
+      #- "traefik.http.routers.calibreweb_kobo.middlewares=calibreweb-kobo-sync-headers,error-middleware"
+      #- "traefik.http.routers.calibreweb_kobo-secure.middlewares=calibreweb-kobo-sync-headers,error-middleware"
+      - "traefik.http.routers.calibreweb_kobo.middlewares=error-middleware"
+      - "traefik.http.routers.calibreweb_kobo-secure.middlewares=error-middleware"
+      # --------------------------------------------------
+    networks:
+      - default
+    expose:
+      - 8083/tcp

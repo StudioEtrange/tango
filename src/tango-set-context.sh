@@ -1,5 +1,18 @@
 #!/bin/bash
 
+
+case ${ACTION} in
+	# we need nothing
+	install|cert|modules|services|vendor )
+		;;
+	* )
+		# we need tango have been installed first
+		__check_tango_dependencies
+		;;
+esac
+
+
+
 if [ "${ACTION}" = "info" ]; then
 	TANGO_LOG_STATE="ON"
 	TANGO_LOG_LEVEL="WARN"
@@ -10,6 +23,8 @@ if [ "${DEBUG}" = "1" ]; then
 	TANGO_LOG_STATE="ON"
 	TANGO_LOG_LEVEL="DEBUG"
 fi
+
+
 
 # TANGO CTX
 TANGO_NOT_IN_ANY_CTX=

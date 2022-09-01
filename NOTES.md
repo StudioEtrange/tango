@@ -73,6 +73,47 @@
     * challenge types : https://letsencrypt.org/fr/docs/challenge-types/
 
 
+
+
+## dashboard/homepage application
+
+* Heimdall
+    * https://github.com/linuxserver/Heimdall
+    * have integrations with some services
+
+* organizr2
+    * https://organizr.app/
+    * https://github.com/causefx/Organizr/
+    * have integrations with some services
+    * support authentification
+    * lot of features
+
+* homepage    
+    * https://github.com/benphelps/homepage
+    * have integrations with some services
+
+* homer
+    * Homer is a full static html/js dashboard, based on a simple yaml configuration file.
+    * have integrations with some services
+    * https://github.com/bastienwirtz/homer
+    * https://www.reddit.com/r/selfhosted/comments/nfkeju/organizr_to_heimdall_to_sui_and_now_homer_my/
+
+* SUI
+    * a startpage for your server and / or new tab page
+    * https://github.com/jeroenpardon/sui
+
+* Dashy
+    * Dashy helps you organize your self-hosted services by making them accessible from a single place
+    * https://github.com/lissy93/dashy
+    * https://dashy.to/
+    * support authentification
+    * lot of features
+
+* Flame
+    * Flame is self-hosted startpage for your server. Its design is inspired (heavily) by SUI. Flame is very easy to setup and use. With built-in editors, it allows you to setup your very own application hub in no time - no file editing necessary.
+    * https://github.com/pawelmalak/flame
+    * Docker integration to automatically pick and add apps based on their labels
+
 ## Backup solutions
 
 * Duplicity
