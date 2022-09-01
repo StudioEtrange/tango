@@ -624,10 +624,12 @@ __create_docker_compose_file() {
 	# traefik middleware management
 	__add_middleware_service_all
 
-
 	# certifacte management
 	__set_letsencrypt_service_all
 	
+	# set traefik log properties
+	__set_traefik_log
+
 	# vpn management
 	__create_vpn_all
 	# do this after other compose modification 	
@@ -965,6 +967,24 @@ __set_time_all() {
 
 }
 
+__set_traefik_log() {
+
+	case ${TRAEFIK_LOG_FILE} in
+		enable )
+			__tango_log "INFO" "tango" "Output traefik log files to ${TRAEFIK_LOG_PATH}/traefik.log"
+			yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--log.filePath=/traefiklog/traefik.log"
+			yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--log.format=json"
+		;;
+	esac
+
+	case ${TRAEFIK_ACCESSLOG_FILE} in
+		enable )
+			__tango_log "INFO" "tango" "Output traefik log files to ${TRAEFIK_LOG_PATH}/access.log"
+			yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--accesslog.filepath=/traefiklog/access.log"
+		;;
+	esac
+
+}
 
 
 # https://doc.traefik.io/traefik/https/acme/

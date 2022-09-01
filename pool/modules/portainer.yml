@@ -45,8 +45,6 @@ services:
     networks:
       - default
       - dcksocketproxy
-    #command:
-    #  -H tcp://dcksocketproxy:2375 --tlsskipverify
     command:
       -H tcp://dcksocketproxy:2375 
     expose:

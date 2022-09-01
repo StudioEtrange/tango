@@ -237,8 +237,11 @@ services:
       - default
     command:
       # https://docs.traefik.io/reference/static-configuration/cli/
+      # by default log to stdout
       - "--log=true"
-      - "--log.level=DEBUG"
+      - "--log.level=${TRAEFIK_LOG_LEVEL}"
+      # by default accesslog to stdout
+      - "--accesslog=true"
       - "--api=true"
       - "--api.dashboard=true"
       - "--api.debug=false"
