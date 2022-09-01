@@ -67,7 +67,7 @@ cd tango
 * [ ] Add possibility to reverse proxy to an http link instead of a service 
     * https://gist.github.com/StudioEtrange/c6bb41732063b0151adf5ef592768348
 
-* [] Catch Error 502 while getting external IP in tango_set_context.sh
+* [ ] Catch Error 502 while getting external IP in tango_set_context.sh
     ```TANGO_EXTERNAL_IP="$(__tango_curl -s ipinfo.io/ip)"```
 
 * [X] error service : exclude non HTTP router in entrypoints list `TRAEFIK_ENTRYPOINTS_LIST` which is used in compose file here : `"traefik.http.routers.error.entrypoints=${TRAEFIK_ENTRYPOINTS_LIST}"`
@@ -84,6 +84,7 @@ cd tango
 * vaultwarden 
     * Vaultwarden is an alternative implementation of the Bitwarden server API 
     * https://github.com/BaptisteBdn/docker-selfhosted-apps/tree/main/vaultwarden
+    # https://github.com/dani-garcia/vaultwarden
 
 * Trillium
     * Build your personal knowledge base with Trilium Notes

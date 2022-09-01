@@ -14,10 +14,10 @@ services:
     depends_on: 
       - service_init
     restart: unless-stopped
-    #privileged: true
-    security_opt:
-      - no-new-privileges:true
-    user: ${TANGO_USER_ID}:${TANGO_GROUP_ID}
+    privileged: true
+    #security_opt:
+    #  - no-new-privileges:true
+    user: 0:0
     volumes:
       - portainer_data:/data
     labels:
@@ -45,8 +45,10 @@ services:
     networks:
       - default
       - dcksocketproxy
+    #command:
+    #  -H tcp://dcksocketproxy:2375 --tlsskipverify
     command:
-      -H tcp://dcksocketproxy:2375
+      -H tcp://dcksocketproxy:2375 
     expose:
       # service portainer HTTP
       - 9000/tcp

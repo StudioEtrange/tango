@@ -23,13 +23,6 @@ volumes:
       device: ${PLUGINS_DATA_PATH}
     name: ${TANGO_CTX_NAME}_plugins_data
   # volumes that can be shared between each ctx
-  # internal_data:
-  #   driver: local
-  #   driver_opts:
-  #     type: none
-  #     o: bind
-  #     device: ${TANGO_DATA_PATH}
-  #   name: ${TANGO_INSTANCE_NAME}_internal_data
   letsencrypt:
     driver: local
     driver_opts:
@@ -257,7 +250,7 @@ services:
       - "--providers.docker.endpoint=${DOCKER_ENGINE_ENDPOINT}"
       - "--providers.docker.constraints=Label(`${TANGO_INSTANCE_NAME}.managed`,`true`)"
       # traefik will route network trafic to managed containers using this network if there is multiple network available to reach managed containers
-      - "--providers.docker.network=default"
+      - "--providers.docker.network=${TANGO_CTX_NETWORK_NAME}"
       # If set to false, containers that do not have a traefik.enable=true label are ignored
       - "--providers.docker.exposedByDefault=false"
       - "--providers.file.directory=/traefikconfig"
