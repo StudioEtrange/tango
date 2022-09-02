@@ -205,7 +205,11 @@ __update_env_files() {
 	echo "# ------ UPDATE : update_env_files : $(date) -- ${__text}" >> "${GENERATED_ENV_FILE_FOR_COMPOSE}"
 	echo "# ------ UPDATE : update_env_files : $(date) -- ${__text}" >> "${GENERATED_ENV_FILE_FOR_BASH}"
 	for __variable in ${VARIABLES_LIST}; do
-		[ -z ${!__variable+x} ] || echo "${__variable}=${!__variable}" >> "${GENERATED_ENV_FILE_FOR_COMPOSE}"
+		# NOTE : since docker-compose v2 env file syntax have changed
+		#		it requires values with $ to be quoted, so we quote each value
+		# 		https://deploy-preview-13474--docsdocker.netlify.app/compose/env-file/#syntax-rules
+		# https://deploy-preview-13474--docsdocker.netlify.app/compose/env-file/#syntax-rules
+		[ -z ${!__variable+x} ] || echo "${__variable}='${!__variable}'" >> "${GENERATED_ENV_FILE_FOR_COMPOSE}"
 		# NOTE : we need to explicitly use "export" for variables in GENERATED_ENV_FILE_FOR_BASH because some software like ansible need to access their values
 		# 		 we export variables only when update file (__update_env_files) not when file is created (__create_env_files "bash") because it easier
 		[ -z ${!__variable+x} ] || echo "export ${__variable}=\"$(echo ${!__variable} | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\$/\\$/g')\"" >> "${GENERATED_ENV_FILE_FOR_BASH}"	
@@ -219,7 +223,7 @@ __update_env_files() {
 		declare -n array_name="$__array"
 		if [ ${#array_name[@]} -gt 0 ]; then
 			__content="$(printf "%q" "$(declare -p $__array | cut -d= -f2-)")"
-			echo "${__array}=${__content}" >> "${GENERATED_ENV_FILE_FOR_COMPOSE}"
+			echo "${__array}='${__content}'" >> "${GENERATED_ENV_FILE_FOR_COMPOSE}"
 			declare -p $__array >> "${GENERATED_ENV_FILE_FOR_BASH}"
 		fi
 	done
@@ -379,6 +383,11 @@ __create_env_files() {
 		# add quote for variable bash support
 		sed -i -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\$/\\$/g' "${__file}"
 		sed -i 's/^\([a-zA-Z0-9_-]*\)=\(.*\)$/\1=\"\2\"/g' "${__file}"
+	fi
+	if [ "$__target" = "docker_compose" ]; then
+		# add quote for compose env file 2.x support
+		# https://deploy-preview-13474--docsdocker.netlify.app/compose/env-file/#syntax-rules
+		sed -i "s/^\([a-zA-Z0-9_-]*\)=\(.*\)$/\1='\2'/g" "${__file}"
 	fi
 
 }
@@ -843,16 +852,15 @@ __add_middleware_service_all() {
 	for _s in $(compgen -A variable | grep _ADDITIONAL_MIDDLEWARES$); do
 		_s="${_s%_ADDITIONAL_MIDDLEWARES}"
 		
-		
+		_t="${_s}_ADDITIONAL_MIDDLEWARES"
 		if __check_traefik_router_exist "${_s,,}"; then
-			_t="${_s}_ADDITIONAL_MIDDLEWARES"
 			for _v in ${!_t}; do
 				__parse_item "middleware" "${_v}" "_MIDDLEWARE"
 				__attach_middleware_to_service "${_s,,}" "${_MIDDLEWARE_NAME}" "${_MIDDLEWARE_POSITION} ${_MIDDLEWARE_POS_NUMBER}"
 				__tango_log "DEBUG" "tango" "add_middleware_service_all : attach middleware : ${_v} to compose service : ${_s,,}."
 			done
 		else
-			__tango_log "WARN" "tango" "add_middleware_service_all : traefik router ${_s,,} do not exist and can add these additional middlewares : ${_t} : ${!_t}."
+			__tango_log "WARN" "tango" "add_middleware_service_all : traefik router ${_s,,} do not exist and can not add these additional middlewares : ${_t} : ${!_t}."
 		fi
 	done
 }
@@ -3587,10 +3595,12 @@ __compose_volume_remove() {
 
 	local __vol="$(__compose_volume_list)"
 	
-	if [ "$DEBUG" = "1" ]; then
-		docker volume remove -f $__vol
-	else
-		docker volume remove -f $__vol 1>/dev/null 2>&1
+	if [ ! "${__vol}" = "" ]; then
+		if [ "$DEBUG" = "1" ]; then
+			docker volume remove -f $__vol
+		else
+			docker volume remove -f $__vol 1>/dev/null 2>&1
+		fi
 	fi
 }
 

@@ -73,7 +73,7 @@ Tango is a command line tool written in bash.
 
 
 * `--domain domain.org` : Specify your wildcard domain name that point to your host.
-    * *Alternative* : use `--domain auto-nip` for testing purpose if you do not have your own domain name [domain name generation](/doc/dns.md#solution-1--using-nipio-the-simplest).
+    * *Alternative* : use `--domain auto-nip` for testing purpose if you do not have your own domain name. See [domain name generation](/doc/dns.md#solution-1--using-nipio-the-simplest) for more information.
         ```
         ./tango --module firefox --domain auto-nip --port main@80@443 up
         ./tango --module firefox --domain auto-nip --port main@80@443 info

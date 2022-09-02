@@ -423,8 +423,9 @@ case ${ACTION} in
 		[ "${TRAEFIK_API_USER}" = "" ] && TRAEFIK_API_USER="tango"
 		[ "${TRAEFIK_API_PASSWORD}" = "" ] && TRAEFIK_API_PASSWORD="tango"
 		#TRAEFIK_API_HASH_PASSWORD=$($STELLA_API htpasswd_md5 "${TRAEFIK_API_PASSWORD}" | tr -dc  "_A-Z-a-z-0-9" | fold -w8 | head -n1)
-		TRAEFIK_API_HASH_PASSWORD="$($STELLA_API htpasswd_md5 "${TRAEFIK_API_PASSWORD}")"
 		#TRAEFIK_API_HASH_PASSWORD="$($STELLA_API md5 "${TRAEFIK_API_PASSWORD}")"
+		TRAEFIK_API_HASH_PASSWORD="$($STELLA_API htpasswd_md5 "${TRAEFIK_API_PASSWORD}")"
+
 		__add_declared_variables "TRAEFIK_API_HASH_PASSWORD"
 
 		# manage subdomain suffix
@@ -605,7 +606,7 @@ case ${ACTION} in
 						__tango_log "INFO" "tango" "$TANGO_DOMAIN is solved as your local IP address ${TANGO_HOST_DEFAULT_IP}"
 						;;
 					"")
-						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN do not return any result. Maybe your DNS configuration is protected against DNS rebind. Try to use auto-ip domain name feature OR get your own domain name !"
+						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN do not return any result. Maybe your DNS configuration is protected against DNS rebind. Try to use auto-ip mode feature OR get your own domain name !"
 						;;
 					*)
 						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN return ${_s} which is different from your local IP address ${TANGO_HOST_DEFAULT_IP}."
