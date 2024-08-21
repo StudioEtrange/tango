@@ -42,6 +42,7 @@ services:
       # service router middlewares : portainer
       - "traefik.http.routers.portainer.middlewares=error-middleware"
       - "traefik.http.routers.portainer-secure.middlewares=error-middleware"
+      # --------------------------------------------------
     networks:
       - default
       - dcksocketproxy

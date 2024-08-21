@@ -34,7 +34,7 @@ services:
       - "traefik.http.services.piwigo.loadbalancer.server.port=80"
       - "traefik.http.services.piwigo.loadbalancer.server.scheme=http"
       - "traefik.http.services.piwigo.loadbalancer.passhostheader=true"
-      # middlewares : piwigo
+      # middlewares definition : piwigo
       # service router : piwigo
       - "traefik.http.routers.piwigo.entrypoints=${PIWIGO_ENTRYPOINTS:-entry_main_http}"
       - "traefik.http.routers.piwigo.rule=HostRegexp(`{subdomain:${PIWIGO_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
@@ -49,6 +49,7 @@ services:
       # service router middlewares : piwigo
       - "traefik.http.routers.piwigo.middlewares=error-middleware"
       - "traefik.http.routers.piwigo-secure.middlewares=error-middleware"
+      # --------------------------------------------------
     networks:
       - default
     expose:

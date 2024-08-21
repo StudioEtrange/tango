@@ -20,7 +20,7 @@ services:
       - "traefik.http.services.medusa.loadbalancer.server.port=8081"
       - "traefik.http.services.medusa.loadbalancer.server.scheme=http"
       - "traefik.http.services.medusa.loadbalancer.passhostheader=true"
-      # middlewares : medusa
+      # middlewares definition : medusa
       # service router : medusa
       - "traefik.http.routers.medusa.entrypoints=${MEDUSA_ENTRYPOINTS:-entry_main_http}"
       - "traefik.http.routers.medusa.rule=HostRegexp(`{subdomain:${MEDUSA_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
@@ -36,6 +36,7 @@ services:
       - "traefik.http.routers.medusa.middlewares=error-middleware"
       - "traefik.http.routers.medusa-secure.middlewares=error-middleware"
       # sub service : medusa_api -------------------------
+      # middlewares definition : medusa_api
       # sub service router : medusa_api
       - "traefik.http.routers.medusa_api.entrypoints=${MEDUSA_ENTRYPOINTS:-entry_main_http}"
       - "traefik.http.routers.medusa_api.rule=HostRegexp(`{subdomain:${MEDUSA_API_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`) && PathPrefix(`/api/${MEDUSA_API_KEY:-}/`)"
@@ -50,9 +51,11 @@ services:
       # sub service router middlewares : medusa_api
       - "traefik.http.routers.medusa_api.middlewares=error-middleware"
       - "traefik.http.routers.medusa_api-secure.middlewares=error-middleware"
+      # --------------------------------------------------
     networks:
       - default
     expose:
+      # service template
       - 8081/tcp
     build:
       context: https://github.com/StudioEtrange/docker-medusa.git#:ver/${MEDUSA_VERSION:-latest}

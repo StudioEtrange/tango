@@ -34,6 +34,7 @@ services:
       - "traefik.http.services.webtop.loadbalancer.server.port=3000"
       - "traefik.http.services.webtop.loadbalancer.server.scheme=http"
       - "traefik.http.services.webtop.loadbalancer.passhostheader=true"
+      # middlewares definition : webtop
       # service router : webtop
       - "traefik.http.routers.webtop.entrypoints=${WEBTOP_ENTRYPOINTS:-entry_main_http}"
       - "traefik.http.routers.webtop.rule=HostRegexp(`{subdomain:${WEBTOP_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
@@ -48,6 +49,7 @@ services:
       # service router middlewares : webtop
       - "traefik.http.routers.webtop.middlewares=error-middleware"
       - "traefik.http.routers.webtop-secure.middlewares=error-middleware"
+      # --------------------------------------------------
     networks:
       - default
     expose:

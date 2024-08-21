@@ -45,6 +45,7 @@ services:
       # service router middlewares : uptimekuma
       - "traefik.http.routers.uptimekuma.middlewares=error-middleware"
       - "traefik.http.routers.uptimekuma-secure.middlewares=error-middleware"
+      # --------------------------------------------------
     networks:
       - default
     expose:

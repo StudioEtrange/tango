@@ -29,7 +29,7 @@ services:
       - "traefik.http.services.kcc.loadbalancer.server.port=8080"
       - "traefik.http.services.kcc.loadbalancer.server.scheme=http"
       - "traefik.http.services.kcc.loadbalancer.passhostheader=true"
-      # middlewares : kcc
+      # middlewares definition : kcc
       # service router : kcc
       - "traefik.http.routers.kcc.entrypoints=${KCC_ENTRYPOINTS:-entry_main_http}"
       - "traefik.http.routers.kcc.rule=HostRegexp(`{subdomain:${KCC_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
@@ -44,6 +44,7 @@ services:
       # service router middlewares : kcc
       - "traefik.http.routers.kcc.middlewares=error-middleware"
       - "traefik.http.routers.kcc-secure.middlewares=error-middleware"
+      # --------------------------------------------------
     networks:
       - default
     expose:

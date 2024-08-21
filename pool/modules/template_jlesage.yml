@@ -32,7 +32,7 @@ services:
       - "traefik.http.services.romvault.loadbalancer.server.port=5800"
       - "traefik.http.services.romvault.loadbalancer.server.scheme=http"
       - "traefik.http.services.romvault.loadbalancer.passhostheader=true"
-      # middlewares : romvault
+      # middlewares definition : romvault
       # service router : romvault
       - "traefik.http.routers.romvault.entrypoints=${ROMVAULT_ENTRYPOINTS:-entry_main_http}"
       - "traefik.http.routers.romvault.rule=HostRegexp(`{subdomain:${ROMVAULT_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
@@ -47,11 +47,13 @@ services:
       # service router middlewares : romvault
       - "traefik.http.routers.romvault.middlewares=error-middleware"
       - "traefik.http.routers.romvault-secure.middlewares=error-middleware"
+      # --------------------------------------------------
     networks:
       - default
     expose:
+      # service template
       - 5800/tcp
-      # VNC port
+      # other non used port : VNC
       - 5900
     build:
       context: https://github.com/StudioEtrange/docker-romvault.git#main

@@ -39,7 +39,7 @@ services:
       - "traefik.http.services.jdownloader2.loadbalancer.server.port=5800"
       - "traefik.http.services.jdownloader2.loadbalancer.server.scheme=http"
       - "traefik.http.services.jdownloader2.loadbalancer.passhostheader=true"
-      # middlewares : jdownloader2
+      # middlewares definition : jdownloader2
       # service router : jdownloader2
       - "traefik.http.routers.jdownloader2.entrypoints=${JDOWNLOADER2_ENTRYPOINTS:-entry_main_http}"
       - "traefik.http.routers.jdownloader2.rule=HostRegexp(`{subdomain:${JDOWNLOADER2_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
@@ -54,6 +54,7 @@ services:
       # service router middlewares : jdownloader2
       - "traefik.http.routers.jdownloader2.middlewares=error-middleware"
       - "traefik.http.routers.jdownloader2-secure.middlewares=error-middleware"
+      # --------------------------------------------------
     networks:
       - default
     expose:

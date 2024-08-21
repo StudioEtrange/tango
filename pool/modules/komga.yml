@@ -1,0 +1,59 @@
+
+volumes:
+  komga_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${KOMGA_DATA_PATH}
+    name: ${TANGO_CTX_NAME}_komga_data
+  komga_media:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${KOMGA_MEDIA_PATH}
+    name: ${TANGO_CTX_NAME}_komga_media
+
+services:
+  komga:
+    image: ${KOMGA_IMAGE_FIXED_VAR}:${KOMGA_VERSION_FIXED_VAR:-latest}
+    user: ${TANGO_USER_ID:-0}:${TANGO_GROUP_ID:-0}
+    container_name: ${TANGO_CTX_NAME}_komga
+    depends_on: 
+      - service_init
+    restart: unless-stopped
+    volumes:
+      # will contain komga configuration
+      - komga_data:/config
+      # different paths used by komga
+      - komga_media:/data
+    environment:
+      - A=1
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      # service : komga -------------------------
+      - "traefik.http.services.komga.loadbalancer.server.port=25600"
+      - "traefik.http.services.komga.loadbalancer.server.scheme=http"
+      - "traefik.http.services.komga.loadbalancer.passhostheader=true"
+      # middlewares definition : komga
+      # service router : komga
+      - "traefik.http.routers.komga.entrypoints=${KOMGA_ENTRYPOINTS:-entry_main_http}"
+      - "traefik.http.routers.komga.rule=HostRegexp(`{subdomain:${KOMGA_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.komga.priority=${KOMGA_PRIORITY}"
+      - "traefik.http.routers.komga.service=komga"
+      - "traefik.http.routers.komga-secure.entrypoints=${KOMGA_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
+      - "traefik.http.routers.komga-secure.rule=HostRegexp(`{subdomain:${KOMGA_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.komga-secure.priority=${KOMGA_PRIORITY}"
+      - "traefik.http.routers.komga-secure.service=komga"
+      - "traefik.http.routers.komga-secure.tls=true"
+      - "traefik.http.routers.komga-secure.tls.domains[0].main=${KOMGA_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      # service router middlewares : komga
+      - "traefik.http.routers.komga.middlewares=error-middleware"
+      - "traefik.http.routers.komga-secure.middlewares=error-middleware"
+      # --------------------------------------------------
+    networks:
+      - default
+    expose:
+      - 8083/tcp

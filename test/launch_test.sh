@@ -24,9 +24,9 @@ function test_launch_bats() {
   declare -f >>"$_v"
 
 	if [ "$filter" = "" ]; then
-    __BATS_STELLA_DECLARE="$_v" bats --verbose-run "$STELLA_APP_ROOT/test_$domain.bats"
+    __BATS_STELLA_DECLARE="$_v" bats --verbose-run "$STELLA_APP_ROOT/suite/test_$domain.bats"
   else
-    __BATS_STELLA_DECLARE="$_v" bats --verbose-run "$STELLA_APP_ROOT/test_$domain.bats" -f ${filter}
+    __BATS_STELLA_DECLARE="$_v" bats --verbose-run "$STELLA_APP_ROOT/suite/test_$domain.bats" -f ${filter}
   fi
   rm -f "$_v"
 }
@@ -35,8 +35,8 @@ function test_launch_bats() {
 
 case $1 in
   all|"" )
-    test_launch_bats common $2
-    test_launch_bats modules $2
+    test_launch_bats variable $2
+    test_launch_bats module $2
     ;;
   * )
     test_launch_bats $1 $2

@@ -19,9 +19,9 @@ STELLA_LOG_STATE="OFF"
 # parse command line
 . "${TANGO_ROOT}/src/tango-parse-arg.sh" $@
 
-# SET CONTEXT ------------------------
+# PROCESS DATA ------------------------
 # init and generate files, variables, folders and everything for the framework to work
-. "${TANGO_ROOT}/src/tango-set-context.sh" $@
+. "${TANGO_ROOT}/src/tango-process-data.sh" $@
 
 # BEFORE ACTION ------------------------
 # before action hook

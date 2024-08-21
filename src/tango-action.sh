@@ -3,7 +3,6 @@
 
 # ------------------- ACTION ----------------------------
 
-
 case ${ACTION} in
 
 	services )
@@ -52,19 +51,23 @@ case ${ACTION} in
 
 	update )
 		if [ "${TARGET}" = "" ]; then
-			__tango_log "ERROR" "tango" "Specify a service to update its docker image"
+			__tango_log "ERROR" "tango" "Specify a service to update"
 			exit 1
 		else
-			__tango_log "INFO" "tango" "Will get last docker image version of ${TARGET}"
+			__tango_log "INFO" "tango" "Will update service ${TARGET}"
+			__tango_log "WARN" "tango" "You may have to restart ${TARGET} service to run its updated version"
 			if $STELLA_API list_contains "${TANGO_SERVICES_MODULES_SCALED}" "${TARGET}"; then
 				__instances="${__service^^}_INSTANCES_LIST"
 				for i in ${!__instances}; do
-					docker-compose pull ${i}
+					docker-compose pull --ignore-buildable ${i}
 				done
 			else
-				docker-compose pull ${TARGET}
+				# first try to build if service have a build context defined in compose
+				docker-compose build --pull ${TARGET}
+				# second try to pull if not buildable
+				docker-compose pull --ignore-buildable ${TARGET}
 			fi
-			__tango_log "WARN" "tango" "You have to restart ${TARGET} service to run the updated version"
+			
 		fi
 	;;
 

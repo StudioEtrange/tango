@@ -79,6 +79,7 @@ services:
       - "traefik.udp.routers.template_subservice.entrypoints=${TEMPLATE_SUBSERVICE_ENTRYPOINTS}"
       - "traefik.udp.routers.template_subservice.service=template_subservice"
       # sub service router middlewares : template_subservice
+      # --------------------------------------------------
     networks:
       - default
     expose:

@@ -1,0 +1,27 @@
+# ctdump shell --verbose
+x: 1
+x?: 2      # x == 1
+y?: 3      # y == 3
+w: []
+w#append: 4
+
+
+
+TOTO: 80
+
+# user
+#B={{A}}
+B: "%>> %(A)s"
+
+# ctx
+#E={{D}}
+E: "%>> %(D)s"
+#F={{H}}
+F: "%>> %(H)s"
+A: 20
+# module
+#H={{C}}
+H: "%>> %(C)s"
+C: 10
+#D={{B}}
+D: "%>> %(B)s"

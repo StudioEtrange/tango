@@ -26,6 +26,7 @@ services:
       - "traefik.http.services.xbackbone.loadbalancer.server.port=80"
       - "traefik.http.services.xbackbone.loadbalancer.server.scheme=http"
       - "traefik.http.services.xbackbone.loadbalancer.passhostheader=true"
+      # middlewares definition : xbackbone
       # service router : xbackbone
       - "traefik.http.routers.xbackbone.entrypoints=${XBACKBONE_ENTRYPOINTS:-entry_main_http}"
       - "traefik.http.routers.xbackbone.rule=HostRegexp(`{subdomain:${XBACKBONE_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
@@ -40,6 +41,7 @@ services:
       # service router middlewares : xbackbone
       - "traefik.http.routers.xbackbone.middlewares=error-middleware"
       - "traefik.http.routers.xbackbone-secure.middlewares=error-middleware"
+      # --------------------------------------------------
     networks:
       - default
     expose:

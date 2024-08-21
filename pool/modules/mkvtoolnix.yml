@@ -32,7 +32,7 @@ services:
       - "traefik.http.services.mkvtoolnix.loadbalancer.server.port=5800"
       - "traefik.http.services.mkvtoolnix.loadbalancer.server.scheme=http"
       - "traefik.http.services.mkvtoolnix.loadbalancer.passhostheader=true"
-      # middlewares : mkvtoolnix
+      # middlewares definition : mkvtoolnix
       # service router : mkvtoolnix
       - "traefik.http.routers.mkvtoolnix.entrypoints=${MKVTOOLNIX_ENTRYPOINTS:-entry_main_http}"
       - "traefik.http.routers.mkvtoolnix.rule=HostRegexp(`{subdomain:${MKVTOOLNIX_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
@@ -47,6 +47,7 @@ services:
       # service router middlewares : mkvtoolnix
       - "traefik.http.routers.mkvtoolnix.middlewares=error-middleware"
       - "traefik.http.routers.mkvtoolnix-secure.middlewares=error-middleware"
+      # --------------------------------------------------
     networks:
       - default
     expose:

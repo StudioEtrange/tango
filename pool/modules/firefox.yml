@@ -21,6 +21,7 @@ services:
       - "traefik.http.services.firefox.loadbalancer.server.port=5800"
       - "traefik.http.services.firefox.loadbalancer.server.scheme=http"
       - "traefik.http.services.firefox.loadbalancer.passhostheader=true"
+      # middlewares definition : firefox
       # service router : firefox
       - "traefik.http.routers.firefox.entrypoints=${FIREFOX_ENTRYPOINTS:-entry_main_http}"
       - "traefik.http.routers.firefox.rule=HostRegexp(`{subdomain:${FIREFOX_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
@@ -35,6 +36,7 @@ services:
       # service router middlewares : firefox
       - "traefik.http.routers.firefox.middlewares=error-middleware"
       - "traefik.http.routers.firefox-secure.middlewares=error-middleware"
+      # --------------------------------------------------
     networks:
       - default
     expose:

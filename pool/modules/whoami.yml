@@ -12,6 +12,7 @@ services:
       - "traefik.http.services.whoami.loadbalancer.server.port=80"
       - "traefik.http.services.whoami.loadbalancer.server.scheme=http"
       - "traefik.http.services.whoami.loadbalancer.passhostheader=true"
+      # middlewares definition : whoami
       # service router : whoami
       - "traefik.http.routers.whoami.entrypoints=${WHOAMI_ENTRYPOINTS:-entry_main_http}"
       - "traefik.http.routers.whoami.rule=HostRegexp(`{subdomain:${WHOAMI_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
@@ -26,6 +27,7 @@ services:
       # service router middlewares : whoami
       - "traefik.http.routers.whoami.middlewares=error-middleware"
       - "traefik.http.routers.whoami-secure.middlewares=error-middleware"
+      # --------------------------------------------------
     networks:
       - default
     expose:

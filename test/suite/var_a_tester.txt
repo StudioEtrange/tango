@@ -1,0 +1,140 @@
+# ctx
+P?=5
+I?=3
+
+# module
+N={{Y}}
+O?={{N}} {{I}}
+I={{N}}
+
+# user
+p={{O}}
+K={{I}}
+-----------------------
+# 
+A?=8
+B=100
+
+# 
+A=20
+A!=30
+
+# 
+A?=40
+A+=10
+B?=50
+
+# 
+A?=1000
+A=200
+A=50
+-----------------------
+[KO E a besoin dune 3ieme boucle pour etre evalue]
+# user
+B={{A}}
+# ctx
+E={{D}}
+F={{H}}
+A=20
+# module
+H={{C}}
+C=10
+D={{B}}
+
+
+=>
+# user
+B={{A}}
+# ctx
+E={{D}}
+F={{H}}
+A=20
+# module
+H={{K}}
+K={{I}}
+I=30
+C=10
+D={{B}}
+
+
+=>
+A=20
+B=20
+C=10
+E={{D}}
+F={{H}}
+H=10
+D=20
+-----------------------
+[KO : attention SWITCH={{A}} doit il etre a vide ou non au 1er passage? plutot OUI]
+# ctx
+VAL?=10
+# module
+SWITCH!={{VAL}}
+# user
+SWITCH={{A}}
+A=ON
+VAL=value2
+=>
+# ctx
+VAL?=10
+# module
+SWITCH!={{VAL}}
+# user
+SWITCH= # non solvable A
+A=ON
+VAL=value2
+=>
+# ctx
+VAL=value2
+# module
+SWITCH=
+# user
+SWITCH=
+A=ON
+VAL=value2
+
+=>
+VAL=value2
+A=ON
+SWITCH=
+
+
+--------------------
+[KO L???? what to do in this case TODO test unit with this]
+# module
+L+=val1 {{VAL}} 
+VAL?=val4
+# ctx
+L=val2 val3
+# user
+C={{L}}
+L+=val0
+VAL=val5
+
+
+=>
+# module
+L+=val1 {{VAL}}
+VAL?=val4
+# ctx
+L=val2 val3
+# user
+C={{L}}
+L+=val0
+VAL=val5
+=>
+# module
+L=val2 val3 val1 {{VAL}}
+VAL=val5
+# ctx
+L=val2 val3
+# user
+C={{L}}
+L=val2 val3 val0
+VAL=val5
+=>
+C=val2 val3
+VAL=val5
+L=val2 val3 val0
+

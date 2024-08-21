@@ -114,8 +114,8 @@ case ${ACTION} in
 		# 	- new and computed variables at runtime
 		#	- shell env variables
 		#	- command line
-		# 	- user env file
 		# 	- modules env file
+		# 	- user env file
 		# 	- ctx env file
 		# 	- default tango env file
 		# 	- default values hardcoded and runtume computed
@@ -138,6 +138,7 @@ case ${ACTION} in
 		# 	- user env file
 		# 	- ctx env file
 		# 	- default env file
+		# TODO : check order __create_env_files
 		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __create_env_files "bash" "default ctx user"
 
 		# modules -----
@@ -168,7 +169,7 @@ case ${ACTION} in
 
 		# get modules dependencies information 
 
-		# we need to extract modules dependencies declared with _MODULE_DEPENDENCIES from shell, user, ctx, and default environment variables :
+		# we need to extract modules dependencies declared with _MODULE_DEPENDENCIES from shell, user, ctx, and default variables :
 		# first, we save modules dependencies list from shell environment variables
 		__save_modules_links_shell_env_var="$(declare -p | grep _MODULE_DEPENDENCIES=)"
 		# second, we need to extract modules dependencies declared with _MODULE_DEPENDENCIES variables
@@ -190,7 +191,7 @@ case ${ACTION} in
 		
 		# get scaling information of modules 
 
-		# we need to extract modules instances names list from shell, user, ctx and default environment variables
+		# we need to extract modules instances names list declared with _INSTANCES_NAMES from shell, user, ctx and default variables
 		# before __parse_and_scale_modules_declaration for eventually scaled modules to come
 
 		# first, we save modules instances list from shell environment variables
@@ -214,16 +215,13 @@ case ${ACTION} in
 		if [ ! "$TANGO_SERVICES_MODULES" = "" ]; then
 			# take care of modules env files by recreating bash env file using user, ctx, modules and default files after having scaled modules and processed modules dependencies
 			# bash env files priority :
+
 			# 			- user env file
-			# 			- modules env file
 			# 			- ctx env file
+			# 			- modules env file
 			# 			- default env file
-			[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __create_env_files "bash" "default ctx modules user"		
+			[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __create_env_files "bash"
 		fi
-
-
-
-
 
 
 
@@ -280,8 +278,6 @@ case ${ACTION} in
 
 		# add to VARIABLES_LIST all variables cumulated from default, ctx, modules and user env file
 		__extract_declared_variable_names "${GENERATED_ENV_FILE_FOR_COMPOSE}"
-		
-
 		
 
 		# STEP 2 ------ process command line and shell environment variables
@@ -356,16 +352,18 @@ case ${ACTION} in
 			__add_declared_variables "${var}"
 		done
 		
-		# update env var 
-		# __update_env_files will update all values using current shell environment variables and values from command line
-		# env var values priority order will be:
+		# update env files variables
+		# __update_env_files will update all values of known variable (listed in VARIABLES_LIST) using current shell environment variables and values from command line
+		# env files variables values priority order will be:
 		#	- shell env variables
 		#	- command line
-		# 	- user env file
 		# 	- modules env file
+		# 	- user env file
 		# 	- ctx env file
 		# 	- default tango env file
-		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __update_env_files "ingest with env variables from shell and command line"
+		
+		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __update_env_files "ingest into env files variables from shell and command line"
+
 		# load env var
 		# even if files have not been modified, we want to load previously saved variables
 		__load_env_vars
@@ -377,8 +375,8 @@ case ${ACTION} in
 		# 	- computed new variables at runtime
 		#	- shell env variables
 		#	- command line
-		# 	- user env file
 		# 	- modules env file
+		# 	- user env file
 		# 	- ctx env file
 		# 	- default tango env file
 		# 	- hardcoded and runtime computed default values
@@ -606,7 +604,7 @@ case ${ACTION} in
 						__tango_log "INFO" "tango" "$TANGO_DOMAIN is solved as your local IP address ${TANGO_HOST_DEFAULT_IP}"
 						;;
 					"")
-						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN do not return any result. Maybe your DNS configuration is protected against DNS rebind. Try to use auto-ip mode feature OR get your own domain name !"
+						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN do not return any result. Maybe your DNS configuration is protected against DNS rebind. Try to use auto-nip mode feature OR get your own domain name !"
 						;;
 					*)
 						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN return ${_s} which is different from your local IP address ${TANGO_HOST_DEFAULT_IP}."
@@ -679,36 +677,18 @@ case ${ACTION} in
 			;;
 		esac
 
-		# case ${ACTION} in
-		# 	gen|info|up|restart )
-		# 		if [ "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
-
-		# 			for area in ${NETWORK_SERVICES_AREA_LIST}; do
-		# 				IFS="|" read -r name proto internal_port secure_port <<<$(echo ${area})
-		# 				v1="NETWORK_PORT_${name^^}"
-		# 				[ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${!v1}")" = "TRUE" ] && eval NETWORK_PORT_${name^^}_REACHABLE=1
-		# 				__add_declared_variables "NETWORK_PORT_${name^^}_REACHABLE"
-		# 				if [ ! "$secure_port" = "" ]; then
-		# 					v2="NETWORK_PORT_${name^^}_SECURE"
-		# 					[ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${!v2}")" = "TRUE" ] && eval NETWORK_PORT_${name^^}_SECURE_REACHABLE=1
-		# 					__add_declared_variables "NETWORK_PORT_${name^^}_SECURE_REACHABLE"
-		# 				fi
-		# 			done
-		# 		fi
-		# 	;;
-		# esac
 
 		# update env var 
 		# new env var values priority order :
 		# 	- computed new variables at runtime
 		#	- shell env variables
 		#	- command line
-		# 	- user env file
 		# 	- modules env file
+		# 	- user env file
 		# 	- ctx env file
 		# 	- default tango env file
 		# 	- hardcoded and runtime computed default values
-		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __update_env_files "ingest default hardcoded values and runtime only variables"
+		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __update_env_files "ingest into env files default hardcoded values and runtime only variables"
 
 
 		# STEP 4 ------ create/transform some values and create docker compose file
@@ -721,12 +701,12 @@ case ${ACTION} in
 		# 	- computed new variables at runtime
 		#	- shell env variables
 		#	- command line
-		# 	- user env file
 		# 	- modules env file		
+		# 	- user env file
 		# 	- ctx env file
 		# 	- default tango env file
 		# 	- hardcoded and runtime computed default values
-		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __update_env_files "ingest created/modified/translated variables"
+		[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __update_env_files "ingest into env files created/modified/translated variables"
 		# load env var
 		# even if files have not been modified, we want to load previously saved variables
 		__load_env_vars

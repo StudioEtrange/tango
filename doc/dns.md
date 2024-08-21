@@ -27,7 +27,7 @@
     *  `auto-nip` : `<YOUR_PUBLIC_IP_ADRESS>.nip.io`
     *  `auto-nip-lan` : `<YOUR_CURRENT_LOCAL_IP_ADRESS>.nip.io`
 
-* nlp.io informations :
+* nip.io informations :
     * https://nip.io/
     * https://github.com/exentriquesolutions/nip.io
 

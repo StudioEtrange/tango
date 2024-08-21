@@ -1,0 +1,53 @@
+volumes:
+  librespeed_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${LIBRESPEED_DATA_PATH}
+    name: ${TANGO_CTX_NAME}_librespeed_data
+
+
+services:
+  librespeed:
+    image: ${LIBRESPEED_IMAGE_FIXED_VAR}:${LIBRESPEED_VERSION_FIXED_VAR:-latest}
+    container_name: ${TANGO_CTX_NAME}_librespeed
+    depends_on: 
+      - service_init
+    restart: unless-stopped
+    volumes:
+      - librespeed_data:/config
+    environment:
+      - PUID=${TANGO_USER_ID:-0}
+      - PGID=${TANGO_GROUP_ID:-0}
+      - PASSWORD=${LIBRESPEED_PASSWORD}
+      - CUSTOM_RESULTS=false
+      - DB_TYPE=${LIBRESPEED_DB_TYPE}
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      # service : librespeed -------------------------
+      - "traefik.http.services.librespeed.loadbalancer.server.port=80"
+      - "traefik.http.services.librespeed.loadbalancer.server.scheme=http"
+      - "traefik.http.services.librespeed.loadbalancer.passhostheader=true"
+      # middlewares definition : librespeed
+      # service router : librespeed
+      - "traefik.http.routers.librespeed.entrypoints=${LIBRESPEED_ENTRYPOINTS:-entry_main_http}"
+      - "traefik.http.routers.librespeed.rule=HostRegexp(`{subdomain:${LIBRESPEED_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.librespeed.priority=${LIBRESPEED_PRIORITY}"
+      - "traefik.http.routers.librespeed.service=librespeed"
+      - "traefik.http.routers.librespeed-secure.entrypoints=${LIBRESPEED_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
+      - "traefik.http.routers.librespeed-secure.rule=HostRegexp(`{subdomain:${LIBRESPEED_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.librespeed-secure.priority=${LIBRESPEED_PRIORITY}"
+      - "traefik.http.routers.librespeed-secure.service=librespeed"
+      - "traefik.http.routers.librespeed-secure.tls=true"
+      - "traefik.http.routers.librespeed-secure.tls.domains[0].main=${LIBRESPEED_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      # service router middlewares : librespeed
+      - "traefik.http.routers.librespeed.middlewares=error-middleware"
+      - "traefik.http.routers.librespeed-secure.middlewares=error-middleware"
+      # --------------------------------------------------
+    networks:
+      - default
+    expose:
+      # service librespeed
+      - 80/tcp

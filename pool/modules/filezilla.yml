@@ -41,6 +41,7 @@ services:
       - "traefik.http.services.filezilla.loadbalancer.server.port=5800"
       - "traefik.http.services.filezilla.loadbalancer.server.scheme=http"
       - "traefik.http.services.filezilla.loadbalancer.passhostheader=true"
+      # middlewares definition : filezilla
       # service router : filezilla
       - "traefik.http.routers.filezilla.entrypoints=${FILEZILLA_ENTRYPOINTS:-entry_main_http}"
       - "traefik.http.routers.filezilla.rule=HostRegexp(`{subdomain:${FILEZILLA_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
@@ -55,6 +56,7 @@ services:
       # service router middlewares : filezilla
       - "traefik.http.routers.filezilla.middlewares=error-middleware"
       - "traefik.http.routers.filezilla-secure.middlewares=error-middleware"
+      # --------------------------------------------------
     networks:
       - default
     expose:

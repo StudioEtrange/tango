@@ -21,7 +21,6 @@ services:
       - PUID=${TANGO_USER_ID:-0}
       - PGID=${TANGO_GROUP_ID:-0}
       - PASSWORD=${CODESERVER_PASSWORD:-}
-      - SUDO_PASSWORD=${CODESERVER_SUDO_PASSWORD:-}
     labels:
       - "${TANGO_INSTANCE_NAME}.managed=true"
       - "traefik.enable=true"
@@ -29,7 +28,7 @@ services:
       - "traefik.http.services.codeserver.loadbalancer.server.port=8443"
       - "traefik.http.services.codeserver.loadbalancer.server.scheme=http"
       - "traefik.http.services.codeserver.loadbalancer.passhostheader=true"
-      # middlewares : codeserver
+      # middlewares definition : codeserver
       # service router : codeserver
       - "traefik.http.routers.codeserver.entrypoints=${CODESERVER_ENTRYPOINTS:-entry_main_http}"
       - "traefik.http.routers.codeserver.rule=HostRegexp(`{subdomain:${CODESERVER_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
@@ -44,7 +43,9 @@ services:
       # service router middlewares : codeserver
       - "traefik.http.routers.codeserver.middlewares=error-middleware"
       - "traefik.http.routers.codeserver-secure.middlewares=error-middleware"
+      # --------------------------------------------------
     networks:
       - default
     expose:
+      # service codeserver
       - 8443/tcp

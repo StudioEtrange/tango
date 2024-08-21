@@ -5,7 +5,7 @@ bats_load_library 'bats-file'
 
 
 setup() {
-	load 'tango_bats_helper.bash'
+	load '../tango_bats_helper.bash'
 
 	TEST_TEMP_DIR="$(temp_make)"
 
@@ -298,6 +298,7 @@ teardown() {
 	__load_modules_dependencies
 	__parse_and_scale_modules_declaration
 
+	# children modules of a module
 	assert_equal "$BAR_MODULE_DEPENDENCIES" "alpha zebra"
 	assert_equal "$ALPHA_MODULE_DEPENDENCIES" ""
 	assert_equal "$ZEBRA_MODULE_DEPENDENCIES" ""
@@ -334,17 +335,19 @@ teardown() {
 	assert_equal "$ALPHA_INSTANCES_NB" "$(( 0 + 9 ))"
 	assert_equal "$MOD_INSTANCES_NB" "$(( 2 + 0 ))"
 
-
+	# parent modules of a module
 	assert_equal "$BAR_MODULE_LINKED" "foo mod"
 	assert_equal "$ZEBRA_MODULE_LINKED" "bar foo"
 	assert_equal "$ALPHA_MODULE_LINKED" "bar"
 	assert_equal "$FOO_MODULE_LINKED" "mod"
 	assert_equal "$MOD_MODULE_LINKED" ""
 
+	# parent instance of instance
 	assert_equal "$BAR_INSTANCE_3_INSTANCE_LINKED" "foo_instance_1"
 	assert_equal "$BAR_INSTANCE_8_INSTANCE_LINKED" "mod_instance_1"
 	assert_equal "$ZEBRA_INSTANCE_10_INSTANCE_LINKED" "foo_instance_1"
 	
+	# children instances of instance
 	assert_equal "$BAR_INSTANCE_1_INSTANCE_DEPENDENCIES" "alpha_instance_1 zebra_instance_1"
 	assert_equal "$FOO_INSTANCE_1_INSTANCE_DEPENDENCIES" "zebra_instance_10 bar_instance_3"
 	assert_equal "$MOD_INSTANCE_1_INSTANCE_DEPENDENCIES" "bar_instance_8 foo_instance_4"
@@ -461,7 +464,7 @@ teardown() {
 	assert_equal "$ZEBRA_INSTANCE_9_INSTANCE_EXTENDED_DEF_WITHOUT_SCALE" "~vpn_1"
 	assert_equal "$ZEBRA_INSTANCE_9_INSTANCE_EXTENDED_DEF_WITHOUT_SCALE_DEP" "~vpn_1"
 
-	# parent instance of instances
+	# parent instance of instance
 	assert_equal "$FOO_INSTANCE_1_INSTANCE_LINKED" ""
 	assert_equal "$FOO_INSTANCE_3_INSTANCE_LINKED" ""
 
@@ -562,7 +565,7 @@ teardown() {
 	assert_equal "$BAR_INSTANCE_5_INSTANCE_EXTENDED_DEF_WITHOUT_SCALE_DEP" ""
 
 
-	# parent instance of instances
+	# parent instance of instance
 	assert_equal "$FOO_INSTANCE_1_INSTANCE_LINKED" ""
 	assert_equal "$FOO_INSTANCE_3_INSTANCE_LINKED" ""
 
@@ -600,7 +603,7 @@ teardown() {
 	touch "${TEST_TEMP_DIR}/K.scalable"
 	touch "${TEST_TEMP_DIR}/P.yml"
 
-	# default dependencies defintion 
+	# default dependencies definition 
 	# P -> D
 	#   -> B
 	#   -> E
@@ -611,7 +614,7 @@ teardown() {
 	D_MODULE_DEPENDENCIES="K"
 	C_MODULE_DEPENDENCIES="K"
 
-	# dependencies declaration on command line
+	# dependencies declaration in command line
 	# P -> D
 	#   -> B
 	#   -> E

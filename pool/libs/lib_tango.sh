@@ -1,580 +1,9 @@
-# SERVICE LIFECYCLE -----------
-
-
-# start a service or all services 
-# if no service specified will start all service (by starting docker compose service "tango")
-# if service specified is the name of a scaled modules, all instances of this module will be launched
-# OPTIONS
-#		NO_EXEC_PLUGINS do not run attached plugins
-#		BUILD	build image before starting
-#
-__service_up() {
-	local __service="$1"
-	local __opt="$2"
-
-	local __build=
-	local __no_exec_plugins=
-	local __instances=
-	for o in ${__opt}; do
-		[ "$o" = "BUILD" ] &&  __build="--build"
-		[ "$o" = "NO_EXEC_PLUGINS" ] && __no_exec_plugins="1"
-	done
-
-
-
-	__tango_log "DEBUG" "tango" "service_up : first stopping services"
-	case "${__service}" in
-		"") 
-			__service_down_all
-		;;
-		vpn)
-			__tango_log "INFO" "tango" "Will stop all vpn services"
-			__service_down "vpn $VPN_SERVICES_LIST"
-		;;
-		*) 
-			__service_down "${__service}"
-		;;
-	esac
-	
-	__tango_log "DEBUG" "tango" "service_up : remove volumes not used in case of path have changed"
-	__compose_volume_remove
-
-
-
-	if $STELLA_API list_contains "${TANGO_SERVICES_MODULES_SCALED}" "${__service}"; then
-		__instances="${__service^^}_INSTANCES_LIST"
-		__tango_log "DEBUG" "tango" "service_up : starting all instances of scaled ${__service} : ${!__instances}"
-		if docker-compose up -V -d $__build ${!__instances}; then
-			__tango_log "INFO" "tango" "${!__instances} started"
-			for i in ${!__instances}; do
-				[ ! "$__no_exec_plugins" = "1" ] && __exec_auto_plugin_all_by_service ${i}
-				docker-compose logs ${i}
-			done
-		else
-			__tango_log "ERROR" "tango" "service_up : error code $? in docker-compose up"
-			exit 1
-		fi
-		
-	else
-		
-		if docker-compose up -V -d $__build ${__service:-tango}; then
-			__tango_log "INFO" "tango" "${__service:-tango} started"
-		else
-			__tango_log "ERROR" "tango" "service_up : error code $? in docker-compose up"
-		fi
-
-		if [ "${__service}" = "" ]; then
-			[ ! "$__no_exec_plugins" = "1" ] && __exec_auto_plugin_service_active_all
-			docker-compose logs tango
-		else
-			[ ! "$__no_exec_plugins" = "1" ] && __exec_auto_plugin_all_by_service ${__service}
-			docker-compose logs ${__service}
-		fi
-	fi
-
-	
-
-}
-
-# docker-compose services stop all
-# OPTIONS
-#	NO_DELETE do not delete containers nor volumes, just stop containers
-__service_down_all() {
-	local __opt="$1"
-
-	local __list=
-
-	local __no_delete=
-	for o in ${__opt}; do
-		[ "$o" = "NO_DELETE" ] &&  __no_delete="1"
-	done
-
-	if [ "${TANGO_INSTANCE_MODE}" = "shared" ]; then 
-		if [ ! "${ALL}" = "1" ]; then
-			# test if network already exist and set it as 'external' to not erase it
-			if [ ! -z $(docker network ls --filter name=^${TANGO_CTX_NETWORK_NAME}$ --format="{{ .Name }}") ] ; then 
-				[ "${TANGO_ALTER_GENERATED_FILES}" = "ON" ] && __set_network_as_external "default" "${TANGO_CTX_NETWORK_NAME}"
-			fi
-		fi
-
-		if [ ! "${ALL}" = "1" ]; then
-			# only non shared service
-			# get all containers running or not
-			__list="$(docker ps -a $(__container_filter 'LIST_NAMES '${TANGO_CTX_NAME}'_.*'))"
-			# stop containers
-			docker stop ${__list}
-			if [ ! "${__no_delete}" = "1" ]; then
-				# remove containers and remove anonymous volumes associated
-				# NOTE : named volumes are not removed here !
-				docker rm -v $(docker ps -a $(__container_filter 'ONLY_STOPPED LIST_NAMES '${TANGO_CTX_NAME}'_.*'))
-			fi
-		else
-			# only shared and non shared service
-			if [ "${__no_delete}" = "1" ]; then
-				# get all stopped containers
-				__list="$(docker ps -q $(__container_filter 'NON_STOPPED LIST_NAMES '${TANGO_CTX_NAME}'_.* '${TANGO_INSTANCE_NAME}'_.*'))"
-				# stop containers
-				docker stop ${__list}			
-			else
-				# stop and remove containers
-				# also remove named volumes declared in the `volumes` section of the Compose file and anonymous volumes attached to containers.
-				docker-compose down -v
-			fi
-		fi
-	else
-		if [ "${__no_delete}" = "1" ]; then
-			# get all stopped containers
-			__list="$(docker ps -q $(__container_filter 'NON_STOPPED LIST_NAMES '${TANGO_CTX_NAME}'_.* '${TANGO_INSTANCE_NAME}'_.*'))"
-			# stop containers
-			docker stop ${__list}		
-		else
-			# stop and remove containers
-			# also remove named volumes declared in the `volumes` section of the Compose file and anonymous volumes attached to containers.
-			docker-compose down -v
-		fi
-	fi
-}
-
-
-# docker-compose service stop specific service (or all instance of a specific service)
-# OPTIONS
-#	NO_DELETE do not delete containers nor volumes, just stop containers
-__service_down() {
-	local __service="$1"
-	local __opt="$2"
-
-	local __no_delete=
-	for o in ${__opt}; do
-		[ "$o" = "NO_DELETE" ] &&  __no_delete="1"
-	done
-
-	if $STELLA_API list_contains "${TANGO_SERVICES_MODULES_SCALED}" "${__service}"; then
-		__instances="${__service^^}_INSTANCES_LIST"
-		__tango_log "DEBUG" "tango" "service_down : stopping all instances of scaled ${__service} : ${!__instances}"
-		# stop containers
-		docker-compose stop ${!__instances}
-		if [ ! "${__no_delete}" = "1" ]; then
-			# remove containers and any anonymous volumes attached to containers
-			# NOTE : named volumes are not removed here !
-			docker-compose rm -f -v ${!__instances}
-		fi
-	else
-		# stop containers
-		docker-compose stop ${__service}
-		if [ ! "${__no_delete}" = "1" ]; then
-			# remove containers and any anonymous volumes attached to containers
-			# NOTE : named volumes are not removed here !
-			docker-compose rm -f -v ${__service}
-		fi
-
-	fi
-}
-
-# MANAGE ENV VARIABLES AND FILES GENERATION -----------------
-
-# load all declared variables (including associative arrays)
-__load_env_vars() {
-	
-	# preserve some current variables
-	local __d="$DEBUG"
-	local __t1="$TANGO_LOG_LEVEL"
-	local __t2="$TANGO_LOG_STATE"
-
-	. "${GENERATED_ENV_FILE_FOR_BASH}"
-	__load_env_associative_arrays
-
-	export DEBUG="$__d"
-	export TANGO_LOG_LEVEL="$__t1"
-	export TANGO_LOG_STATE="$__t2"
-	
-}
-
-
-# load all associative arrays
-# https://stackoverflow.com/a/59157715
-__load_env_associative_arrays() {
-	for __array in ${ASSOCIATIVE_ARRAY_LIST}; do
-		__str="declare -A $__array=\"\$__array\""
-		eval $__str
-	done 
-}
-
-# update env files with current declared variables in VARIABLES_LIST
-__update_env_files() {
-	local __text="$1"
-	echo "# ------ UPDATE : update_env_files : $(date) -- ${__text}" >> "${GENERATED_ENV_FILE_FOR_COMPOSE}"
-	echo "# ------ UPDATE : update_env_files : $(date) -- ${__text}" >> "${GENERATED_ENV_FILE_FOR_BASH}"
-	for __variable in ${VARIABLES_LIST}; do
-		# NOTE : since docker-compose v2 env file syntax have changed
-		#		it requires values with $ to be quoted, so we quote each value
-		# 		https://deploy-preview-13474--docsdocker.netlify.app/compose/env-file/#syntax-rules
-		# https://deploy-preview-13474--docsdocker.netlify.app/compose/env-file/#syntax-rules
-		[ -z ${!__variable+x} ] || echo "${__variable}='${!__variable}'" >> "${GENERATED_ENV_FILE_FOR_COMPOSE}"
-		# NOTE : we need to explicitly use "export" for variables in GENERATED_ENV_FILE_FOR_BASH because some software like ansible need to access their values
-		# 		 we export variables only when update file (__update_env_files) not when file is created (__create_env_files "bash") because it easier
-		[ -z ${!__variable+x} ] || echo "export ${__variable}=\"$(echo ${!__variable} | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\$/\\$/g')\"" >> "${GENERATED_ENV_FILE_FOR_BASH}"	
-	done
-
-	# store associative arrays
-	# to load stored associative arrays from compose env file see __load_env_associative_arrays
-	# https://stackoverflow.com/a/59157715
-	for __array in ${ASSOCIATIVE_ARRAY_LIST}; do
-		# note : use this to store array name and get its length
-		declare -n array_name="$__array"
-		if [ ${#array_name[@]} -gt 0 ]; then
-			__content="$(printf "%q" "$(declare -p $__array | cut -d= -f2-)")"
-			echo "${__array}='${__content}'" >> "${GENERATED_ENV_FILE_FOR_COMPOSE}"
-			declare -p $__array >> "${GENERATED_ENV_FILE_FOR_BASH}"
-		fi
-	done
-
-}
-
-# extract declared variable names from various env files (tango, ctx and user env files)
-__init_declared_variable_names() {
-	# reset global variables values
-	export VARIABLES_LIST=""
-	export ASSOCIATIVE_ARRAY_LIST=""
-
-}
-
-# add variables names declared in an env file and add them to VARIABLES_LIST
-__extract_declared_variable_names() {
-	local __file="$1"
-
-	[ -f "${__file}" ] && VARIABLES_LIST="${VARIABLES_LIST} $(sed -e '/^[[:space:]]*$/d' -e '/^[#]\+.*$/d' -e 's/^\([^=+]*\)+\?=\(.*\)$/\1/g' "${__file}")"
-	VARIABLES_LIST="$($STELLA_API list_filter_duplicate "${VARIABLES_LIST}")"
-}
-
-
-
-
-# add variables to variables list to be stored in env files
-__add_declared_variables() {
-	VARIABLES_LIST="${VARIABLES_LIST} $1"
-}
-
-# add associative array to arrays list to be stored in env files
-__add_declared_associative_array() {
-	ASSOCIATIVE_ARRAY_LIST="${ASSOCIATIVE_ARRAY_LIST} ${1}"
-}
-
-
-
-# generate an env file from various env files (tango, ctx, modules and user env files) 
-# 		__target bash : generate a bash file to be sourced (GENERATED_ENV_FILE_FOR_BASH)
-# 		__target docker_compose : generate an env file to be used as env-file in environment section of docker compose file (GENERATED_ENV_FILE_FOR_COMPOSE)
-# __target : bash | docker_compose
-# __source_list : user, modules, ctx, default -- will create env file by adding in order thoses source file (ascending priority order)
-#				default ascending priority order is 'default ctx modules user', so default env var have lowest priority
-__create_env_files() {
-	local __target="$1"
-	local __source_list="$2"
-
-	[ "${__source_list}" = "" ] && __source_list="default ctx modules user"
-
-	local __file=
-	local __instances_list=
-	local __modules_list=
-	local __scaled_modules_processed=
-	case $__target in
-		bash )
-			__file="${GENERATED_ENV_FILE_FOR_BASH}"
-		;;
-		docker_compose )
-			__file="${GENERATED_ENV_FILE_FOR_COMPOSE}"
-		;;
-	esac
-
-	__tango_log "DEBUG" "tango" "create_env_files for $__target : init ${__file} with theses source files order : $__source_list"
-
-
-	echo "# ------ CREATE : __create_env_files for $__target : $(date)" > "${__file}"
-
-	for o in ${__source_list}; do
-
-		case $o in 
-
-			default )	
-				# add default tango env file
-				__tango_log "DEBUG" "tango" "create_env_files for $__target : add default tango env file ${TANGO_ENV_FILE}"
-				cat <(echo \# --- PART FROM default tango env file ${TANGO_ENV_FILE}) <(echo) <(echo) "${TANGO_ENV_FILE}" <(echo) >> "${__file}"
-			;;
-
-			ctx )
-				# add ctx env file
-				if [ -f "${TANGO_CTX_ENV_FILE}" ]; then 
-					__tango_log "DEBUG" "tango" "create_env_files for $__target : add ctx env file ${TANGO_CTX_ENV_FILE}"
-					cat <(echo \# --- PART FROM ctx env file ${TANGO_CTX_ENV_FILE}) <(echo) <(echo) "${TANGO_CTX_ENV_FILE}" <(echo) >> "${__file}"
-				fi
-			;;
-
-			modules )
-				# add modules env files for scaled modules
-				__modules_list="${TANGO_SERVICES_MODULES}"
-				__scaled_modules_processed=
-				if [ ! "$TANGO_SERVICES_MODULES_SCALED" = "" ]; then
-					__tango_log "DEBUG" "tango" "create_env_files for $__target : add modules env files for scaled modules : $TANGO_SERVICES_MODULES_SCALED"
-					for m in ${TANGO_SERVICES_MODULES_SCALED}; do
-						__instances_list="${m^^}_INSTANCES_LIST"
-
-						for i in ${!__instances_list}; do
-							# ctx modules overrides tango modules
-							if [ -f "${TANGO_CTX_MODULES_ROOT}/${m}.env" ]; then
-								__tango_log "DEBUG" "tango" "create_env_files for $__target : ctx module ${m} instance ${i} : add env file : ${TANGO_CTX_MODULES_ROOT}/${m}.env"
-								# we replace all ocurrence of module name with an instance name
-								# except into lines containing FIXED_VAR expression anywhere
-								# except expression beginning with SHARED_VAR_
-								# use sed implementation of negative lookbehind https://stackoverflow.com/a/26110465
-								#sed -e "/FIXED_VAR/!s/${m}\([^a-zA-Z0-9]*\)/${i}\1/g" -e "/FIXED_VAR/!s/${m^^}\([^a-zA-Z0-9]*\)/${i^^}\1/g" <(echo \# --- PART FROM modules env file ${TANGO_CTX_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_CTX_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
-								sed -E "{/FIXED_VAR/! {s/#/##/g; s/(SHARED_VAR_)(${m})/\1_#_/g; s/(SHARED_VAR_)(${m^^})/\1-#-/g; s/${m}([^a-zA-Z0-9]*)/${i}\1/g; s/${m^^}([^a-zA-Z0-9]*)/${i^^}\1/g; s/(SHARED_VAR_)_#_/\1${m}/g; s/(SHARED_VAR_)-#-/\1${m^^}/g; s/##/#/g} }" <(echo \# --- PART FROM module env file ${TANGO_CTX_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_CTX_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
-							else
-								if [ -f "${TANGO_MODULES_ROOT}/${m}.env" ]; then
-									__tango_log "DEBUG" "tango" "create_env_files for $__target : tango module ${m} instance ${i} : add env file : ${TANGO_MODULES_ROOT}/${m}.env"
-									# we replace all ocurrence of module name with instance name
-									# except into lines containing FIXED_VAR expression anywhere
-									# except expression beginning with SHARED_VAR_
-									# use sed implementation of negative lookbehind https://stackoverflow.com/a/26110465
-									#sed -e "/FIXED_VAR/!s/${m}\([^a-zA-Z0-9]*\)/${i}\1/g" -e "/FIXED_VAR/!s/${m^^}\([^a-zA-Z0-9]*\)/${i^^}\1/g" <(echo \# --- PART FROM modules env file ${TANGO_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
-									sed -E "{/FIXED_VAR/! {s/#/##/g; s/(SHARED_VAR_)(${m})/\1_#_/g; s/(SHARED_VAR_)(${m^^})/\1-#-/g; s/${m}([^a-zA-Z0-9]*)/${i}\1/g; s/${m^^}([^a-zA-Z0-9]*)/${i^^}\1/g; s/(SHARED_VAR_)_#_/\1${m}/g; s/(SHARED_VAR_)-#-/\1${m^^}/g; s/##/#/g} }"  <(echo \# --- PART FROM module env file ${TANGO_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
-								else
-									__tango_log "DEBUG" "tango" "create_env_files for $__target : scaled module $m do not have an env file (${TANGO_CTX_MODULES_ROOT}/${m}.env nor ${TANGO_MODULES_ROOT}/${m}.env do not exists) might be an error"
-								fi
-							fi
-							__scaled_modules_processed="${__scaled_modules_processed} ${i}"
-						done
-					done
-					# remove from list scaled modules already processed
-					__modules_list="$($STELLA_API filter_list_with_list "${__modules_list}" "${__scaled_modules_processed}")"
-				fi
-
-				# add modules env files
-				__tango_log "DEBUG" "tango" "create_env_files for $__target : add modules env files for modules : ${__modules_list}"
-				for s in ${__modules_list}; do
-					# ctx modules overrides tango modules
-					if [ -f "${TANGO_CTX_MODULES_ROOT}/${s}.env" ]; then
-						__tango_log "DEBUG" "tango" "create_env_files for $__target : ctx module ${s} : add env file : ${TANGO_CTX_MODULES_ROOT}/${s}.env"
-						cat <(echo \# --- PART FROM module env file ${TANGO_CTX_MODULES_ROOT}/${s}.env) <(echo) <(echo) "${TANGO_CTX_MODULES_ROOT}/${s}.env" <(echo) >> "${__file}"
-					else
-						if [ -f "${TANGO_MODULES_ROOT}/${s}.env" ]; then
-							__tango_log "DEBUG" "tango" "create_env_files for $__target : tango module ${s} : add env file : ${TANGO_MODULES_ROOT}/${s}.env"
-							cat <(echo \# --- PART FROM module env file ${TANGO_MODULES_ROOT}/${s}.env) <(echo) <(echo) "${TANGO_MODULES_ROOT}/${s}.env" <(echo) >> "${__file}"
-						else
-							__tango_log "DEBUG" "tango" "create_env_files for $__target : module $s do not have an env file (${TANGO_CTX_MODULES_ROOT}/${s}.env nor ${TANGO_MODULES_ROOT}/${s}.env do not exists) maybe abnormal or not"
-						fi
-					fi
-				done
-			;;
-
-			user )
-				# add user env file
-				if [ -f "${TANGO_USER_ENV_FILE}" ]; then
-					__tango_log "DEBUG" "tango" "create_env_files for $__target : add user env file ${TANGO_USER_ENV_FILE}"
-					cat <(echo \# --- PART FROM user env file ${TANGO_USER_ENV_FILE}) <(echo) <(echo) "${TANGO_USER_ENV_FILE}" <(echo) >> "${__file}"
-				fi
-			;;
-		esac
-	done
-
-	# process special notations
-	__parse_env_file "${__file}"
-
-	if [ "$__target" = "bash" ]; then
-		# add quote for variable bash support
-		sed -i -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\$/\\$/g' "${__file}"
-		sed -i 's/^\([a-zA-Z0-9_-]*\)=\(.*\)$/\1=\"\2\"/g' "${__file}"
-	fi
-	if [ "$__target" = "docker_compose" ]; then
-		# add quote for compose env file 2.x support
-		# https://deploy-preview-13474--docsdocker.netlify.app/compose/env-file/#syntax-rules
-		sed -i "s/^\([a-zA-Z0-9_-]*\)=\(.*\)$/\1='\2'/g" "${__file}"
-	fi
-
-}
-
-
-
-# remove commentary 
-# manage += : cumulative assignation
-# manage ?= : init value of not already assigned variable (within file or in env var) with a value 
-# manage != : erase value of an already assigned variable (within file or in env var) with another value
-__parse_env_file() {
-	local _file="$1"
-
-	__tango_log "DEBUG" "tango" "parse_env_file : ${_file}"
-	local _temp=$(mktmp)
-
-	awk -F= '
-	BEGIN {
-	}
-
-	# catch !=
-	/^[^=#]*!=/ {
-		key=substr($1, 1, length($1)-1);
-		if (arr[key]) arr[key]=$2;
-		else if(ENVIRON[key]) arr[key]=$2;
-		
-		print key"="arr[key];
-		next;
-	}
-
-	# catch ?=
-	/^[^=#]*\?=/ {
-		key=substr($1, 1, length($1)-1);
-		if (arr[key]) arr[key]=arr[key];
-		else if(ENVIRON[key]) arr[key]=ENVIRON[key];
-		else arr[key]=$2;
-		print key"="arr[key];
-		next;
-	}
-
-	# catch +=
-	/^[^=#]*\+=/ {
-		key=substr($1, 1, length($1)-1);
-		if (arr[key]) arr[key]=arr[key] " " $2;
-		else if(ENVIRON[key]) arr[key]=ENVIRON[key] " " $2;
-		else arr[key]=$2;
-		print key"="arr[key];
-		next;
-	}
-
-	# catch =
-	/^[^=#]*=/ {
-		arr[$1]=$2;
-		print $0;
-		next;
-	}
-
-	/.*/ {
-		print $0;
-		next;
-	}
-	
-	END {
-	}
-	' "${_file}" > "${_temp}"
-	cat "${_temp}" > "${_file}"
-	rm -f "${_temp}"
-	
-	__substitute_env_var_in_file "$1"
-	__substitute_key_in_file "$1"
-}
-
-
-# https://gist.github.com/StudioEtrange/152e7bd0ac278b175663d11ab5db5d81
-
-# In any text or configuration file substitute a key with its own value, if its value is assigned earlier in the file and the key is referenced with {{key}}
-# This could be used on any text file, i.e an .ini file or a docker-compose env file
-# The mechanism works like in shell script variable syntax in some ways : assignation, declaration, resolution order and comment symbol (#)
-#   Usage : substitute_var_env_file "<file_path>"
-#   Input file content:
-#			N=10
-#			The number is {{N}}
-#			# FOO={{N}}
-#			A=1
-#			B={{A}}
-#			C={{B}}
-#			X={{Y}}
-#			Y=4
-#			X={{Y}}
-#   Result file content:
-#			N=10
-#			# The number is 10
-#			# FOO=10
-#			A=1
-#			B=1
-#			C=1
-#			X={{Y}}
-#			Y=4
-#			X=4
-__substitute_key_in_file() {
-
-	local _file="$1"
-
-	local _temp=$(mktmp)
-
-	awk -F= '
-
- 		function parsekey(str) {
-			# if there is a value assignation to a key into this string
-			# update val array
-			if (match(str,/^([^=#]*)=/)) {
-            	tmp=substr(str, RSTART, RLENGTH-1);
-                val[tmp]=substr(str, RSTART+RLENGTH);
-            }
-			
-		}
-
-		# fill the key array which contains all existing key
-		/^[^=#]*=/ {
-			# FNR=NR only when reading first file
-			if (FNR==NR) {
-				key[$1]=1;
-				next;
-			}
-		}
-		/.*/ {
-			# FNR=NR only when reading first file
-			if (FNR==NR) {
-				next;
-			}
-		}
-	
-		# this block is triggered at each line only if not bypassed by next
-		# so this block is really triggered only when reading second file
-		{
-			for (k in key) {
-				# transform any reference to the keyy in current line into its value, if it has a known value
-				# key[] list all existing keys in file
-				# val[] list only key which have a known value
-				if (k in val) {
-					# we replace any reference to the key with its value with gsub in current line
-					gsub("{{"k"}}", val[k]);			
-				}
-			}
-			# re-parse the current line to find any value assignation to a key
-			parsekey($0);
-			print $0;
-		} 
-
-		' "${_file}" "${_file}" > "${_temp}"
-		cat "${_temp}" > "${_file}"
-		rm -f "${_temp}"
-}
-
-# replace in a file exported environnement variable in the form {{$variable}}
-# NOTE : authorized char as shell variable name : [a-zA-Z_]+[a-zA-Z0-9_]* https://stackoverflow.com/a/2821201
-# WARN : env var must have been exported (with export command) to be used here
-__substitute_env_var_in_file() {
-
-	local _file="$1"
-
-	local _temp=$(mktmp)
-
-	awk '
-		/{{\$[a-zA-Z_]+[a-zA-Z0-9_]*}}/ {
-				if (match($0,/{{\$[a-zA-Z_]+[a-zA-Z0-9_]*}}/)) {
-						tmp=substr($0,RSTART+3,RLENGTH-5)
-                        if (tmp in ENVIRON) gsub("{{\\$"tmp"}}",ENVIRON[tmp],$0);
-                        else gsub("{{\\$"tmp"}}","{{MISSING_"tmp"}}",$0)
-				}
-		}
-
-		/.*/ {
-				print $0;
-		}
-	'  "${_file}" > "${_temp}"
-	cat "${_temp}" > "${_file}"
-	rm -f "${_temp}"
-}
-
-
 
 # generate docker compose file
 __create_docker_compose_file() {
 	rm -f "${GENERATED_DOCKER_COMPOSE_FILE}"
 
-	# concatenate compose files starting with tango compose file
+	# concatenate docker compose files starting with tango compose file
 	# NOTE : do not explode anchors here, we need to keep anchor &default-vpn, because we add vpn sections later and we need &default-vpn still exists
 	cp -f "${TANGO_COMPOSE_FILE}" "${GENERATED_DOCKER_COMPOSE_FILE}"
 
@@ -583,10 +12,10 @@ __create_docker_compose_file() {
 	__add_entrypoints_all
 
 
-	# ctx compose file
+	# merge context docker compose file
 	[ -f "${TANGO_CTX_COMPOSE_FILE}" ] && yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_CTX_COMPOSE_FILE}")
 
-	# user compose file
+	# merge user docker compose file
 	[ -f "${TANGO_USER_COMPOSE_FILE}" ] && yq m -i -a=append -- "${GENERATED_DOCKER_COMPOSE_FILE}" <(yq r --explodeAnchors "${TANGO_USER_COMPOSE_FILE}")
 
 
@@ -628,6 +57,7 @@ __create_docker_compose_file() {
 	__add_volume_definition_all
 	__add_volume_artefact_all
 	__add_volume_pool_and_plugins_data_all
+
 	__add_volume_service_all
 
 	# traefik middleware management
@@ -756,14 +186,14 @@ __set_certificates_all() {
 
 	local i=0
 	for p in ${TANGO_CERT_FILES}; do
-		yq w -i -- "${GENERATED_TLS_FILE_PATH}" "tls.certificates[$i].certFile" "${p}"
+		yq w -i --style=single -- "${GENERATED_TLS_FILE_PATH}" "tls.certificates[$i].certFile" "${p}"
 		__add_volume_mapping_service "traefik" "${p}:${p}"
 		(( i++ ))
 	done
 
 	i=0
 	for k in ${TANGO_KEY_FILES}; do
-		yq w -i -- "${GENERATED_TLS_FILE_PATH}" "tls.certificates[$i].keyFile" "${k}"
+		yq w -i --style=single -- "${GENERATED_TLS_FILE_PATH}" "tls.certificates[$i].keyFile" "${k}"
 		__add_volume_mapping_service "traefik" "${k}:${k}"
 		(( i++ ))
 	done
@@ -879,7 +309,7 @@ __add_environment_service_all() {
 		if __check_docker_compose_service_exist "${_s,,}"; then
 			_t="${_s}_ADDITIONAL_ENVVAR"
 			for _e in ${!_t}; do
-				yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${_s,,}.environment[+]" "${_e}"
+				yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${_s,,}.environment[+]" "${_e}"
 			done
 		else
 			__tango_log "WARN" "tango" "add_environment_service_all : service compose ${_s,,} declared with ${_s}_ADDITIONAL_ENVVAR  do not exist."
@@ -980,15 +410,15 @@ __set_traefik_log() {
 	case ${TRAEFIK_LOG_FILE} in
 		enable )
 			__tango_log "INFO" "tango" "Output traefik log files to ${TRAEFIK_LOG_PATH}/traefik.log"
-			yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--log.filePath=/traefiklog/traefik.log"
-			yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--log.format=json"
+			yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--log.filePath=/traefiklog/traefik.log"
+			yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--log.format=json"
 		;;
 	esac
 
 	case ${TRAEFIK_ACCESSLOG_FILE} in
 		enable )
 			__tango_log "INFO" "tango" "Output traefik log files to ${TRAEFIK_LOG_PATH}/access.log"
-			yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--accesslog.filepath=/traefiklog/access.log"
+			yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--accesslog.filepath=/traefiklog/access.log"
 		;;
 	esac
 
@@ -1010,22 +440,22 @@ __set_letsencrypt_service_all() {
 				__tango_log "INFO" "tango" "check generated certificates in $LETS_ENCRYPT_DATA_PATH"
 
 				# set letsencrypt debug server if needed
-				yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.caserver=${LETS_ENCRYPT_SERVER_DEBUG}"
+				yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.caserver=${LETS_ENCRYPT_SERVER_DEBUG}"
 			fi
 			__tango_log "INFO" "tango" "ACME protocol use ${ACME_CHALLENGE} challenge to validate letsencrypt certificates"
 
 			case ${ACME_CHALLENGE} in
 				HTTP )
 					
-					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.httpchallenge=true"
+					yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.httpchallenge=true"
 					# The entrypoint MUST use the default 'main' network area
-					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.httpchallenge.entrypoint=entry_main_http"
+					yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.httpchallenge.entrypoint=entry_main_http"
 				;;
 				DNS )
 					__tango_log "INFO" "tango" "ACME protocol ask ${ACME_DNS_PROVIDER} dns provider to validate letsencrypt certificates"
-					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.dnschallenge=true"
-					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.dnschallenge.provider=${ACME_DNS_PROVIDER}"
-					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53"
+					yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.dnschallenge=true"
+					yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.dnschallenge.provider=${ACME_DNS_PROVIDER}"
+					yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53"
 					
 							
 					case ${ACME_DNS_PROVIDER} in
@@ -1036,13 +466,13 @@ __set_letsencrypt_service_all() {
 							__cloudflare_ip=$(__tango_curl --connect-timeout 2 -fkSLs "https://www.cloudflare.com/ips-v4" | tr '\n' ',')
 
 							# To delay DNS check and reduce LE hitrate
-							yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.dnschallenge.delayBeforeCheck=90"
+							yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.dnschallenge.delayBeforeCheck=90"
 							
 							for e in ${TRAEFIK_ENTRYPOINTS_HTTP_LIST//,/ }; do
 								case $e in
 									*_secure)
 										# Allow these IPs to set the X-Forwarded-* headers - Cloudflare IPs: https://www.cloudflare.com/ips/
-										yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--entrypoints.$e.forwardedHeaders.trustedIPs=${__cloudflare_ip}"
+										yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--entrypoints.$e.forwardedHeaders.trustedIPs=${__cloudflare_ip}"
 									;;
 								esac
 							done 
@@ -1050,7 +480,7 @@ __set_letsencrypt_service_all() {
 
 						* )
 						 	# To delay DNS check and reduce LE hitrate
-							yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.dnschallenge.delayBeforeCheck=10"
+							yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--certificatesresolvers.tango.acme.dnschallenge.delayBeforeCheck=10"
 						;;
 					esac
 				;;
@@ -1291,23 +721,23 @@ __add_entrypoint() {
 		;;
 	esac
 
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--entrypoints.entry_${__name}_${__proto}=true"
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--entrypoints.entry_${__name}_${__proto}.address=:${__internal_port}/${__real_proto}"
+	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--entrypoints.entry_${__name}_${__proto}=true"
+	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--entrypoints.entry_${__name}_${__proto}.address=:${__internal_port}/${__real_proto}"
 	export TRAEFIK_ENTRYPOINTS_LIST="$TRAEFIK_ENTRYPOINTS_LIST entry_${__name}_${__proto}"
 	# add port mapping to traefik
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.ports[+]" "\${NETWORK_PORT_${__name^^}}:$__internal_port/${__real_proto}"
+	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.ports[+]" "\${NETWORK_PORT_${__name^^}}:$__internal_port/${__real_proto}"
 	__add_declared_variables "NETWORK_PORT_${__name^^}"
 	
 	case ${__proto} in
 		http )
 			export TRAEFIK_ENTRYPOINTS_HTTP_LIST="$TRAEFIK_ENTRYPOINTS_HTTP_LIST entry_${__name}_${__proto}"
 			if [ ! "$__associated_entrypoint" = "" ]; then
-				yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--entrypoints.entry_${__name}_${__proto}_secure=true"
-				yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--entrypoints.entry_${__name}_${__proto}_secure.address=:${__associated_entrypoint}/${__real_proto}"
+				yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--entrypoints.entry_${__name}_${__proto}_secure=true"
+				yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.command[+]" "--entrypoints.entry_${__name}_${__proto}_secure.address=:${__associated_entrypoint}/${__real_proto}"
 				export TRAEFIK_ENTRYPOINTS_LIST="$TRAEFIK_ENTRYPOINTS_LIST entry_${__name}_${__proto}_secure"
 				export TRAEFIK_ENTRYPOINTS_HTTP_LIST="$TRAEFIK_ENTRYPOINTS_HTTP_LIST entry_${__name}_${__proto}_secure"
 				# add port mapping to traefik
-				yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.ports[+]" "\${NETWORK_PORT_${__name^^}_SECURE}:$__associated_entrypoint/${__real_proto}"
+				yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.ports[+]" "\${NETWORK_PORT_${__name^^}_SECURE}:$__associated_entrypoint/${__real_proto}"
 				__add_declared_variables "NETWORK_PORT_${__name^^}_SECURE"
 			fi
 		;;
@@ -1487,14 +917,14 @@ __set_redirect_https_service_all() {
 				if [ "$proto" = "http" ]; then
 					if [ ! "$secure_port" = "" ]; then
 						# catch HTTP request on entry_xxx_tcp and entry_xxx_tcp_secure entrypoint
-						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}.entrypoints=entry_${name}_${proto},entry_${name}_${proto}_secure"
-						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}.rule=HostRegexp(\`{host:.+}\`)"
-						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}.priority=\${ROUTER_PRIORITY_HTTP_TO_HTTPS_VALUE}"
+						yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}.entrypoints=entry_${name}_${proto},entry_${name}_${proto}_secure"
+						yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}.rule=HostRegexp(\`{host:.+}\`)"
+						yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}.priority=\${ROUTER_PRIORITY_HTTP_TO_HTTPS_VALUE}"
 						# catch HTTPS request on entry_xxx_tcp only entrypoint (no need to catch HTTPS on entry_xxx_tcp_secure)
-						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}_secure.entrypoints=entry_${name}_${proto}"
-						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}_secure.rule=HostRegexp(\`{host:.+}\`)"
-						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}_secure.priority=\${ROUTER_PRIORITY_HTTP_TO_HTTPS_VALUE}"
-						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}_secure.tls=true"
+						yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}_secure.entrypoints=entry_${name}_${proto}"
+						yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}_secure.rule=HostRegexp(\`{host:.+}\`)"
+						yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}_secure.priority=\${ROUTER_PRIORITY_HTTP_TO_HTTPS_VALUE}"
+						yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}_secure.tls=true"
 						
 						# - "traefik.http.routers.http-catchall-entry_admin_tcp.entrypoints=entry_admin_tcp,entry_admin_tcp_secure"
 						# - "traefik.http.routers.http-catchall-entry_admin_tcp.rule=HostRegexp(`{host:.+}`)"
@@ -1506,17 +936,17 @@ __set_redirect_https_service_all() {
 						# - "traefik.http.routers.http-catchall-entry_admin_tcp_secure.tls=true"
 						
 						# declare HTTP to HTTPS redirect middlewares
-						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.middlewares.redirect-entry_${name}_${proto}_secure.redirectscheme.scheme=https"
-						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.middlewares.redirect-entry_${name}_${proto}_secure.redirectscheme.permanent=true"
-						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.middlewares.redirect-entry_${name}_${proto}_secure.redirectscheme.port=\${NETWORK_PORT_${name^^}_SECURE}"
+						yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.middlewares.redirect-entry_${name}_${proto}_secure.redirectscheme.scheme=https"
+						yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.middlewares.redirect-entry_${name}_${proto}_secure.redirectscheme.permanent=true"
+						yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.middlewares.redirect-entry_${name}_${proto}_secure.redirectscheme.port=\${NETWORK_PORT_${name^^}_SECURE}"
 						
 						# - "traefik.http.middlewares.redirect-entry_main_tcp_secure.redirectscheme.scheme=https"
 						# - "traefik.http.middlewares.redirect-entry_main_tcp_secure.redirectscheme.permanent=true"
 						# - "traefik.http.middlewares.redirect-entry_main_tcp_secure.redirectscheme.port=${NETWORK_PORT_MAIN_SECURE}"
 
 						# add middleware to catchall routers
-						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}.middlewares=redirect-entry_${name}_${proto}_secure@docker"
-						yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}_secure.middlewares=redirect-entry_${name}_${proto}_secure@docker"	
+						yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}.middlewares=redirect-entry_${name}_${proto}_secure@docker"
+						yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}_secure.middlewares=redirect-entry_${name}_${proto}_secure@docker"	
 
 						#   - traefik.http.routers.http-catchall-entry_main_tcp.middlewares=redirect-entry_main_tcp_secure@docker
 						#   - traefik.http.routers.http-catchall-entry_main_tcp_secure.middlewares=redirect-entry_main_tcp_secure@docker
@@ -1547,7 +977,7 @@ __add_service_direct_port_access_all() {
 				port_inside="$(yq r "${GENERATED_DOCKER_COMPOSE_FILE}" services.$service.expose[0])"
 				if [ ! "${port_inside}" = "" ]; then
 					__tango_log "INFO" "tango" "Setting direct access to $service port (bypass reverse proxy) : mapping $port to $port_inside"
-					yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.$service.ports[+]" "$port:$port_inside"
+					yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.$service.ports[+]" "$port:$port_inside"
 				else
 					__tango_log "WARN" "tango" "can not set direct access to $service through $port : Unknown inside port to map to. Inside port must be declared as first port in expose section."
 				fi
@@ -1652,7 +1082,7 @@ __set_module_instance() {
 			# and except expression beginning with SHARED_VAR_
 			# use sed implementation of negative lookbehind https://stackoverflow.com/a/26110465
 
-			# we also replace all occurence of dependencies instances
+			# we also replace all occurence of children dependencies instances
 			__dep="${__instance^^}_INSTANCE_DEPENDENCIES"
 			__dep="${!__dep}"
 			__tango_log "DEBUG" "tango" "set_module_instance : ${__instance} dependencies instances : ${__dep}"
@@ -1673,7 +1103,7 @@ __set_module_instance() {
 			# and except expression beginning with SHARED_VAR_
 			# use sed implementation of negative lookbehind https://stackoverflow.com/a/26110465
 			
-			# we also replace all occurence of dependencies instances
+			# we also replace all occurence of children dependencies instances
 			__dep="${__instance^^}_INSTANCE_DEPENDENCIES"
 			__dep="${!__dep}"
 			__tango_log "DEBUG" "tango" "set_module_instance : ${__instance} dependencies instances : ${__dep}"
@@ -2200,6 +1630,7 @@ __process_modules_dependencies() {
 			eval "export ${i^^}_INSTANCE_LINKED=\"${__parent_instance}\""
 			__add_declared_variables "${i^^}_INSTANCE_LINKED"
 
+			# _INSTANCE_DEPENDENCIES contains children instances
 			__tmp="${__parent_instance^^}_INSTANCE_DEPENDENCIES"
 			eval "export ${__tmp}=\"$($STELLA_API trim "${!__tmp} ${i}")\""
 			__add_declared_variables "${__tmp}"
@@ -2320,7 +1751,7 @@ __recursive_modules_dependencies() {
 # parse modules declarations
 #  - scale module
 #  - split module list between full list and name list and update variable TANGO_SERVICES_xxxxx_FULL TANGO_SERVICES_xxxxx
-#  - add dependencies declaration by completing _MODULE_DEPENDENCIES variable
+#  - add dependencies declaration by completing _MODULE_DEPENDENCIES variables and setting all _INSTANCE definition
 __parse_and_scale_modules_declaration() {
 
 
@@ -2390,8 +1821,8 @@ __parse_and_scale_modules_declaration() {
 			__add_declared_variables "${__name^^}_INSTANCES_NB"
 
 			# dependencies : 
-			# module name have dependencies stored in _MODULE_DEPENDENCIES var
-			# cumulate with dependencies declared with previous variable _MODULE_DEPENDENCIES
+			# module have dependencies list stored in <module>_MODULE_DEPENDENCIES var
+			# this list is cumulative with dependencies declared with any previous variable <module>_MODULE_DEPENDENCIES
 			__links="${__name^^}_MODULE_DEPENDENCIES"
 			[ -n "${__ITEM_DEPENDENCIES}" ] && eval "export ${__links}=\"$($STELLA_API list_filter_duplicate "${__ITEM_DEPENDENCIES} ${!__links}")\""
 			__add_declared_variables "${__links}"
@@ -2756,6 +2187,7 @@ __list_items() {
 # FEATURES MANAGEMENT ------------------------
 
 __print_info_services() {
+	
 	local __services_list="$1"
 	local __info=""
 	local __list=""
@@ -2907,9 +2339,9 @@ __set_vpn_service() {
 	yq d -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.expose"
 	yq d -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.ports"
 
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.network_mode" "service:${__vpn_service_name}"
+	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.network_mode" "service:${__vpn_service_name}"
 
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "VPN_ID=${__vpn_id}"
+	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "VPN_ID=${__vpn_id}"
 
 	# add volume from vpn service to get conf files into /vpn
 	__add_volume_from_service "${__service_name}" "${__vpn_service_name}"
@@ -2948,21 +2380,21 @@ __create_vpn() {
 	_tmp="VPN_${__vpn_id}_ROUTE6"
 	local __route6="${!_tmp}"
 	# !!merge <<: default-vpn
-	yq w -i "${GENERATED_DOCKER_COMPOSE_FILE}" --makeAlias "services.${__service_name}.<<" "default-vpn" 
-	#yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.<<" default-vpn
+	yq w -i --style=single "${GENERATED_DOCKER_COMPOSE_FILE}" --makeAlias "services.${__service_name}.<<" "default-vpn" 
+	#yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.<<" default-vpn
 	# need tweak '*default-vpn' yaml anchor while this issue exist in yq : https://github.com/mikefarah/yq/issues/377
 	#sed -i 's/[^&]default-vpn/ \*default-vpn/' "${GENERATED_DOCKER_COMPOSE_FILE}"
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.container_name" '${TANGO_INSTANCE_NAME}_'${__service_name}
+	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.container_name" '${TANGO_INSTANCE_NAME}_'${__service_name}
 	[ "${__folder}" ] && __add_volume_mapping_service "${__service_name}" "${__folder}:/vpn"
-	[ "${__vpn_files}" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "VPN_FILES=${__vpn_files}"
-	[ "${__vpn}" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "VPN=${__vpn}"
-	[ "${__vpn_auth}" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "VPN_AUTH=${__vpn_auth}"
-	[ "${__dns}" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "DNS=${__dns}"
-	[ "${__cert_auth}" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "CERT_AUTH=${__cert_auth}"
-	[ "${__cipher}" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "CIPHER=${__cipher}"
-	[ "${__mss}" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "MSS=${__mss}"
-	[ "${__route}" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "ROUTE=${__route}"
-	[ "${__route6}" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "ROUTE6=${__route6}"
+	[ "${__vpn_files}" ] && yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "VPN_FILES=${__vpn_files}"
+	[ "${__vpn}" ] && yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "VPN=${__vpn}"
+	[ "${__vpn_auth}" ] && yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "VPN_AUTH=${__vpn_auth}"
+	[ "${__dns}" ] && yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "DNS=${__dns}"
+	[ "${__cert_auth}" ] && yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "CERT_AUTH=${__cert_auth}"
+	[ "${__cipher}" ] && yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "CIPHER=${__cipher}"
+	[ "${__mss}" ] && yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "MSS=${__mss}"
+	[ "${__route}" ] && yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "ROUTE=${__route}"
+	[ "${__route6}" ] && yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "ROUTE6=${__route6}"
 
 	export TANGO_TIME_VOLUME_SERVICES="${TANGO_TIME_VOLUME_SERVICES} ${__service_name}"
 
@@ -3034,6 +2466,8 @@ __add_gpu() {
 	local __service="$1"
 	local __opt="$2"
 
+	local __docker_version
+	
 	__opt_intel_quicksync=0
 	__opt_nvidia=0
 	for o in $__opt; do
@@ -3041,14 +2475,40 @@ __add_gpu() {
 		[ "${o}" = "NVIDIA" ] && __opt_nvidia=1
 	done
 
+	
 	if [ "${__opt_intel_quicksync}" = "1" ]; then
-		[ -d "/dev/dri" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.devices[+]" "/dev/dri:/dev/dri"
+		[ -d "/dev/dri" ] && yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.devices[+]" "/dev/dri:/dev/dri"
 	fi
 
-	if [ "${__opt_nvidia}" = "1" ]; then
-		yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.environment[+]" "NVIDIA_VISIBLE_DEVICES=all"
-		yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.environment[+]" "NVIDIA_DRIVER_CAPABILITIES=compute,video,utility"
-		yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.runtime" "nvidia"
+	if [ "${__opt_nvidia}" = "1" ]; then	
+		# docker <19.03 -- method A : nvidia-docker2
+		# docker run --rm --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=compute,video,utility nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
+		yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.environment[+]" "NVIDIA_VISIBLE_DEVICES=all"
+		yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.environment[+]" "NVIDIA_DRIVER_CAPABILITIES=all"
+		yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.runtime" "nvidia"
+		
+		__docker_version=$(__docker_get_server_version)
+		__docker_version_major=$(echo "$__docker_version"| cut -d'.' -f 1)
+		__docker_version_minor=$(echo "$__docker_version"| cut -d'.' -f 2)
+		__docker_version_build=$(echo "$__docker_version"| cut -d'.' -f 3)
+
+		# NOTE we keep old and new method (A and B) because some image like plexinc/pms-docker needs envrionement variable even when using devices method (B)
+		[ "${__docker_version_major}" -gt 19 ] && USE_NVIDIA_CONTAINER_TOOLKIT="1"
+		if [ "${__docker_version_major}" -eq 19 ]; then
+			[ "${__docker_version_minor}" -gt 0 ] && USE_NVIDIA_CONTAINER_TOOLKIT="1"
+			if [ "${__docker_version_minor}" -eq 0 ]; then
+				[ "${__docker_version_build}" -ge 3 ] && USE_NVIDIA_CONTAINER_TOOLKIT="1"
+			fi
+		fi
+
+		if [ $USE_NVIDIA_CONTAINER_TOOLKIT = "1" ]; then
+			# docker >= 19.03 -- method B : nvidia-container-toolkit
+			# docker run --rm --gpus all,capabilities=utility nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
+			yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.deploy.resources.reservations.devices[+].driver" "nvidia"
+			yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.deploy.resources.reservations.devices[0].count" "all"
+			yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.deploy.resources.reservations.devices[0].capabilities[+]" "compute"
+			yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.deploy.resources.reservations.devices[0].capabilities[+]" "utility"
+		fi
 	fi
 }
 
@@ -3059,7 +2519,7 @@ __add_tz_var_for_time() {
 
 	if [ -f "/etc/timezone" ]; then
 		TZ="$(cat /etc/timezone)"
-		yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.environment[+]" "TZ=${TZ}"
+		yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.environment[+]" "TZ=${TZ}"
 	fi
 }
 
@@ -3068,7 +2528,7 @@ __add_tz_var_for_time() {
 __add_generated_env_file() {
 	local __service="$1"
 
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.env_file[+]" "${GENERATED_ENV_FILE_FOR_COMPOSE}"
+	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.env_file[+]" "${GENERATED_ENV_FILE_FOR_COMPOSE}"
 }
 
 
@@ -3084,7 +2544,7 @@ __add_service_dependency() {
 		__tango_log "ERROR" "tango" "__add_service_dependency : service compose ${__dependency} which is a dependency of ${__service} not found."
 		exit 1
 	fi
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.depends_on[+]" "${__dependency}"
+	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.depends_on[+]" "${__dependency}"
 }
 
 __add_volume_for_time() {
@@ -3093,6 +2553,34 @@ __add_volume_for_time() {
 	# add these volumes only if files exists
 	[ -f "/etc/timezone" ] && __add_volume_mapping_service "${__service}" "/etc/timezone:/etc/timezone:ro"
 	[ -f "/etc/localtime" ] && __add_volume_mapping_service "${__service}" "/etc/localtime:/etc/localtime:ro"
+}
+
+
+# create a middleware inside a service
+# __create_middleware "transmission-autoauthbasic" "headers.customrequestheaders.Authorization" "Basic ${TRANSMISSION_AUTH_BASIC}"
+#		add : 'traefik.http.middlewares.transmission-autoauthbasic.headers.customrequestheaders.Authorization=Basic ${TRANSMISSION_AUTH_BASIC}'
+__create_middleware() {
+	local __service="$1"
+	local __middleware_name="$2"
+	local __middleware_key="$3"
+	local __middleware_value="$4"
+
+	# first delete existing middleware
+	__delete_middleware "$__service" "$__middleware_name" "$__middleware_key"
+
+	__tango_log "DEBUG" "tango" "create middleware : $__middleware_name inside service $__service : traefik.http.middlewares.${__middleware_name}.${__middleware_key}=${__middleware_value}"
+	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.labels[+]" "traefik.http.middlewares.${__middleware_name}.${__middleware_key}=${__middleware_value}"
+}
+
+__delete_middleware() {
+	local __service="$1"
+	local __middleware_name="$2"
+	local __middleware_key="$3"
+
+	# delete existing middleware
+	__tango_log "DEBUG" "tango" "delete middleware : $__middleware_name from service $__service : traefik.http.middlewares.${__middleware_name}.${__middleware_key}"
+	sed -i -e '/^[^#]*traefik\.http\.middlewares\.'${__middleware_name}.${__middleware_key}'/d' "${GENERATED_DOCKER_COMPOSE_FILE}"
+
 }
 
 
@@ -3169,8 +2657,8 @@ __modify_services_middlewares() {
 	local __temp_list=
 	local __temp_list_secure=
 	# extract actual middlewares values
-	__middlewares_list="$(sed -n -e 's/^[^#]*traefik\.http\.routers\.'${__service}'\.middlewares=\(.*\)["]*$/\1/p' "${GENERATED_DOCKER_COMPOSE_FILE}" | sed -e 's/[",]/ /g')"
-	[ "$__secure" = "1" ] && __middlewares_list_secure="$(sed -n -e 's/^[^#]*traefik\.http\.routers\.'${__service}'-secure\.middlewares=\(.*\)["]*$/\1/p' "${GENERATED_DOCKER_COMPOSE_FILE}" | sed -e 's/[",]/ /g')"
+	__middlewares_list="$(sed -n -e 's/^[^#]*traefik\.http\.routers\.'${__service}'\.middlewares=\(.*\)['"\'"'"]*$/\1/p' "${GENERATED_DOCKER_COMPOSE_FILE}" | sed -e 's/['"\'"'",]/ /g')"
+	[ "$__secure" = "1" ] && __middlewares_list_secure="$(sed -n -e 's/^[^#]*traefik\.http\.routers\.'${__service}'-secure\.middlewares=\(.*\)['"\'"'"]*$/\1/p' "${GENERATED_DOCKER_COMPOSE_FILE}" | sed -e 's/['"\'"'",]/ /g')"
 
 	case $__action in
 
@@ -3262,14 +2750,14 @@ __modify_services_middlewares() {
 	# remove previous value
 	sed -i -e '/^[^#]*traefik\.http\.routers\.'${__service}'\.middlewares=/d' "${GENERATED_DOCKER_COMPOSE_FILE}"
 	# set new value
-	[ ! "${__middlewares_list}" = "" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__parent}.labels[+]" "traefik.http.routers.${__service}.middlewares=${__middlewares_list}"
+	[ ! "${__middlewares_list}" = "" ] && yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__parent}.labels[+]" "traefik.http.routers.${__service}.middlewares=${__middlewares_list}"
 
 	if [ "$__secure" = "1" ]; then
 		__middlewares_list_secure="${__middlewares_list_secure// /,}"
 		# remove previous value
 		sed -i -e '/^[^#]*traefik\.http\.routers\.'${__service}'-secure\.middlewares=/d' "${GENERATED_DOCKER_COMPOSE_FILE}"
 		# set new value
-		[ ! "${__middlewares_list_secure}" = "" ] && yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__parent}.labels[+]" "traefik.http.routers.${__service}-secure.middlewares=${__middlewares_list_secure}"
+		[ ! "${__middlewares_list_secure}" = "" ] && yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__parent}.labels[+]" "traefik.http.routers.${__service}-secure.middlewares=${__middlewares_list_secure}"
 	fi
 }
 
@@ -3281,7 +2769,7 @@ __add_letsencrypt_service() {
 
 	[ "${__parent}" = "" ] && __parent="${__service}"
 	if __check_docker_compose_service_exist "${__parent}"; then
-		yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__parent}.labels[+]" "traefik.http.routers.${__service}-secure.tls.certresolver=tango"
+		yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__parent}.labels[+]" "traefik.http.routers.${__service}-secure.tls.certresolver=tango"
 	else
 		__tango_log "WARN" "tango" "unknow service ${__parent} declared in LETS_ENCRYPT_SERVICES"
 	fi
@@ -3386,14 +2874,14 @@ __add_volume_mapping_service() {
 	local __service="$1"
 	local __mapping="$2"
 	
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.volumes[+]" "${__mapping}"
+	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.volumes[+]" "${__mapping}"
 }
 
 __add_volume_from_service() {
 	local __service="$1"
 	local __from_service="$2"
 	
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.volumes_from[+]" "${__from_service}"
+	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.volumes_from[+]" "${__from_service}"
 }
 
 
@@ -3401,11 +2889,11 @@ __add_volume_definition_by_value() {
 	local __name="$1"
 	local __path="$2"
 
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver" "local"
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.name" "\${TANGO_CTX_NAME}_${__name}"
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver_opts.type" "none"
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver_opts.o" "bind"
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver_opts.device" "${__path}"
+	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver" "local"
+	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.name" "\${TANGO_CTX_NAME}_${__name}"
+	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver_opts.type" "none"
+	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver_opts.o" "bind"
+	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver_opts.device" "${__path}"
 }
 
 # add a volume with path defined by a variable name
@@ -3413,11 +2901,11 @@ __add_volume_definition_by_variable() {
 	local __name="$1"
 	local __variable="$2"
 
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver" "local"
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.name" "\${TANGO_CTX_NAME}_${__name}"
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver_opts.type" "none"
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver_opts.o" "bind"
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver_opts.device" "\${${__variable}}"
+	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver" "local"
+	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.name" "\${TANGO_CTX_NAME}_${__name}"
+	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver_opts.type" "none"
+	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver_opts.o" "bind"
+	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "volumes.${__name}.driver_opts.device" "\${${__variable}}"
 
 	# add variable name to variables list passed in env file, because it can be initialized out of tango when using TANGO_CREATE_VOLUMES
 	__add_declared_variables "${__variable}"
@@ -3430,13 +2918,20 @@ __set_network_as_external() {
 	local __full_name="$2"
 
 	yq d -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "networks.${__name}.name"
-	yq w -i -- "${GENERATED_DOCKER_COMPOSE_FILE}" "networks.${__name}.external.name" "${__full_name}"
+	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "networks.${__name}.external.name" "${__full_name}"
 }
 
 
 
 
 # DOCKER ---------------------------------
+
+
+# docker version
+__docker_get_server_version() {
+	echo "$(docker version --format '{{.Server.Version}}')"
+}
+
 
 # docker client available
 __is_docker_client_available() {
@@ -3695,19 +3190,22 @@ __xml_set_attribute_value() {
 	local __attribute_name="$4"
 	local __attribute_value="$5"
 
-
-	xidel "${__file}" --silent --xml --xquery3 'let $selected := '${__xpath_selector}' return transform(/,function($e) { if ($selected[$e is .]) then <'${__node_name}'>{$e/attribute() except $e/@'${__attribute_name}', attribute '${__attribute_name}' { "'${__attribute_value}'" },$e/node()}</'${__node_name}'> else $e })' > "${__file}.new"
-	rm -f "${__file}"
-	mv "${__file}.new" "${__file}"
+	if [ -f "${__file}" ]; then
+		xidel "${__file}" --silent --xml --xquery3 'let $selected := '${__xpath_selector}' return transform(/,function($e) { if ($selected[$e is .]) then <'${__node_name}'>{$e/attribute() except $e/@'${__attribute_name}', attribute '${__attribute_name}' { "'${__attribute_value}'" },$e/node()}</'${__node_name}'> else $e })' > "${__file}.new"
+		rm -f "${__file}"
+		mv "${__file}.new" "${__file}"
+	fi
 }
 
-# get an attribute value 
-#		__xml_get_attribute_value "Preferences.xml" "/Preferences/@PlexOnlineToken"
-__xml_get_attribute_value() {
+# get an xpath value 
+#		__xml_get_xpath_value "Preferences.xml" "/Preferences/@PlexOnlineToken"
+__xml_get_xpath_value() {
 	local __file="$1"
 	local __xpath_selector="$2"
-
-	xidel "${__file}" --silent --extract "${__xpath_selector}"
+	
+	if [ -f "${__file}" ]; then
+		xidel "${__file}" --silent --extract "${__xpath_selector}"
+	fi
 }
 
 

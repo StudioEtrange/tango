@@ -12,6 +12,7 @@ services:
       - "traefik.http.services.cloud9.loadbalancer.server.port=8181"
       - "traefik.http.services.cloud9.loadbalancer.server.scheme=http"
       - "traefik.http.services.cloud9.loadbalancer.passhostheader=true"
+      # middlewares definition : cloud9
       # service router : cloud9
       - "traefik.http.routers.cloud9.entrypoints=${CLOUD9_ENTRYPOINTS:-entry_main_http}"
       - "traefik.http.routers.cloud9.rule=HostRegexp(`{subdomain:${CLOUD9_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
@@ -26,6 +27,7 @@ services:
       # service router middlewares : cloud9
       - "traefik.http.routers.cloud9.middlewares=error-middleware"
       - "traefik.http.routers.cloud9-secure.middlewares=error-middleware"
+      # --------------------------------------------------
     networks:
       - default
     expose:
