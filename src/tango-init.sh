@@ -6,8 +6,8 @@ export WORKING_DIR="${TANGO_CURRENT_RUNNING_DIR}"
 export TANGO_VERSION=
 
 # TANGO system requirements
-TANGO_REQUIREMENTS_LIST="awk sed docker"
-for t in ${TANGO_REQUIREMENTS_LIST}; do
+TANGO_SYSTEM_REQUIREMENTS_LIST="awk sed docker"
+for t in ${TANGO_SYSTEM_REQUIREMENTS_LIST}; do
 	if ! type $t &>/dev/null; then
 		echo "** ERROR : $t not found. Please install it."
 		exit 1
@@ -36,10 +36,8 @@ TANGO_ENV_FILE="${TANGO_ROOT}/tango.internal.env"
 
 TANGO_MODULES_ROOT="${TANGO_ROOT}/pool/modules"
 TANGO_PLUGINS_ROOT="${TANGO_ROOT}/pool/plugins"
-#TANGO_SCRIPTS_ROOT="${TANGO_ROOT}/pool/scripts"
 
-TANGO_LOG_STATE="ON"
-TANGO_LOG_LEVEL="INFO"
+
 
 # switch to control modification of generated files and alteration of filesystem (files & folder)
 TANGO_ALTER_GENERATED_FILES="ON"
@@ -51,8 +49,6 @@ declare -A TANGO_PLUGINS_BY_SERVICE_FULL_AUTO_EXEC
 # associative array for mapping services by plugin
 declare -A TANGO_SERVICES_BY_PLUGIN_FULL
 
-# load some external libs
-. "${TANGO_ROOT}/pool/bash_colors/bash_colors.sh"
 
 # load tango libs
 for f in ${TANGO_ROOT}/pool/libs/*; do

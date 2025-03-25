@@ -1,5 +1,14 @@
 # NOTES
 
+- [NOTES](#notes)
+  - [VPN](#vpn)
+  - [Paas](#paas)
+  - [Reverse Proxy](#reverse-proxy)
+    - [Traefik](#traefik)
+    - [Nginx](#nginx)
+  - [SSL / certificate](#ssl--certificate)
+  - [dashboard/homepage application](#dashboardhomepage-application)
+  - [Backup solutions](#backup-solutions)
 
 
 ## VPN
@@ -19,6 +28,18 @@
 * sample with openvpn server https://gist.github.com/darth-veitcher/93acda9617bab3e1de0264cebf4637fc
 * free vpn provider for test https://pilovali.nl/free-vpn/
 * qomui - Qt - openvpn client conf management  https://github.com/corrad1nho/qomui
+
+
+## Paas
+
+  * dokploy
+    * Dokploy is a free, self-hostable Platform as a Service (PaaS) that simplifies the deployment and management of applications and databases.
+    * based on traefik and docker compose and docker swarm
+    * https://dokploy.com/
+    * https://github.com/Dokploy/dokploy
+
+
+
 
 ## Reverse Proxy
 
@@ -47,7 +68,7 @@
 
 
 * docker provider network and traefik https://doc.traefik.io/traefik/providers/docker/#network
-     * `--providers.docker.network=mynetwork` traefik launch option : it defines mynetwork as the default network used ny traefik to route network trafic to containers. Can be usefull if there is several neetworks and you want to select one. WARN : to route trafic using a specific network, traefik instance AND routed containers MUST be connected to this network ! 
+     * `--providers.docker.network=mynetwork` traefik launch option : it defines mynetwork as the default network used by traefik to route network trafic to containers. Can be usefull if there is several neetworks and you want to select one. WARN : to route trafic using a specific network, traefik instance AND routed containers MUST be connected to this network ! 
         i.e in a compose file
         traefk:
             ...
@@ -79,13 +100,21 @@
 
 * Heimdall
     * https://github.com/linuxserver/Heimdall
-    * have integrations with some services
+    * have integrations with some services https://apps.heimdall.site/applications/enhanced
 
 * organizr2
     * https://organizr.app/
     * https://github.com/causefx/Organizr/
     * have integrations with some services
     * support authentification
+    * lot of features
+
+* Dashy
+    * Dashy helps you organize your self-hosted services by making them accessible from a single place
+    * https://github.com/lissy93/dashy
+    * https://dashy.to/
+    * support authentification
+      * OIDC, keycloak, authelia, HTTP Basic Auth
     * lot of features
 
 * homepage    
@@ -102,17 +131,19 @@
     * a startpage for your server and / or new tab page
     * https://github.com/jeroenpardon/sui
 
-* Dashy
-    * Dashy helps you organize your self-hosted services by making them accessible from a single place
-    * https://github.com/lissy93/dashy
-    * https://dashy.to/
-    * support authentification
-    * lot of features
+* Homarr
+  * https://github.com/ajnart/homarr
+  * homepage specialized in *arr product
 
 * Flame
     * Flame is self-hosted startpage for your server. Its design is inspired (heavily) by SUI. Flame is very easy to setup and use. With built-in editors, it allows you to setup your very own application hub in no time - no file editing necessary.
     * https://github.com/pawelmalak/flame
     * Docker integration to automatically pick and add apps based on their labels
+  
+* Fenrus
+    * https://github.com/revenz/Fenrus
+    * start page
+    * support some authentification mechanism
 
 ## Backup solutions
 

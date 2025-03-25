@@ -287,17 +287,33 @@ case ${ACTION} in
 				) \
 			-subj "/CN=${TANGO_DOMAIN}"
 		else
-			echo "* ERROR ${TARGET} do not exist or is not a folder"
+			__tango_log "ERROR" "tango" "${TARGET} do not exist or is not a folder"
 		fi
 	;;
 
 
 	vendor )
 		if [ "${TARGET}" = "" ]; then
-			echo "* ERROR specify a target path"
+			__tango_log "ERROR" "tango" "Specify a target path"
 		else
-			echo "* Copy tango into ${TARGET}/tango"
+			__tango_log "INFO" "tango" "Vendorize ${TARGET}"
+			__tango_log "INFO" "tango" "Copy tango into ${TARGET}/tango"
 			$STELLA_API transfer_app "${TARGET}"
+
+			cp -f "$TANGO_ROOT/pool/tango-link.sh" "${TARGET}/tango-link.sh"
+			chmod +x "${TARGET}/tango-link.sh"
+
+			cp -f "$TANGO_ROOT/pool/sample-app.sh" "${TARGET}/sample-app.sh"
+			chmod +x "${TARGET}/sample-app.sh"
+
+			__tango_log "INFO" "tango" "Link stella framework"
+			$STELLA_API init_app "$(basename "${TARGET}")" "${TARGET}"
+
+			echo ". \$_STELLA_LINK_CURRENT_FILE_DIR/tango-link.sh set-tango-root" >"${TARGET}/.stella-id"
+			echo "export STELLA_ROOT=\$TANGO_ROOT/pool/stella" >>"${TARGET}/.stella-id"
+			echo "STELLA_DEP_FLAVOUR=VENDOR" >>"${TARGET}/.stella-id"
+			echo "STELLA_DEP_VERSION=" >>"${TARGET}/.stella-id"
+			
 		fi
 	;;
 esac

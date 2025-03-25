@@ -68,6 +68,7 @@ x-vpn: &default-vpn
     - FIREWALL=1
     # group id that will own openvpn-client process AND that can bypass any firewall rule
     - GROUPID=33333
+    # https://serverfault.com/a/1029470 redirect-gateway add default route
     - 'OTHER_ARGS=--redirect-gateway def1'
   labels:
     - "${TANGO_INSTANCE_NAME}.managed=true"

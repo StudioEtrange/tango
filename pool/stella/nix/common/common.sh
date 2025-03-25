@@ -966,7 +966,8 @@ __sort_version() {
 
 
 __url_encode() {
-	if [ "$(which xxd 2>/dev/null)" = "" ]; then
+	#if [ "$(which xxd 2>/dev/null)" = "" ]; then
+	if ! type -P xxd &>/dev/null; then
 		__url_encode_1 "$@"
 	else
 		__url_encode_with_xxd "$@"
@@ -1738,13 +1739,15 @@ __filter_list() {
 	local _result_list=
 
 	[ -z "$_list" ] && return
-
 	# INCLUDE_TAG -- option name of include option -- must be setted before using	 INCLUDE_TAG
 	# EXCLUDE_TAG -- option name of exclude option -- must be setted before using EXCLUDE_TAG
-	# ${INCLUDE_TAG} <expr> -- include these items
-	# ${EXCLUDE_TAG} <expr> -- exclude these items
+	# ${INCLUDE_TAG} <expr> -- include these items 
+	# ${EXCLUDE_TAG} <expr> -- exclude these items 
 	# ${INCLUDE_TAG} is apply first, before ${EXCLUDE_TAG}
+	# 	ie : __filter_list "/foo/lib /foo/bin /foo/share" "EXCLUDE_TAG EXCLUDE_FILTER EXCLUDE_FILTER /foo/lib|/foo/share"
+	#	=>	/foo/bin
 
+	
 	local _tag_include=
 	local _flag_tag_include=OFF
 	local _tag_exclude=
@@ -2311,7 +2314,7 @@ __count_folder_item() {
 }
 
 __del_folder() {
-	echo "** Deleting $1 folder"
+	__log "DEBUG" "** Deleting $1 folder"
 	[ -d $1 ] && rm -Rf $1
 }
 
@@ -2727,13 +2730,15 @@ __download() {
 	if [ ! -f "$STELLA_APP_CACHE_DIR/$FILE_NAME" ]; then
 		if [ ! -f "$STELLA_INTERNAL_CACHE_DIR/$FILE_NAME" ]; then
 			# NOTE : curl seems to be more compatible
-			if [[ -n `which curl 2> /dev/null` ]]; then
+			#if [[ -n `which curl 2> /dev/null` ]]; then
+			if type -P curl &>/dev/null; then
 				# TODO : why two curl call ?
 				curl -fkSL -o "$STELLA_APP_CACHE_DIR/$FILE_NAME" "$URL" || \
 				curl -fkSL -o "$STELLA_APP_CACHE_DIR/$FILE_NAME" "$URL" || \
 				rm -f "$STELLA_APP_CACHE_DIR/$FILE_NAME"
 			else
-				if [[ -n `which wget 2> /dev/null` ]]; then
+				#if [[ -n `which wget 2> /dev/null` ]]; then
+				if type -P wget &>/dev/null; then
 					wget "$URL" -O "$STELLA_APP_CACHE_DIR/$FILE_NAME" --no-check-certificate || \
 					wget "$URL" -O "$STELLA_APP_CACHE_DIR/$FILE_NAME" || \
 					rm -f "$STELLA_APP_CACHE_DIR/$FILE_NAME"
@@ -2861,7 +2866,8 @@ __mercurial_project_version() {
 		[ "$o" = "LONG" ] && _opt_version_long=ON
 	done
 
-	if [[ -n `which hg 2> /dev/null` ]]; then
+	#if [[ -n `which hg 2> /dev/null` ]]; then
+	if type -P hg &>/dev/null; then
 		if [ "$_opt_version_long" = "ON" ]; then
 			echo "$(hg log -R "$_PATH" -r . --template "{latesttag}-{latesttagdistance}-{node|short}")"
 		fi
@@ -2883,13 +2889,27 @@ __git_project_version() {
 		[ "$o" = "LONG" ] && _opt_version_long=ON && _opt_version_short=OFF
 	done
 
+	if [ "$_opt_version_short" = "ON" ]; then
+		_git_options="--abbrev=0"
+	else
+		_git_options="--long"
+	fi
+
 	if [ -d "${_path}/.git" ]; then
-		if [[ -n `which git 2> /dev/null` ]]; then
-			if [ "$_opt_version_long" = "ON" ]; then
-				echo "$(git --git-dir "${_path}/.git" describe --tags --long --always --first-parent)"
-			fi
-			if [ "$_opt_version_short" = "ON" ]; then
-				echo "$(git --git-dir "${_path}/.git" describe --tags --abbrev=0 --always --first-parent)"
+		if type -P git &>/dev/null; then
+			# TODO NOTE : --first-parent option needs git version >= 1.8.4 but for fast execution purpose we test only >2
+			if [ "$(git --version | awk '{print $3}' | cut -d. -f1)" -ge 2 ]; then			
+				echo "$(git --git-dir "${_path}/.git" describe --tags ${_git_options} --always --first-parent)"
+			else
+				commit=$(git --git-dir "${_path}/.git" rev-parse HEAD)
+				while [ -n "$commit" ]; do
+					tag=$(git --git-dir "${_path}/.git" describe --tags ${_git_options} --always $commit 2>/dev/null)
+					if [ -n "$tag" ]; then
+						echo $tag
+						break
+					fi
+					commit=$(git --git-dir "${_path}/.git" rev-parse "${commit}^1" 2>/dev/null || echo "")
+				done
 			fi
 		fi
 	fi
@@ -3066,21 +3086,26 @@ __get_keys() {
 
 
 __del_key() {
-	local _FILE=$1
-	local _SECTION=$2
-	local _KEY=$3
+	local _FILE="$1"
+	local _SECTION="$2"
+	local _KEY="$3"
 
 	[ -f "$_FILE" ] && __ini_file "DEL" "$_FILE" "$_SECTION" "$_KEY"
 }
 
 __add_key() {
-	local _FILE=$1
-	local _SECTION=$2
-	local _KEY=$3
-	local _VALUE=$4
+	local _FILE="$1"
+	local _SECTION="$2"
+	local _KEY="$3"
+	local _VALUE="$4"
 
-	if [ ! -f "$_FILE" ]; then
-		touch $_FILE
+	if [ "${_FILE}" = "" ]; then
+		__dds_log "ERROR" "add_key no file specified"
+		exit 1
+	fi
+
+	if [ ! -f "${_FILE}" ]; then
+		touch ${_FILE}
 	fi
 
 	__ini_file "ADD" "$_FILE" "$_SECTION" "$_KEY" "$_VALUE"

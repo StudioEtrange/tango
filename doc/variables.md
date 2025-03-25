@@ -150,7 +150,7 @@ For full list see `tango.internal.env` file
     * can have a known parent path (if listed in `PARENT_PATH_SUBPATH_LIST`) or an unknow parent (if listed in `TANGO_PATH_LIST`)
 
 * Each declared path variable with an absolute path value must exists before launching tango
-* Each declared path variable with a relative path value will be auto created if missiung
+* Each declared path variable with a relative path value will be auto created if missing
 
 * Each declared path variable are turned into absolute path at runtime following these path evaluation rules
     * if variable path is an absolute path, then this absoluted path is used as is
@@ -225,7 +225,7 @@ For full list see `tango.internal.env` file
 
 
 
-* `TANGO_ARTEFACT_FOLDERS` is a special list of folder path named `artefacts`. Those listed folders are all absolute. Listed artefacts are attached to each service listed in `TANGO_ARTEFACT_SERVICES`. The mount point into service is defined by `TANGO_ARTEFACT_MOUNT_POINT` (`/artefact` by default) concatened to the deepest tree folder name.
+* `TANGO_ARTEFACT_FOLDERS` is a special list of folder path named `artefacts`. Those listed folders are all absolute. Listed artefacts are attached to each service in read write mode listed in `TANGO_ARTEFACT_SERVICES`. (Same for services listed in `TANGO_ARTEFACT_SERVICES_READONLY` but in read only mode). The mount point into service is defined by `TANGO_ARTEFACT_MOUNT_POINT` (`/artefact` by default) concatened to the deepest tree folder name.
 Artefact folder is an easy way to quick unite several folders into the same root inside a container
     * `TANGO_ARTEFACT_FOLDERS=/mnt/media/movies /foo/bar/tv /flu/bar/music` will be mounted under `/artefact/movies`, `/artefact/tv` and `/artefact/music` into each service
 

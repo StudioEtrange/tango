@@ -1,0 +1,64 @@
+volumes:
+  ownfoil_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${OWNFOIL_DATA_PATH}
+    name: ${TANGO_CTX_NAME}_ownfoil_data
+  games_switch_library:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${GAMES_SWITCH_LIBRARY_PATH}
+    name: ${TANGO_CTX_NAME}_games_switch_library
+
+services:
+  ownfoil:
+    image: ${OWNFOIL_IMAGE_FIXED_VAR}:${OWNFOIL_VERSION_FIXED_VAR:-latest}
+    container_name: ${TANGO_CTX_NAME}_ownfoil
+    depends_on: 
+      - service_init
+    restart: unless-stopped
+    volumes:
+      - ownfoil_data:/app/config
+      - games_switch_library:/games
+    environment:
+      - PUID=${TANGO_USER_ID:-0}
+      - PGID=${TANGO_GROUP_ID:-0}
+      - USER_ADMIN_NAME=${OWNFOIL_USER_ADMIN_NAME:-}
+      - USER_ADMIN_PASSWORD=${OWNFOIL_USER_ADMIN_PASSWORD:-}
+      - USER_GUEST_NAME=${OWNFOIL_USER_GUEST_NAME:-}
+      - USER_GUEST_PASSWORD=${OWNFOIL_USER_GUEST_PASSWORD:-}
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      # service : ownfoil -------------------------
+      - "traefik.http.services.ownfoil.loadbalancer.server.port=8465"
+      - "traefik.http.services.ownfoil.loadbalancer.server.scheme=http"
+      - "traefik.http.services.ownfoil.loadbalancer.passhostheader=true"
+      # middlewares definition : ownfoil
+      # service router : ownfoil
+      - "traefik.http.routers.ownfoil.entrypoints=${OWNFOIL_ENTRYPOINTS:-entry_main_http}"
+      - "traefik.http.routers.ownfoil.rule=HostRegexp(`{subdomain:${OWNFOIL_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.ownfoil.priority=${OWNFOIL_PRIORITY}"
+      - "traefik.http.routers.ownfoil.service=ownfoil"
+      - "traefik.http.routers.ownfoil-secure.entrypoints=${OWNFOIL_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
+      - "traefik.http.routers.ownfoil-secure.rule=HostRegexp(`{subdomain:${OWNFOIL_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.ownfoil-secure.priority=${OWNFOIL_PRIORITY}"
+      - "traefik.http.routers.ownfoil-secure.service=ownfoil"
+      - "traefik.http.routers.ownfoil-secure.tls=true"
+      - "traefik.http.routers.ownfoil-secure.tls.domains[0].main=${OWNFOIL_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      # service router middlewares : ownfoil
+      - "traefik.http.routers.ownfoil.middlewares=error-middleware"
+      - "traefik.http.routers.ownfoil-secure.middlewares=error-middleware"
+      # --------------------------------------------------
+    networks:
+      - default
+    expose:
+      # service ownfoil
+      - 8465/tcp
+    build:
+      #context: https://github.com/StudioEtrange/ownfoil.git#develop
+      context: /home/nomorgan/workspace/ownfoil

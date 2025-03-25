@@ -3,7 +3,7 @@
 
 case ${ACTION} in
 	# we need nothing
-	install|cert|modules|services|vendor )
+	install|cert|vendor )
 		;;
 	* )
 		# we need tango have been installed first
@@ -15,13 +15,19 @@ esac
 
 if [ "${ACTION}" = "info" ]; then
 	TANGO_LOG_STATE="ON"
-	TANGO_LOG_LEVEL="WARN"
+	TANGO_LOG_LEVEL="INFO"
+	STELLA_APP_LOG_STATE="ON"
+	STELLA_APP_LOG_LEVEL="INFO"
 fi
 
 
 if [ "${DEBUG}" = "1" ]; then
 	TANGO_LOG_STATE="ON"
 	TANGO_LOG_LEVEL="DEBUG"
+	STELLA_APP_LOG_STATE="ON"
+	STELLA_APP_LOG_LEVEL="DEBUG"
+	STELLA_LOG_STATE="ON"
+	STELLA_LOG_LEVEL="DEBUG"
 fi
 
 
@@ -35,13 +41,18 @@ TANGO_CTX_NAME_CAPS="${TANGO_CTX_NAME^^}"
 [ "${CTXROOT}" = "" ] && TANGO_CTX_ROOT="${TANGO_ROOT}" || TANGO_CTX_ROOT="${CTXROOT}"
 TANGO_CTX_ROOT="$($STELLA_API rel_to_abs_path "${TANGO_CTX_ROOT}" "${TANGO_CURRENT_RUNNING_DIR}")"
 
+__tango_log "INFO" "tango" "Tango context name : ${TANGO_CTX_NAME}"
+__tango_log "DEBUG" "tango" "Tango context root : ${TANGO_CTX_ROOT}"
+
+
 [ "${TANGO_CTX_COMPOSE_FILE}" = "" ] && TANGO_CTX_COMPOSE_FILE="${TANGO_CTX_ROOT}/${TANGO_CTX_NAME}.docker-compose.yml"
 TANGO_CTX_ENV_FILE="${TANGO_CTX_ROOT}/${TANGO_CTX_NAME}.env"
 TANGO_CTX_COMPOSE_FILE="${TANGO_CTX_ROOT}/${TANGO_CTX_NAME}.docker-compose.yml"
 TANGO_CTX_MODULES_ROOT="${TANGO_CTX_ROOT}/pool/modules"
 TANGO_CTX_PLUGINS_ROOT="${TANGO_CTX_ROOT}/pool/plugins"
-#TANGO_CTX_SCRIPTS_ROOT="${TANGO_CTX_ROOT}/pool/scripts"
 
+__tango_log "DEBUG" "tango" "Tango context modules root : ${TANGO_CTX_MODULES_ROOT}"
+__tango_log "DEBUG" "tango" "Tango context plugins root : ${TANGO_CTX_PLUGINS_ROOT}"
 
 # workspace folder
 TANGO_WORK_ROOT="${TANGO_ROOT}/workspace"
@@ -49,6 +60,7 @@ mkdir -p "${TANGO_WORK_ROOT}"
 TANGO_CTX_WORK_ROOT="${TANGO_CTX_ROOT}/workspace/${TANGO_CTX_NAME}"
 mkdir -p "${TANGO_CTX_WORK_ROOT}"
 
+__tango_log "DEBUG" "tango" "Tango context workroot : ${TANGO_CTX_WORK_ROOT}"
 
 # available modules from tango
 TANGO_MODULES_AVAILABLE="$(__list_items "module" "tango")"
@@ -564,8 +576,61 @@ case ${ACTION} in
 				exit 1
 			fi
 		fi
+		if [ "${TANGO_DOMAIN}" = "auto-sslip" ]; then
+			if [ ! "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
+				__tango_log "ERROR" "tango" "Your current tango context is declared not beeing exposed to internet. You can not use auto-sslip domain name feature. To declare your current tango context exposed to internet change variable value NETWORK_INTERNET_EXPOSED to 1"
+				exit 1
+			fi
+		fi
 
 		case $TANGO_DOMAIN in
+
+			auto-sslip-lan)
+				__tango_log "INFO" "tango" "auto-sslip-lan feature for domain name enabled."
+				TANGO_DOMAIN_FEATURE="auto-sslip-lan"
+				TANGO_DOMAIN="${TANGO_HOST_DEFAULT_IP//./-}.sslip.io"
+				__tango_log "INFO" "tango" "Domain is auto set to $TANGO_DOMAIN"
+				TANGO_SUBDOMAIN_SEPARATOR="-"
+				_s="$($STELLA_API get_ip_from_hostname ${TANGO_DOMAIN})"
+				case ${_s} in
+					${TANGO_HOST_DEFAULT_IP})
+						__tango_log "INFO" "tango" "$TANGO_DOMAIN is solved as your local IP address ${TANGO_HOST_DEFAULT_IP}"
+						;;
+					"")
+						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN do not return any result. Maybe your DNS configuration is protected against DNS rebind. Try to use auto-sslip mode feature OR get your own domain name !"
+						;;
+					*)
+						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN return ${_s} which is different from your local IP address ${TANGO_HOST_DEFAULT_IP}."
+						;;
+				esac
+			;;
+
+			auto-sslip)
+				__tango_log "INFO" "tango" "auto-sslip feature for domain name enabled."
+				TANGO_DOMAIN_FEATURE="auto-sslip"
+				if [ "${TANGO_EXTERNAL_IP}" = "" ]; then
+					__tango_log "ERROR" "tango" "Can not auto determine your external internet ip. Try to use auto-sslip-lan domain name feature OR get your own domain name !."
+					exit 1
+				else
+					TANGO_DOMAIN="${TANGO_EXTERNAL_IP//./-}.sslip.io"
+				fi
+				__tango_log "INFO" "tango" "Domain is auto set to $TANGO_DOMAIN"
+				TANGO_SUBDOMAIN_SEPARATOR="-"
+				_s="$($STELLA_API get_ip_from_hostname ${TANGO_DOMAIN})"
+				case ${_s} in
+					${TANGO_EXTERNAL_IP})
+						__tango_log "INFO" "tango" "$TANGO_DOMAIN is solved as your external IP address ${TANGO_EXTERNAL_IP}"
+						;;
+					"")
+						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN do not return any result. Maybe your DNS configuration is protected against DNS rebind. Try to use auto-sslip-lan mode OR get your own domain name !"
+						;;
+					*)
+						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN return ${_s} which is different from your external IP address ${TANGO_EXTERNAL_IP}."
+						;;
+				esac
+				
+			;;
+
 			auto-nip)
 				__tango_log "INFO" "tango" "auto-nip feature for domain name enabled."
 				TANGO_DOMAIN_FEATURE="auto-nip"
@@ -669,7 +734,7 @@ case ${ACTION} in
 					if [ ! "${TANGO_DOMAIN_FEATURE}" = "auto-lan-nip" ]; then
 						__port_list="$($STELLA_API trim ${__port_list})"
 						if [ ! "${__port_list}" = "" ]; then
-							__tango_log "INFO" "tango" "If you are on a local network with a router, do not forget to forward ports ${__port_list// / and } to your tango host IP ${TANGO_HOST_DEFAULT_IP}"
+							__tango_log "INFO" "tango" "If you are on a local network with a router, do not forget to forward ports ${__port_list// / and } entering into your router to your tango host IP ${TANGO_HOST_DEFAULT_IP}"
 							[ "${TANGO_FREEPORT}" = "1" ] && __tango_log "INFO" "tango" "When using freeport option this is a common mistake as port change at each services launch."
 						fi
 					fi

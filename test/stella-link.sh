@@ -22,6 +22,7 @@ case $ACTION in
 	include)
 		. "$STELLA_ROOT/conf.sh"
 		__init_stella_env
+		__log_stella "DEBUG" "stella-link" "Loaded STELLA framework from $STELLA_ROOT"
 		;;
 	bootstrap)
 		cd "$_STELLA_LINK_CURRENT_FILE_DIR"

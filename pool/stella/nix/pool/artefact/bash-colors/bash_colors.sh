@@ -1,7 +1,6 @@
 #!/bin/bash
 #
 # Constants and functions for terminal colors.
-# Author: Max Tsepkov <max@yogi.pw>
 if [[ "$BASH_SOURCE" == "$0" ]]; then
     is_script=true
     set -eu -o pipefail
@@ -49,7 +48,7 @@ function fn_exists
     type -t "$1" | grep -q 'function'
 }
 
-# iterate through command arguments, o allow for iterative color application
+# iterate through command arguments, to allow for iterative color application
 function clr_layer
 {
     # default echo setting

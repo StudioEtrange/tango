@@ -1,6 +1,14 @@
 #  TODO 
+- [TODO](#todo)
+  - [Modules to add to Tango](#modules-to-add-to-tango)
+  - [Catalog of docker images to turn into tango module](#catalog-of-docker-images-to-turn-into-tango-module)
+  - [Various](#various)
+
+
 
 ## Modules to add to Tango
+
+* catalog of selfhosted app : https://selfh.st/
 
 * Hoarder
   * https://github.com/hoarder-app/hoarder
@@ -176,10 +184,11 @@
     * http.redirection entrypoint priority ?
     * tls ?
 
-* [ ] secure traefik headers
+* [ ] secure traefik headers and optimize traefik trafic
     * https://mediacenterz.com/ultimate-docker-home-server-avec-traefik-2-letsencrypt-et-oauth-2020/
     * https://blog.lapaire.org/update-traefik-v2-4-to-v2-5/
     * https://github.com/htpcBeginner/docker-traefik/blob/master/appdata/traefik2/rules/web/middlewares.yml.example
+    * optimisation : https://github.com/brokenscripts/authentik_traefik/tree/traefik3/appdata/traefik/rules
 
 * [ ] scripts are sourced when exec => they should not be ? => to inehrit the env var of tango context ? (which is by the way the only main purpose of this 'script' functionality) ==> DEPRECATE script usage ?
 
@@ -203,3 +212,7 @@
     * plugin traefik for OWASP ModSecurity Core Rule Set : https://github.com/acouvreur/traefik-modsecurity-plugin
     * plugin Geoblock : allow/unallow request based on geographic origin https://plugins.traefik.io/plugins/62d6ce04832ba9805374d62c/geo-block
 
+
+* VPN gluetun [ ] replace https://github.com/StudioEtrange/openvpn-client with https://github.com/qdm12/gluetun
+    * lib_pia_port_forward.sh lib_transmission.sh : about PIA provider remote port : https://github.com/qdm12/gluetun-wiki/blob/main/setup/options/port-forwarding.md
+    * lib_tango.sh::__create_vpn() : open vpn option to get from env var : https://github.com/qdm12/gluetun-wiki/blob/main/setup/options/openvpn.md 

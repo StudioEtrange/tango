@@ -8,6 +8,8 @@ __load_env_vars() {
 	local __d="$DEBUG"
 	local __t1="$TANGO_LOG_LEVEL"
 	local __t2="$TANGO_LOG_STATE"
+	local __t3="$STELLA_LOG_LEVEL"
+	local __t4="$STELLA_LOG_STATE"
 
 	. "${GENERATED_ENV_FILE_FOR_BASH}"
 
@@ -16,6 +18,12 @@ __load_env_vars() {
 	export DEBUG="$__d"
 	export TANGO_LOG_LEVEL="$__t1"
 	export TANGO_LOG_STATE="$__t2"
+	export STELLA_LOG_LEVEL="$__t3"
+	export STELLA_LOG_STATE="$__t4"
+	#$STELLA_API set_log_level_app "$__t1"
+	#$STELLA_API set_log_state_app "$__t2"
+	export STELLA_APP_LOG_LEVEL="$__t1"
+	export STELLA_APP_LOG_STATE="$__t2"
 	
 }
 

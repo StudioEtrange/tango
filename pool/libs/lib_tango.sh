@@ -215,6 +215,7 @@ __add_volume_service_all() {
 		if __check_docker_compose_service_exist "${_s,,}"; then
 			_t="${_s}_ADDITIONAL_VOLUMES"
 			for _v in ${!_t}; do
+				__tango_log "DEBUG" "tango" "add_volume_service_all : ${_s}_ADDITIONAL_VOLUMES : volume : ${_v}"
 				__parse_item "volume" "${_v}" "_VOLUME"
 
 				[ ! "${_VOLUME_OUTSIDE_PATH}" = "" ] && _mapping_service="${_VOLUME_OUTSIDE_PATH}:"
@@ -334,10 +335,12 @@ __add_volume_artefact_all() {
 			__name="$($STELLA_API md5 "${f}")"
 			__add_volume_definition_by_value "artefact_${__name}" "${f}"
 			for s in $TANGO_ARTEFACT_SERVICES; do
-				__check_docker_compose_service_exist "${s}" && __add_volume_mapping_service "${s}" "artefact_${__name}:${TANGO_ARTEFACT_MOUNT_POINT}/${target}"
+				__check_docker_compose_service_exist "${s}" && __add_volume_mapping_service "${s}" "artefact_${__name}:${TANGO_ARTEFACT_MOUNT_POINT}/${target}:rw"
 				# NOTE : do not print WARN because a warn is printed for each artefact folder for each undefined services
 				#	|| echo "** WARN : unknow ${s} service declared in TANGO_ARTEFACT_SERVICES"
-				
+			done
+			for s in $TANGO_ARTEFACT_SERVICES_READONLY; do
+				__check_docker_compose_service_exist "${s}" && __add_volume_mapping_service "${s}" "artefact_${__name}:${TANGO_ARTEFACT_MOUNT_POINT}/${target}:ro"
 			done
 			__tango_log "DEBUG" "tango" "[${f}] will be mapped to {${TANGO_ARTEFACT_MOUNT_POINT}/${target}}"
 		fi
@@ -3347,6 +3350,7 @@ __create_path_all() {
 	if [ ! "${DEBUG}" = "1" ]; then
 		__tango_log "INFO_BEGINNING_NEWLINE_NO_HEADER" "" ""
 	fi
+
 }
 
 # create various sub folder and files if not exist
@@ -3427,14 +3431,16 @@ __create_path() {
 
 # install and update tango dependencies
 __install_tango_dependencies() {
-	
+	local _s_STELLA_LOG_STATE="$STELLA_LOG_STATE"
+
 	if [ "$TANGO_NOT_IN_ANY_CTX" = "1" ]; then
 		# standalone tango
 		__tango_log "INFO" "tango" "Install tango requirements : $STELLA_APP_FEATURE_LIST"
 		$STELLA_API feature_remove_list "docker-compose jq xidel yq"
+		
 		STELLA_LOG_STATE="ON"
 		$STELLA_API get_features
-		STELLA_LOG_STATE="OFF"
+		STELLA_LOG_STATE="$_s_STELLA_LOG_STATE"
 
 	else
 		STELLA_APP_FEATURE_LIST=$(__get_all_properties $(__select_app $TANGO_ROOT); echo $STELLA_APP_FEATURE_LIST)' '$STELLA_APP_FEATURE_LIST
@@ -3443,7 +3449,7 @@ __install_tango_dependencies() {
 		$STELLA_API feature_remove_list "docker-compose jq xidel yq"
 		STELLA_LOG_STATE="ON"
 		$STELLA_API get_features
-		STELLA_LOG_STATE="OFF"
+		STELLA_LOG_STATE="$_s_STELLA_LOG_STATE"
 	fi
 
 
@@ -3453,11 +3459,6 @@ __install_tango_dependencies() {
 __check_tango_dependencies() {
 
 	# NOTE : cannot use 'type' command because 'type' detect the bash function docker-compose which override the command
-	if ! which docker-compose 1>/dev/null 2>&1; then
-		__tango_log "ERROR" "tango" "missing tango dependency docker-compose, please install tango first"
-		exit 1
-	fi
-
 	if ! which jq 1>/dev/null 2>&1; then
 		__tango_log "ERROR" "tango" "missing tango dependency jq, please install tango first"
 		exit 1
@@ -3470,6 +3471,11 @@ __check_tango_dependencies() {
 
 	if ! which yq 1>/dev/null 2>&1; then
 		__tango_log "ERROR" "tango" "missing tango dependency yq, please install tango first"
+		exit 1
+	fi
+
+	if ! which docker-compose 1>/dev/null 2>&1; then
+		__tango_log "ERROR" "tango" "missing tango dependency docker-compose, please install tango first"
 		exit 1
 	fi
 
@@ -3541,144 +3547,18 @@ __check_lets_encrypt_settings() {
 }
 
 
-# this function protect tango for variable used in __tango_log_internal
+# 1 : level of log (INFO, WARN, ERROR, DEBUG, ASK)
+# 2 : domain is a string to indicate some sort of "category"
+# 3 : remaning parameters are the message to print
 __tango_log() {
-	( LOG_STATE=$TANGO_LOG_STATE; __log_internal "$@" )
-}
-
-# level of log (INFO, WARN, ERROR, ASK)
-#		the level can have suffices to modify the printing of log
-#			_NO_HEADER : disable print of domain and level
-#			_BEGINNING_NEWLINE : start by printing a new line before the message
-#		i.e 
-#			__log_internal "DEBUG_NO_HEADER_BEGINNING_NEWLINE" "" "" # will print only a new line
-#			__log_internal "DEBUG_BEGINNING_NEWLINE" "category" "test" # will print a new line then "category@level" then "test" message
-# domain is a string to indicate some sort of "category"
-# remaning parameters are the message to print
-__log_internal() {
-	local __level="$1"
-	local __domain="$2"
-	shift 2
-	local __msg="$@"
-
-	if [ "$LOG_STATE" = "ON" ]; then
-		_print="0"
-
-		
-		local _beginning_new_line="0"
-		local _no_header="0"
-		while [[ "${__level}" =~ _BEGINNING_NEWLINE|_NO_HEADER ]]; do
-			case ${__level} in
-				*_BEGINNING_NEWLINE* ) _beginning_new_line="1"; __level="${__level//_BEGINNING_NEWLINE}";;
-				*_NO_HEADER* ) _no_header="1"; __level="${__level//_NO_HEADER}";;
-			esac
-		done
-
-		local _color=
-		local _no_color_for_msg="1"
-		case ${__level} in
-				INFO )
-					_color="clr_bold clr_green"
-				;;
-				WARN )
-					_color="clr_bold"
-				;;
-				ERROR )
-					_color="clr_bold clr_red"
-					_no_color_for_msg="0"
-				;;
-				DEBUG )
-					_color="clr_bold clr_cyan"
-				;;
-				ASK )
-					_color="clr_bold clr_blue"
-				;;
-		esac
-
-		case $TANGO_LOG_LEVEL in
-			INFO )
-				case ${__level} in
-					INFO|WARN|ERROR|ASK ) _print="1"
-					;;
-				esac
-				;;
-			WARN )
-				case ${__level} in
-					WARN|ERROR|ASK ) _print="1"
-					;;
-				esac
-			;;
-			ERROR )
-				case ${__level} in
-					ERROR|ASK ) _print="1"
-					;;
-				esac
-			;;
-			DEBUG )
-				case ${__level} in
-					INFO|WARN|ERROR|DEBUG|ASK ) _print="1"
-					;;
-				esac
-			;;
-		esac
-
-		if [ "${_print}" = "1" ]; then
-			# start by printing a newline
-			if [ "${_beginning_new_line}" = "1" ]; then
-				printf "\n";
-			fi
-
-			# nothing to print more
-			if [ "${_no_header}" = "1" ]; then
-				if [ "${__msg}" = "" ]; then
-					return
-				fi
-			fi
-
-
-			case ${__level} in
-				# add spaces for tab alignment
-				INFO|WARN ) __level="${__level} ";;
-				ASK ) __level="${__level}  ";;
-			esac
-			
-
-			if [ "${_color}" = "" ]; then
-				if [ "${_no_header}" = "0" ]; then
-					echo "${__level}@${__domain}> ${__msg}"
-				else
-					echo "${__msg}"
-				fi
-			else
-				if [ "${_no_color_for_msg}" = "1" ]; then
-					if [ "${_no_header}" = "0" ]; then
-						${_color} -n "${__level}@${__domain}> "; clr_reset "${__msg}"
-					else
-						clr_reset "${__msg}"
-					fi
-				else
-					if [ "${_no_header}" = "0" ]; then
-						${_color} "${__level}@${__domain}> ${__msg}"
-					else
-						${_color} "${__msg}"
-					fi
-				fi
-			fi
-		fi
-	fi
+	$STELLA_API log_app "$@"
 }
 
 # trash any output
 __tango_log_run_without_output() {
 	local __domain="$1"
 	shift 1
-	if [ "${TANGO_LOG_STATE}" = "ON" ]; then
-		if [ "${TANGO_LOG_LEVEL}" = "DEBUG" ]; then
-			#echo "DEBUG>" $@
-			__tango_log "DEBUG" "$__domain" "$@"
-		fi
-	fi
-
+	__tango_log "DEBUG" "$__domain" "$@"
 	if [ "${TANGO_LOG_LEVEL}" = "DEBUG" ]; then
 		"$@"
 	else
@@ -3690,12 +3570,7 @@ __tango_log_run_without_output() {
 __tango_log_run_with_output() {
 	local __domain="$1"
 	shift 1
-	if [ "${TANGO_LOG_STATE}" = "ON" ]; then
-		if [ "${TANGO_LOG_LEVEL}" = "DEBUG" ]; then
-			#echo "DEBUG>" $@
-			__tango_log "DEBUG" "$__domain" "$@"
-		fi
-	fi
+	__tango_log "DEBUG" "$__domain" "$@"
 	"$@"
 }
 

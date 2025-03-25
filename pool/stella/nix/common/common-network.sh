@@ -590,6 +590,7 @@ __get_network_info() {
 
 }
 
+# TODO return only ipv4
 __get_ip_from_interface() {
 	local _if="$1"
 	type ifconfig &>/dev/null
@@ -713,33 +714,41 @@ __disable_proxy() {
 
 
 # no_proxy is read from conf file only if a stella proxy is active
-# _list_uri could be a list of no proxy values separated with comma
+# _list_uri should be a list of no proxy values separated with comma
 __register_no_proxy() {
 	local _list_uri="$1"
 	__get_key "$STELLA_ENV_FILE" "STELLA_PROXY" "NO_PROXY" "PREFIX"
 
 	_list_uri="${_list_uri//,/ }"
-	for p in $_list_uri; do
-			__uri_parse "$p"
+	_list_uri="${_list_uri} ${STELLA_PROXY_NO_PROXY//,/ }"
+	
+	_list_uri="$(__list_filter_duplicate "${_list_uri}")"
 
-			_host="$__stella_uri_host"
+	_list_uri="$(__sort_version "${_list_uri}")"
 
-			_exist=
-			STELLA_PROXY_NO_PROXY="${STELLA_PROXY_NO_PROXY//,/ }"
-			for h in $STELLA_PROXY_NO_PROXY; do
-				[ "$h" = "$_host" ] && _exist=1
-			done
+	__add_key "$STELLA_ENV_FILE" "STELLA_PROXY" "NO_PROXY" "${_list_uri// /,}"
 
-			if [ "$_exist" = "" ]; then
-				if [ "$STELLA_PROXY_NO_PROXY" = "" ]; then
-					STELLA_PROXY_NO_PROXY="$_host"
-				else
-					STELLA_PROXY_NO_PROXY="$STELLA_PROXY_NO_PROXY $_host"
-				fi
+	# for p in $_list_uri; do
+	# 		__uri_parse "$p"
 
-				__add_key "$STELLA_ENV_FILE" "STELLA_PROXY" "NO_PROXY" "${STELLA_PROXY_NO_PROXY// /,}"
-			fi
-	done
+	# 		_host="$__stella_uri_host"
+
+	# 		_exist=
+	# 		STELLA_PROXY_NO_PROXY="${STELLA_PROXY_NO_PROXY//,/ }"
+	# 		for h in $STELLA_PROXY_NO_PROXY; do
+	# 			[ "$h" = "$_host" ] && _exist=1
+	# 		done
+
+	# 		if [ "$_exist" = "" ]; then
+	# 			if [ "$STELLA_PROXY_NO_PROXY" = "" ]; then
+	# 				STELLA_PROXY_NO_PROXY="$_host"
+	# 			else
+	# 				STELLA_PROXY_NO_PROXY="$STELLA_PROXY_NO_PROXY $_host"
+	# 			fi
+
+	# 			__add_key "$STELLA_ENV_FILE" "STELLA_PROXY" "NO_PROXY" "${STELLA_PROXY_NO_PROXY// /,}"
+	# 		fi
+	# done
 	__init_proxy
 
 }
@@ -747,11 +756,17 @@ __register_no_proxy() {
 # only temporary no proxy
 # will be reseted each time proxy values are read from env file
 __no_proxy_for() {
-	local _uri=$1
+	local _uri="$1"
 
+	if [ "$_uri" == "" ]; then
+		return
+	fi
 	__uri_parse "$_uri"
 	local _host="$__stella_uri_host"
 
+	if [ "$_host" == "" ]; then
+		return
+	fi
 
 	local _exist=
 	local _tmp_no_proxy="${STELLA_NO_PROXY//,/ }"

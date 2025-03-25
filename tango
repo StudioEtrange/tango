@@ -4,9 +4,18 @@ _CURRENT_RUNNING_DIR="$( cd "$( dirname "." )" && pwd )"
 
 TANGO_ROOT="${_CURRENT_FILE_DIR}"
 
-STELLA_LOG_STATE="OFF"
+# stella framework log
+[ "$STELLA_LOG_STATE" = "" ] && STELLA_LOG_STATE="OFF"
+[ "$STELLA_LOG_LEVEL" = "" ] && STELLA_LOG_LEVEL="INFO"
+# tangp logs
+[ "$TANGO_LOG_STATE" = "" ] && TANGO_LOG_STATE="ON"
+[ "$TANGO_LOG_LEVEL" = "" ] && TANGO_LOG_LEVEL="INFO"
+STELLA_APP_LOG_STATE="$TANGO_LOG_STATE"
+STELLA_APP_LOG_LEVEL="$TANGO_LOG_LEVEL"
+
 . "${TANGO_ROOT}/stella-link.sh" include
 
+$STELLA_API log_app "INFO" "tango" "Detected TANGO framework in ${TANGO_ROOT}"
 
 # INIT TANGO -------------------
 . "${TANGO_ROOT}/src/tango-init.sh" $@
