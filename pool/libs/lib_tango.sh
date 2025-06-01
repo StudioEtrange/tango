@@ -52,7 +52,6 @@ __create_docker_compose_file() {
 	# attach generated env compose file to services
 	__add_generated_env_file_all
 	__add_gpu_all
-
 	# volume management
 	__add_volume_definition_all
 	__add_volume_artefact_all
@@ -65,7 +64,7 @@ __create_docker_compose_file() {
 
 	# certifacte management
 	__set_letsencrypt_service_all
-	
+
 	# set traefik log properties
 	__set_traefik_log
 
@@ -75,6 +74,9 @@ __create_docker_compose_file() {
 	# because it remove some network definition
 	# and because some methods above add service to VPN_x_SERVICES
 	__set_vpn_service_all
+	
+	# NOT NEEDED
+	#__set_network_dns_search_all
 
 
 	__tango_log "INFO" "tango" "Active services and subservices : ${TANGO_SERVICES_ACTIVE} ${TANGO_SUBSERVICES_ROUTER_ACTIVE}"
@@ -199,9 +201,18 @@ __set_certificates_all() {
 	done
 }
 
-
-
-
+# 20250417 : NOT NEEDED !
+# add a dns_search field to all services in docker compose file which have a networks defined to default
+# WRONG : 
+#		we set dns search value to "." (which is empty value) to not use any default search domain inherited from host
+# 		for dns request or any dns request using name container will fail
+__set_network_dns_search_all() {
+	local services=$(yq r --printMode p -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.*.networks.(.==default)" | awk -F'.' '{print $2}')
+	
+	for s in $services; do
+		yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${s}.dns_search[+]" "."
+	done
+}
 
 
 
@@ -2347,8 +2358,8 @@ __set_vpn_service() {
 	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "VPN_ID=${__vpn_id}"
 
 	# add volume from vpn service to get conf files into /vpn
-	__add_volume_from_service "${__service_name}" "${__vpn_service_name}"
-
+	#__add_volume_from_service "${__service_name}" "${__vpn_service_name}"
+	__add_volume_mapping_service "${__service_name}" "vpn_${__vpn_id}_data:/vpn"
 	__add_service_dependency "${__service_name}" "${__vpn_service_name}"
 
 }
@@ -2388,7 +2399,10 @@ __create_vpn() {
 	# need tweak '*default-vpn' yaml anchor while this issue exist in yq : https://github.com/mikefarah/yq/issues/377
 	#sed -i 's/[^&]default-vpn/ \*default-vpn/' "${GENERATED_DOCKER_COMPOSE_FILE}"
 	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.container_name" '${TANGO_INSTANCE_NAME}_'${__service_name}
-	[ "${__folder}" ] && __add_volume_mapping_service "${__service_name}" "${__folder}:/vpn"
+	if [ ! "${__folder}" = "" ]; then
+		__add_volume_definition_by_variable "vpn_${__vpn_id}_data" "VPN_${__vpn_id}_PATH"
+		__add_volume_mapping_service "${__service_name}" "${__folder}:/vpn"
+	fi
 	[ "${__vpn_files}" ] && yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "VPN_FILES=${__vpn_files}"
 	[ "${__vpn}" ] && yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "VPN=${__vpn}"
 	[ "${__vpn_auth}" ] && yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service_name}.environment[+]" "VPN_AUTH=${__vpn_auth}"
@@ -2880,6 +2894,7 @@ __add_volume_mapping_service() {
 	yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.volumes[+]" "${__mapping}"
 }
 
+# NOTE : do not work on compose 3.x file
 __add_volume_from_service() {
 	local __service="$1"
 	local __from_service="$2"

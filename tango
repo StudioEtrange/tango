@@ -16,6 +16,7 @@ STELLA_APP_LOG_LEVEL="$TANGO_LOG_LEVEL"
 . "${TANGO_ROOT}/stella-link.sh" include
 
 $STELLA_API log_app "INFO" "tango" "Detected TANGO framework in ${TANGO_ROOT}"
+$STELLA_API log_app "INFO" "tango" "Detected STELLA framework in ${STELLA_ROOT}"
 
 # INIT TANGO -------------------
 . "${TANGO_ROOT}/src/tango-init.sh" $@

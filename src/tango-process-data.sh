@@ -766,7 +766,7 @@ case ${ACTION} in
 		# 	- computed new variables at runtime
 		#	- shell env variables
 		#	- command line
-		# 	- modules env file		
+		# 	- modules env file
 		# 	- user env file
 		# 	- ctx env file
 		# 	- default tango env file

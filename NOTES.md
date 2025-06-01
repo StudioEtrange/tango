@@ -38,7 +38,9 @@
     * https://dokploy.com/
     * https://github.com/Dokploy/dokploy
 
-
+  * dockge
+    * A fancy, easy-to-use and reactive self-hosted docker compose.yaml stack-oriented manager
+    * https://github.com/louislam/dockge
 
 
 ## Reverse Proxy
