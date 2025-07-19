@@ -289,12 +289,14 @@ services:
 
       # use as "fallback" for any request non matching any router (with priority below normal)
       # catch unresolved "unknown.domain.com" HTTP request on all entrypoints
-      - "traefik.http.routers.error.rule=HostRegexp(`{host:.+}`)"
+      #- "traefik.http.routers.error.rule=HostRegexp(`{host:.+}`)"
+      - "traefik.http.routers.error.rule=HostRegexp(`.+`)"
       - "traefik.http.routers.error.priority=${ERROR_PRIORITY}"
       - "traefik.http.routers.error.entrypoints=${TRAEFIK_ENTRYPOINTS_HTTP_LIST}"
       - "traefik.http.routers.error.middlewares=error-middleware"
       # catch unresolved "unknown.domain.com" HTTPS request on all entrypoints
-      - "traefik.http.routers.error-secure.rule=HostRegexp(`{host:.+}`)"
+      #- "traefik.http.routers.error-secure.rule=HostRegexp(`{host:.+}`)"
+      - "traefik.http.routers.error-secure.rule=HostRegexp(`.+`)"
       - "traefik.http.routers.error-secure.priority=${ERROR_PRIORITY}"
       - "traefik.http.routers.error-secure.entrypoints=${TRAEFIK_ENTRYPOINTS_HTTP_LIST}"
       - "traefik.http.routers.error-secure.middlewares=error-middleware"
