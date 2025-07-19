@@ -30,8 +30,16 @@ $STELLA_API log_app "INFO" "tango" "Detected STELLA framework in ${STELLA_ROOT}"
 . "${TANGO_ROOT}/src/tango-parse-arg.sh" $@
 
 # PROCESS DATA ------------------------
+
+#. "${TANGO_ROOT}/pool/libs/tango_variable_system.sh"
+#init_variable_system
+
 # init and generate files, variables, folders and everything for the framework to work
 . "${TANGO_ROOT}/src/tango-process-data.sh" $@
+
+#generate_compose_env "generated.new.compose.env"
+#generate_bash_env "generated.new.tango.bash.env"
+#show_variables_summary
 
 # BEFORE ACTION ------------------------
 # before action hook

@@ -1,0 +1,91 @@
+volumes:
+  template_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${TEMPLATE_DATA_PATH}
+    name: ${TANGO_CTX_NAME}_template_data
+  template_media:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${TEMPLATE_MEDIA_PATH}
+    name: ${TANGO_CTX_NAME}_template_media
+
+services:
+  template:
+    image: ${TEMPLATE_IMAGE_FIXED_VAR}:${TEMPLATE_VERSION_FIXED_VAR:-latest}
+    container_name: ${TANGO_CTX_NAME}_template
+    depends_on: 
+      - service_init
+    restart: unless-stopped
+    volumes:
+      - template_data:/config
+      - template_media:/media
+    environment:
+      - USER_ID=${TANGO_USER_ID:-0}
+      - GROUP_ID=${TANGO_GROUP_ID:-0}
+      - DISPLAY_WIDTH=${TEMPLATE_WIDTH:-1280}
+      - DISPLAY_HEIGHT=${TEMPLATE_HEIGHT:-768}
+      - PUID=${TANGO_USER_ID:-0}
+      - PGID=${TANGO_GROUP_ID:-0}
+    labels:
+      - "${TANGO_INSTANCE_NAME}.managed=true"
+      - "traefik.enable=true"
+      # service : template -------------------------
+      - "traefik.http.services.template.loadbalancer.server.port=5800"
+      - "traefik.http.services.template.loadbalancer.server.scheme=http"
+      - "traefik.http.services.template.loadbalancer.passhostheader=true"
+      # middlewares definition : template
+      # service router : template
+      - "traefik.http.routers.template.entrypoints=${TEMPLATE_ENTRYPOINTS:-entry_main_http}"
+      - "traefik.http.routers.template.rule=HostRegexp(`{subdomain:${TEMPLATE_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.template.priority=${TEMPLATE_PRIORITY}"
+      - "traefik.http.routers.template.service=template"
+      - "traefik.http.routers.template-secure.entrypoints=${TEMPLATE_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
+      - "traefik.http.routers.template-secure.rule=HostRegexp(`{subdomain:${TEMPLATE_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.template-secure.priority=${TEMPLATE_PRIORITY}"
+      - "traefik.http.routers.template-secure.service=template"
+      - "traefik.http.routers.template-secure.tls=true"
+      - "traefik.http.routers.template-secure.tls.domains[0].main=${TEMPLATE_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      # service router middlewares : template
+      - "traefik.http.routers.template.middlewares=error-middleware"
+      - "traefik.http.routers.template-secure.middlewares=error-middleware"
+      # sub service : template_api -------------------------
+      - "traefik.http.services.template_api.loadbalancer.server.port=28080"
+      - "traefik.http.services.template_api.loadbalancer.server.scheme=http"
+      - "traefik.http.services.template_api.loadbalancer.passhostheader=true"
+      # middlewares definition : template_api
+      # sub service router : template_api
+      - "traefik.http.routers.template_api.entrypoints=${TEMPLATE_API_ENTRYPOINTS:-entry_main_http}"
+      - "traefik.http.routers.template_api.rule=HostRegexp(`{subdomain:${TEMPLATE_API_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`) && PathPrefix(`/api/`)"
+      - "traefik.http.routers.template_api.priority=${TEMPLATE_API_PRIORITY}"
+      - "traefik.http.routers.template_api.service=medusa"
+      - "traefik.http.routers.template_api-secure.entrypoints=${TEMPLATE_API_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
+      - "traefik.http.routers.template_api-secure.rule=HostRegexp(`{subdomain:${TEMPLATE_API_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`) && PathPrefix(`/api/`)"
+      - "traefik.http.routers.template_api-secure.priority=${TEMPLATE_API_PRIORITY}"
+      - "traefik.http.routers.template_api-secure.service=template_api"
+      - "traefik.http.routers.template_api-secure.tls=true"
+      - "traefik.http.routers.template_api-secure.tls.domains[0].main=${TEMPLATE_API_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      # sub service router middlewares : template_subservice
+      - "traefik.http.routers.template_api.middlewares=error-middleware"
+      - "traefik.http.routers.template_api-secure.middlewares=error-middleware"
+      # sub service : template_subservice -------------------------
+      - "traefik.udp.services.template_subservice.loadbalancer.server.port=41000"
+      # middlewares definition : template_subservice
+      # sub service router : template_subservice
+      - "traefik.udp.routers.template_subservice.entrypoints=${TEMPLATE_SUBSERVICE_ENTRYPOINTS}"
+      - "traefik.udp.routers.template_subservice.service=template_subservice"
+      # sub service router middlewares : template_subservice
+      # --------------------------------------------------
+    networks:
+      - default
+    expose:
+      # service template
+      - 5800/tcp
+      # subservice template_api
+      - 28080/tcp
+      # subservice template_subservice
+      - 41000/udp

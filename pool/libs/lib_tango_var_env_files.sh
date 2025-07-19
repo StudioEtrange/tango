@@ -180,17 +180,27 @@ __create_env_files() {
 
 		case $o in 
 
-			default )	
-				# add default tango env file
-				__tango_log "DEBUG" "tango" "create_env_files for $__target : add default tango env file ${TANGO_ENV_FILE}"
-				cat <(echo \# --- PART FROM default tango env file ${TANGO_ENV_FILE}) <(echo) <(echo) "${TANGO_ENV_FILE}" <(echo) >> "${__file}"
+			default )
+				if [ -s "${TANGO_ENV_FILE}" ]; then 
+					# add default tango env file
+					__tango_log "DEBUG" "tango" "create_env_files for $__target : add default tango env file ${TANGO_ENV_FILE}"
+					cat <(echo) <(echo \# --- PART FROM default tango env file ${TANGO_ENV_FILE}) <(echo) <(echo) "${TANGO_ENV_FILE}" <(echo) >> "${__file}"
+					
+					# ----------------------------- NEW PART -----------------------------
+					# tango_log "INFO" "Loading default ${TANGO_ENV_FILE}"
+					# load_env_file "$TANGO_ENV_FILE" "default_env" "$PRIORITY_DEFAULT_ENV"
+				fi
 			;;
 
 			ctx )
 				# add ctx env file
-				if [ -f "${TANGO_CTX_ENV_FILE}" ]; then 
+				if [ -s "${TANGO_CTX_ENV_FILE}" ]; then 
 					__tango_log "DEBUG" "tango" "create_env_files for $__target : add ctx env file ${TANGO_CTX_ENV_FILE}"
-					cat <(echo \# --- PART FROM ctx env file ${TANGO_CTX_ENV_FILE}) <(echo) <(echo) "${TANGO_CTX_ENV_FILE}" <(echo) >> "${__file}"
+					cat <(echo) <(echo \# --- PART FROM ctx env file ${TANGO_CTX_ENV_FILE}) <(echo) <(echo) "${TANGO_CTX_ENV_FILE}" <(echo) >> "${__file}"
+
+					# ----------------------------- NEW PART -----------------------------
+					# tango_log "INFO" "Loading CONTEXT ${TANGO_CTX_ENV_FILE}"
+					# load_env_file "$TANGO_CTX_ENV_FILE" "context_env" "$PRIORITY_CONTEXT_ENV"
 				fi
 			;;
 
@@ -213,6 +223,9 @@ __create_env_files() {
 								# use sed implementation of negative lookbehind https://stackoverflow.com/a/26110465
 								#sed -e "/FIXED_VAR/!s/${m}\([^a-zA-Z0-9]*\)/${i}\1/g" -e "/FIXED_VAR/!s/${m^^}\([^a-zA-Z0-9]*\)/${i^^}\1/g" <(echo \# --- PART FROM modules env file ${TANGO_CTX_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_CTX_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
 								sed -E "{/FIXED_VAR/! {s/#/##/g; s/(SHARED_VAR_)(${m})/\1_#_/g; s/(SHARED_VAR_)(${m^^})/\1-#-/g; s/${m}([^a-zA-Z0-9]*)/${i}\1/g; s/${m^^}([^a-zA-Z0-9]*)/${i^^}\1/g; s/(SHARED_VAR_)_#_/\1${m}/g; s/(SHARED_VAR_)-#-/\1${m^^}/g; s/##/#/g} }" <(echo \# --- PART FROM module env file ${TANGO_CTX_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_CTX_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
+							
+								# ----------------------------- NEW PART -----------------------------
+								# TODO
 							else
 								if [ -f "${TANGO_MODULES_ROOT}/${m}.env" ]; then
 									__tango_log "DEBUG" "tango" "create_env_files for $__target : tango module ${m} instance ${i} : add env file : ${TANGO_MODULES_ROOT}/${m}.env"
@@ -222,6 +235,9 @@ __create_env_files() {
 									# use sed implementation of negative lookbehind https://stackoverflow.com/a/26110465
 									#sed -e "/FIXED_VAR/!s/${m}\([^a-zA-Z0-9]*\)/${i}\1/g" -e "/FIXED_VAR/!s/${m^^}\([^a-zA-Z0-9]*\)/${i^^}\1/g" <(echo \# --- PART FROM modules env file ${TANGO_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
 									sed -E "{/FIXED_VAR/! {s/#/##/g; s/(SHARED_VAR_)(${m})/\1_#_/g; s/(SHARED_VAR_)(${m^^})/\1-#-/g; s/${m}([^a-zA-Z0-9]*)/${i}\1/g; s/${m^^}([^a-zA-Z0-9]*)/${i^^}\1/g; s/(SHARED_VAR_)_#_/\1${m}/g; s/(SHARED_VAR_)-#-/\1${m^^}/g; s/##/#/g} }"  <(echo \# --- PART FROM module env file ${TANGO_MODULES_ROOT}/${m}.env) <(echo) <(echo) "${TANGO_MODULES_ROOT}/${m}.env" <(echo) >> "${__file}"
+
+									# ----------------------------- NEW PART -----------------------------
+									# TODO
 								else
 									__tango_log "DEBUG" "tango" "create_env_files for $__target : scaled module $m do not have an env file (${TANGO_CTX_MODULES_ROOT}/${m}.env nor ${TANGO_MODULES_ROOT}/${m}.env do not exists) might be an error"
 								fi
@@ -238,24 +254,50 @@ __create_env_files() {
 				for s in ${__modules_list}; do
 					# ctx modules overrides tango modules
 					if [ -f "${TANGO_CTX_MODULES_ROOT}/${s}.env" ]; then
-						__tango_log "DEBUG" "tango" "create_env_files for $__target : ctx module ${s} : add env file : ${TANGO_CTX_MODULES_ROOT}/${s}.env"
-						cat <(echo \# --- PART FROM module env file ${TANGO_CTX_MODULES_ROOT}/${s}.env) <(echo) <(echo) "${TANGO_CTX_MODULES_ROOT}/${s}.env" <(echo) >> "${__file}"
+						_f="${TANGO_CTX_MODULES_ROOT}/${s}.env"
 					else
-						if [ -f "${TANGO_MODULES_ROOT}/${s}.env" ]; then
-							__tango_log "DEBUG" "tango" "create_env_files for $__target : tango module ${s} : add env file : ${TANGO_MODULES_ROOT}/${s}.env"
-							cat <(echo \# --- PART FROM module env file ${TANGO_MODULES_ROOT}/${s}.env) <(echo) <(echo) "${TANGO_MODULES_ROOT}/${s}.env" <(echo) >> "${__file}"
+						if [ -f "${TANGO_MODULES_ROOT}/${s}.env" ]; then 
+							_f="${TANGO_MODULES_ROOT}/${s}.env"
 						else
-							__tango_log "DEBUG" "tango" "create_env_files for $__target : module $s do not have an env file (${TANGO_CTX_MODULES_ROOT}/${s}.env nor ${TANGO_MODULES_ROOT}/${s}.env do not exists) maybe abnormal or not"
+							__tango_log "DEBUG" "tango" "create_env_files for $__target : module $s do not have an env file (${TANGO_CTX_MODULES_ROOT}/${s}.env nor ${TANGO_MODULES_ROOT}/${s}.env do not exists) might be an error"
 						fi
 					fi
+					__tango_log "DEBUG" "tango" "create_env_files for $__target : module ${s} : add env file : ${_f}.env"
+					cat <(echo) <(echo \# --- PART FROM LAYER MODULE ${s^^}) >> "${__file}"
+					[ -s "${_f}" ] && cat <"${_f}" >> "${__file}"
+				
+					# ----------------------------- NEW PART -----------------------------
+					#tango_log "INFO" "Loading CONTEXT ${TANGO_CTX_ENV_FILE}"
+					#load_env_file "$_f" "module_env" "$PRIORITY_MODULE_ENV"
 				done
+
+				# for s in ${__modules_list}; do
+				# 	# ctx modules overrides tango modules
+				# 	if [ -f "${TANGO_CTX_MODULES_ROOT}/${s}.env" ]; then
+				# 		__tango_log "DEBUG" "tango" "create_env_files for $__target : ctx module ${s} : add env file : ${TANGO_CTX_MODULES_ROOT}/${s}.env"
+				# 		cat <(echo) <(echo \# --- PART FROM module env file ${TANGO_CTX_MODULES_ROOT}/${s}.env) <(echo) <(echo) "${TANGO_CTX_MODULES_ROOT}/${s}.env" <(echo) >> "${__file}"
+				# 	else
+				# 		if [ -f "${TANGO_MODULES_ROOT}/${s}.env" ]; then
+				# 			__tango_log "DEBUG" "tango" "create_env_files for $__target : tango module ${s} : add env file : ${TANGO_MODULES_ROOT}/${s}.env"
+				# 			cat <(echo) <(echo \# --- PART FROM module env file ${TANGO_MODULES_ROOT}/${s}.env) <(echo) <(echo) "${TANGO_MODULES_ROOT}/${s}.env" <(echo) >> "${__file}"
+				# 		else
+				# 			__tango_log "DEBUG" "tango" "create_env_files for $__target : module $s do not have an env file (${TANGO_CTX_MODULES_ROOT}/${s}.env nor ${TANGO_MODULES_ROOT}/${s}.env do not exists) maybe abnormal or not"
+				# 		fi
+				# 	fi
+				# done
+
 			;;
 
 			user )
 				# add user env file
 				if [ -f "${TANGO_USER_ENV_FILE}" ]; then
 					__tango_log "DEBUG" "tango" "create_env_files for $__target : add user env file ${TANGO_USER_ENV_FILE}"
-					cat <(echo \# --- PART FROM user env file ${TANGO_USER_ENV_FILE}) <(echo) <(echo) "${TANGO_USER_ENV_FILE}" <(echo) >> "${__file}"
+					cat <(echo) <(echo \# --- PART FROM user env file ${TANGO_USER_ENV_FILE}) <(echo) <(echo) "${TANGO_USER_ENV_FILE}" <(echo) >> "${__file}"
+
+					
+					# ----------------------------- NEW PART -----------------------------
+					#tango_log "INFO" "Loading TANGO_USER_ENV_FILE"
+        			#load_env_file "$TANGO_USER_ENV_FILE" "user_env" "$PRIORITY_USER_ENV"
 				fi
 			;;
 		esac

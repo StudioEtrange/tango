@@ -1250,6 +1250,9 @@ __get_scaled_item_instances_list() {
 # exec all plugins programmed to auto exec at launch of all active service
 __exec_auto_plugin_service_active_all() {
 	local __plugin
+
+	__tango_log "DEBUG" "tango" "__exec_auto_plugin_service_active_all : TANGO_SERVICES_ACTIVE : ${TANGO_SERVICES_ACTIVE}"
+
 	for s in ${TANGO_SERVICES_ACTIVE}; do
 		__exec_auto_plugin_all_by_service ${s}
 	done
@@ -1259,6 +1262,8 @@ __exec_auto_plugin_service_active_all() {
 __exec_auto_plugin_all_by_service() {
 	local __service="$1"
 	local __plugins="${TANGO_PLUGINS_BY_SERVICE_FULL_AUTO_EXEC[$__service]}"
+
+	__tango_log "DEBUG" "tango" "__exec_auto_plugin_all_by_service : __service : ${__service} __plugins : ${__plugins}"
 
 	if [ ! "${__plugins}" = "" ]; then
 		for p in ${__plugins}; do			
@@ -1272,6 +1277,8 @@ __exec_plugin_all_by_service() {
 	local __service="$1"
 	local __plugins="${TANGO_PLUGINS_BY_SERVICE_FULL[$__service]}"
 
+	__tango_log "DEBUG" "tango" "__exec_plugin_all_by_service : __service : ${__service} __plugins : ${__plugins}"
+
 	if [ ! "${__plugins}" = "" ]; then
 		for p in ${__plugins}; do 
 			__exec_plugin "${__service}" "${p}"
@@ -1284,6 +1291,8 @@ __exec_plugin_all_by_service() {
 __exec_plugin_into_services() {
 	local __plugin="$1"
 	local __services="${TANGO_SERVICES_BY_PLUGIN_FULL[$__plugin]}"
+
+	__tango_log "DEBUG" "tango" "__exec_plugin_into_services : __service : ${__service} __plugins : ${__plugins}"
 
 	if [ ! "${__services}" = "" ]; then
 		for s in ${__services}; do 
@@ -1301,8 +1310,10 @@ __exec_plugin() {
 
 	local __instances=
 
+	__tango_log "DEBUG" "tango" "__exec_plugin : __service : ${__service} __plugin : ${__plugin}"
 	__parse_item "plugin" "${__plugin}" "PLUGIN"
 
+	__tango_log "DEBUG" "tango" "__exec_plugin : TANGO_SERVICES_MODULES_SCALED : ${TANGO_SERVICES_MODULES_SCALED}"
 	# case : module have been scaled
 	if $STELLA_API list_contains "${TANGO_SERVICES_MODULES_SCALED}" "${__service}"; then
 		__tango_log "INFO" "tango" "    Plugin execution : ${PLUGIN_NAME}"
@@ -1321,6 +1332,7 @@ __exec_plugin() {
 
 		docker-compose exec --user ${TANGO_USER_ID}:${TANGO_GROUP_ID} ${__service} /bin/sh -c '[ "'${PLUGIN_OWNER}'" = "CTX" ] && /pool/'${TANGO_CTX_NAME}'/plugins/'${PLUGIN_NAME}' '${PLUGIN_ARG_LIST}' || /pool/tango/plugins/'${PLUGIN_NAME}' '${PLUGIN_ARG_LIST}
 	fi
+
 }
 
 
@@ -1522,8 +1534,8 @@ __parse_plugins_declaration() {
 	__tango_log "DEBUG" "tango" "__parse_plugins_declaration"
 
 	local __list_full="${TANGO_PLUGINS}"
-
 	local __type="plugin"
+
 
 	
 	local __list_names="$(__extract_names_list "${__list_full}")"
@@ -1541,12 +1553,16 @@ __parse_plugins_declaration() {
 		__full="${__array_list_full[$index]}"
 		
 		if __item_definition_exists "plugin" "${__name}"; then
+
+			__tango_log "DEBUG" "tango" "__parse_plugins_declaration : parse_item ${__array_list_full[$index]}"
 			__parse_item "plugin" "${__array_list_full[$index]}" "__PLUGIN"
-			for s in ${PLUGIN_LINKS}; do
+			__tango_log "DEBUG" "tango" "__parse_plugins_declaration : __PLUGIN_LINKS : ${__PLUGIN_LINKS} __PLUGIN_LINKS_AUTO_EXEC : ${__PLUGIN_LINKS_AUTO_EXEC}"
+
+			for s in ${__PLUGIN_LINKS}; do
 				TANGO_PLUGINS_BY_SERVICE_FULL["${s}"]="${TANGO_PLUGINS_BY_SERVICE_FULL[$s]} ${__full}"
 				TANGO_SERVICES_BY_PLUGIN_FULL["${__name}"]="${TANGO_SERVICES_BY_PLUGIN_FULL[${__name}]} ${s}"
 			done
-			for s in ${PLUGIN_LINKS_AUTO_EXEC}; do
+			for s in ${__PLUGIN_LINKS_AUTO_EXEC}; do
 				TANGO_PLUGINS_BY_SERVICE_FULL_AUTO_EXEC["${s}"]="${TANGO_PLUGINS_BY_SERVICE_FULL_AUTO_EXEC[$s]} ${__full}"
 			done
 			__list_names="${__list_names} ${__name}"
@@ -1559,10 +1575,9 @@ __parse_plugins_declaration() {
 	# FULL list conserve existing items in full declarative format
 	# standard list conserve existing items with only intances names
 	TANGO_PLUGINS_FULL="${__list_full}"
-	TANGO_PLUGINS="${__list_instances_names}"
+	TANGO_PLUGINS="${__list_names}"
 	__tango_log "DEBUG" "tango" "__parse_plugins_declaration : existing plugins full format list : ${TANGO_PLUGINS_FULL}"
 	__tango_log "DEBUG" "tango" "__parse_plugins_declaration : existing plugins : ${TANGO_PLUGINS}"
-
 }
 
 
