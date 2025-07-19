@@ -2476,6 +2476,9 @@ __get_network_area_name_from_entrypoint() {
 	echo ${result}
 }
 
+
+
+
 # a service (aka a docker compose service) may exist but may not have a default traefik associated router with the same name
 # i.e a service may have only associated subservice with router for them but no router for the service name itself
 __check_traefik_router_exist() {
@@ -2872,7 +2875,7 @@ __set_priority_router() {
 	eval "export ${__var}=${__priority}"
 	__add_declared_variables "${__var}"
 
-	__tango_log "DEBUG" "tango" "set priority : ${__priority} to traefik router : ${__service}"
+	__tango_log "DEBUG" "tango" "set priority : ${__priority} to traefik service : ${__service}"
 	
 }
 
@@ -2892,12 +2895,16 @@ __set_redirect_https_service() {
 
 	local __var="${__service}_PRIORITY"
 	__var=${!__var}
+	__tango_log "DEBUG" "tango" "set_redirect_https_service : change rule priority of ${__service} from ${__var}"
 	__var="$(($__var - $__lower_http_router_priority_value))"
-	__set_priority_router "${__service}" "${__var}" 
+	__tango_log "DEBUG" "tango" "set_redirect_https_service : change rule priority of ${__service} to ${__var}"
+	__set_priority_router "${__service}" "${__var}"
+
 	# DEPRECATED : technique was to add a middleware redirect rule for each service
 	# add only once ',' separator to compose file only if there is other middlewars declarated 
 	# ex : "traefik.http.routers.sabnzbd.middlewares=${SABNZBD_REDIRECT_HTTPS}sabnzbd-stripprefix"
 	# sed -i 's/\(.*\)\${'$__service'_REDIRECT_HTTPS}\([^,].\+\)\"$/\1\${'$__service'_REDIRECT_HTTPS},\2\"/g' "${GENERATED_DOCKER_COMPOSE_FILE}"
+
 }
 
 # add a volume to a service
