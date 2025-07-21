@@ -527,6 +527,8 @@ __set_routers_info_service_all() {
 	local __router_list=
 	local __fill_info=
 
+
+	__tango_log "INFO" "tango" "Declared tango domain : ${TANGO_DOMAIN}"
 	__tango_log "DEBUG" "tango" "set_routers_info_service_all : setting routers information (port, subdomain, hostname, address, uri)"
 
 	for __service in ${TANGO_SERVICES_AVAILABLE} SUBSERVICES_DELIMITER ${TANGO_SUBSERVICES_ROUTER}; do
@@ -593,7 +595,8 @@ __set_routers_info_service_all() {
 				fi
 			fi
 
-			if [ "${TANGO_DOMAIN}" = '.*' ]; then
+			#if [ "${TANGO_DOMAIN}" = '.*' ]; then
+			if [ "${TANGO_DOMAIN}" = "" ]; then
 				__hostname="${__subdomain}" 
 			else
 				__hostname="${__subdomain}${TANGO_SUBDOMAIN_SEPARATOR}${TANGO_DOMAIN}"
@@ -602,7 +605,6 @@ __set_routers_info_service_all() {
 			
 			eval "export ${__service^^}_SUBDOMAIN=${__subdomain}"
 
-			#[ "${TANGO_DOMAIN}" = '.*' ] && __hostname="${__subdomain}" || __hostname="${__subdomain}${TANGO_SUBDOMAIN_SEPARATOR}${TANGO_DOMAIN}"
 			eval "export ${__service^^}_HOSTNAME=${__hostname}"
 			__add_declared_variables "${__service^^}_HOSTNAME"
 
@@ -2292,7 +2294,7 @@ __set_error_engine() {
 
 
 	
-	# a wild card domain is by default attached to https error router (error-secure.tls.domains[0].main=*.${TANGO_DOMAIN:-.*}")
+	# a wild card domain is by default attached to https error router (error-secure.tls.domains[0].main=*.${TANGO_DOMAIN:-}")
 	# the code below add a certificate generation for this wild card domain
 	# But if we use HTTP challenge we cannot generate a wild card domain, it must be in DNS challenge only
 	# NOTE that all dns provider do not support wild card domain, so dnschallenge shall fail
@@ -3560,7 +3562,7 @@ __check_lets_encrypt_settings() {
  	case ${LETS_ENCRYPT} in
     	enable|debug ) 
 			[ "${LETS_ENCRYPT_MAIL}" = "" ] && __tango_log "$__log" "tango" "You have to specify a mail as identity into LETS_ENCRYPT_MAIL variable when using let's encrypt." && __exit=1
-			[ "${TANGO_DOMAIN}" = '.*' ] && __tango_log "$__log" "tango" "You cannot use a generic domain (.*) setted by TANGO_DOMAIN when using let's encrypt. Set TANGO_DOMAIN variables or --domain comand line option with other value." && __exit=1
+			#[ "${TANGO_DOMAIN}" = '.*' ] && __tango_log "$__log" "tango" "You cannot use a generic domain (.*) setted by TANGO_DOMAIN when using let's encrypt. Set TANGO_DOMAIN variables or --domain comand line option with other value." && __exit=1
 			[ "${TANGO_DOMAIN}" = "" ] && __tango_log "$__log" "tango" "You have to set a domain with TANGO_DOMAIN variable or --domain comand line option when using let's encrypt." && __exit=1
 
 			case ${ACME_CHALLENGE} in

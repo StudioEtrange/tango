@@ -37,15 +37,15 @@ services:
       # middlewares definition : webtop
       # service router : webtop
       - "traefik.http.routers.webtop.entrypoints=${WEBTOP_ENTRYPOINTS:-entry_main_http}"
-      - "traefik.http.routers.webtop.rule=HostRegexp(`{subdomain:${WEBTOP_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.webtop.rule=Host(`${WEBTOP_SUBDOMAIN:-}${TANGO_DOMAIN:-}`)"
       - "traefik.http.routers.webtop.priority=${WEBTOP_PRIORITY}"
       - "traefik.http.routers.webtop.service=webtop"
       - "traefik.http.routers.webtop-secure.entrypoints=${WEBTOP_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
-      - "traefik.http.routers.webtop-secure.rule=HostRegexp(`{subdomain:${WEBTOP_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.webtop-secure.rule=Host(`${WEBTOP_SUBDOMAIN:-}${TANGO_DOMAIN:-}`)"
       - "traefik.http.routers.webtop-secure.priority=${WEBTOP_PRIORITY}"
       - "traefik.http.routers.webtop-secure.service=webtop"
       - "traefik.http.routers.webtop-secure.tls=true"
-      - "traefik.http.routers.webtop-secure.tls.domains[0].main=${WEBTOP_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      - "traefik.http.routers.webtop-secure.tls.domains[0].main=${WEBTOP_SUBDOMAIN:-}${TANGO_DOMAIN:-}"
       # service router middlewares : webtop
       - "traefik.http.routers.webtop.middlewares=error-middleware"
       - "traefik.http.routers.webtop-secure.middlewares=error-middleware"

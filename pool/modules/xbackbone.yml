@@ -29,15 +29,15 @@ services:
       # middlewares definition : xbackbone
       # service router : xbackbone
       - "traefik.http.routers.xbackbone.entrypoints=${XBACKBONE_ENTRYPOINTS:-entry_main_http}"
-      - "traefik.http.routers.xbackbone.rule=HostRegexp(`{subdomain:${XBACKBONE_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.xbackbone.rule=Host(`${XBACKBONE_SUBDOMAIN:-}${TANGO_DOMAIN:-}`)"
       - "traefik.http.routers.xbackbone.priority=${XBACKBONE_PRIORITY}"
       - "traefik.http.routers.xbackbone.service=xbackbone"
       - "traefik.http.routers.xbackbone-secure.entrypoints=${XBACKBONE_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
-      - "traefik.http.routers.xbackbone-secure.rule=HostRegexp(`{subdomain:${XBACKBONE_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.xbackbone-secure.rule=Host(`${XBACKBONE_SUBDOMAIN:-}${TANGO_DOMAIN:-}`)"
       - "traefik.http.routers.xbackbone-secure.priority=${XBACKBONE_PRIORITY}"
       - "traefik.http.routers.xbackbone-secure.service=xbackbone"
       - "traefik.http.routers.xbackbone-secure.tls=true"
-      - "traefik.http.routers.xbackbone-secure.tls.domains[0].main=${XBACKBONE_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      - "traefik.http.routers.xbackbone-secure.tls.domains[0].main=${XBACKBONE_SUBDOMAIN:-}${TANGO_DOMAIN:-}"
       # service router middlewares : xbackbone
       - "traefik.http.routers.xbackbone.middlewares=error-middleware"
       - "traefik.http.routers.xbackbone-secure.middlewares=error-middleware"

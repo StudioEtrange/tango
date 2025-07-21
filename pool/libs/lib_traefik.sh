@@ -15,7 +15,7 @@
 # there is a direct mapping from labels to json. When label is a list (like entrypoints) it is translated as a json array [ ]
 # sample to add a router
 #      - "traefik.http.routers.test.entrypoints=entrypoint1"
-#      - "traefik.http.routers.test.rule=HostRegexp(`{subdomain:test.}{domain:domain.com}`)"
+#      - "traefik.http.routers.test.rule=Host(`test.domain.com`)"
 #      - "traefik.http.routers.test.service=service1@docker"
 # body='
 # {
@@ -25,7 +25,7 @@
 #                 "entryPoints": [
 #                     "entrypoint1"
 #                 ],
-#                 "rule": "HostRegexp(`{subdomain:test.}{domain:domain.com}`)",
+#                 "rule": "Host(`test.domain.com}`)",
 #                 "service": "service1@docker"
 #             }
 #         }

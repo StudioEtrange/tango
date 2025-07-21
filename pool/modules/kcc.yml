@@ -32,15 +32,15 @@ services:
       # middlewares definition : kcc
       # service router : kcc
       - "traefik.http.routers.kcc.entrypoints=${KCC_ENTRYPOINTS:-entry_main_http}"
-      - "traefik.http.routers.kcc.rule=HostRegexp(`{subdomain:${KCC_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.kcc.rule=Host(`${KCC_SUBDOMAIN:-}${TANGO_DOMAIN:-}`)"
       - "traefik.http.routers.kcc.priority=${KCC_PRIORITY}"
       - "traefik.http.routers.kcc.service=kcc"
       - "traefik.http.routers.kcc-secure.entrypoints=${KCC_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
-      - "traefik.http.routers.kcc-secure.rule=HostRegexp(`{subdomain:${KCC_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.kcc-secure.rule=Host(`${KCC_SUBDOMAIN:-}${TANGO_DOMAIN:-}`)"
       - "traefik.http.routers.kcc-secure.priority=${KCC_PRIORITY}"
       - "traefik.http.routers.kcc-secure.service=kcc"
       - "traefik.http.routers.kcc-secure.tls=true"
-      - "traefik.http.routers.kcc-secure.tls.domains[0].main=${KCC_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      - "traefik.http.routers.kcc-secure.tls.domains[0].main=${KCC_SUBDOMAIN:-}${TANGO_DOMAIN:-}"
       # service router middlewares : kcc
       - "traefik.http.routers.kcc.middlewares=error-middleware"
       - "traefik.http.routers.kcc-secure.middlewares=error-middleware"

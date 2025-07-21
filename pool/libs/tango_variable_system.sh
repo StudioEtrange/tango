@@ -421,7 +421,7 @@ init_variable_system() {
     TANGO_VARS["TANGO_CTX_WORK_ROOT"]="${TANGO_CTX_WORK_ROOT:-$(pwd)/workspace/tango}"
     TANGO_VARS["CTX_DATA_PATH"]="${CTX_DATA_PATH:-data}"
     TANGO_VARS["WORKING_DIR"]="$(pwd)"
-    TANGO_VARS["TANGO_DOMAIN"]="${TANGO_DOMAIN:-.*}"
+    TANGO_VARS["TANGO_DOMAIN"]="${TANGO_DOMAIN}"
     
     # Marquer comme variables par défaut
     for var_name in TANGO_CTX_NAME TANGO_CTX_WORK_ROOT CTX_DATA_PATH WORKING_DIR TANGO_DOMAIN; do

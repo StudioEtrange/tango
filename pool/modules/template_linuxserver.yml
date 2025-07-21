@@ -31,15 +31,15 @@ services:
       # middlewares definition : codeserver
       # service router : codeserver
       - "traefik.http.routers.codeserver.entrypoints=${CODESERVER_ENTRYPOINTS:-entry_main_http}"
-      - "traefik.http.routers.codeserver.rule=HostRegexp(`{subdomain:${CODESERVER_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.codeserver.rule=Host(`${CODESERVER_SUBDOMAIN:-}${TANGO_DOMAIN:-}`)"
       - "traefik.http.routers.codeserver.priority=${CODESERVER_PRIORITY}"
       - "traefik.http.routers.codeserver.service=codeserver"
       - "traefik.http.routers.codeserver-secure.entrypoints=${CODESERVER_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
-      - "traefik.http.routers.codeserver-secure.rule=HostRegexp(`{subdomain:${CODESERVER_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.codeserver-secure.rule=Host(`${CODESERVER_SUBDOMAIN:-}${TANGO_DOMAIN:-}`)"
       - "traefik.http.routers.codeserver-secure.priority=${CODESERVER_PRIORITY}"
       - "traefik.http.routers.codeserver-secure.service=codeserver"
       - "traefik.http.routers.codeserver-secure.tls=true"
-      - "traefik.http.routers.codeserver-secure.tls.domains[0].main=${CODESERVER_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      - "traefik.http.routers.codeserver-secure.tls.domains[0].main=${CODESERVER_SUBDOMAIN:-}${TANGO_DOMAIN:-}"
       # service router middlewares : codeserver
       - "traefik.http.routers.codeserver.middlewares=error-middleware"
       - "traefik.http.routers.codeserver-secure.middlewares=error-middleware"
