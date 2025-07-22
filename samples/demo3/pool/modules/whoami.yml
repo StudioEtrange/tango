@@ -14,15 +14,15 @@ services:
       - "traefik.http.services.whoami.loadbalancer.passhostheader=true"
       # service router : whoami
       - "traefik.http.routers.whoami.entrypoints=${WHOAMI_ENTRYPOINTS:-entry_main_http}"
-      - "traefik.http.routers.whoami.rule=HostRegexp(`{subdomain:${WHOAMI_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.whoami.rule=Host(`${WHOAMI_SUBDOMAIN:-}${TANGO_DOMAIN:-}`)"
       - "traefik.http.routers.whoami.priority=${WHOAMI_PRIORITY}"
       - "traefik.http.routers.whoami.service=whoami"
       - "traefik.http.routers.whoami-secure.entrypoints=${WHOAMI_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
-      - "traefik.http.routers.whoami-secure.rule=HostRegexp(`{subdomain:${WHOAMI_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.whoami-secure.rule=Host(`${WHOAMI_SUBDOMAIN:-}${TANGO_DOMAIN:-}`)"
       - "traefik.http.routers.whoami-secure.priority=${WHOAMI_PRIORITY}"
       - "traefik.http.routers.whoami-secure.service=whoami"
       - "traefik.http.routers.whoami-secure.tls=true"
-      - "traefik.http.routers.whoami-secure.tls.domains[0].main=${WHOAMI_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      - "traefik.http.routers.whoami-secure.tls.domains[0].main=${WHOAMI_SUBDOMAIN:-}${TANGO_DOMAIN:-}"
       # service router middlewares : whoami
       - "traefik.http.routers.whoami.middlewares=error-middleware"
       - "traefik.http.routers.whoami-secure.middlewares=error-middleware"

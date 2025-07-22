@@ -30,15 +30,15 @@ services:
       # middlewares definition : portainer
       # service router : portainer
       - "traefik.http.routers.portainer.entrypoints=${PORTAINER_ENTRYPOINTS:-entry_main_http}"
-      - "traefik.http.routers.portainer.rule=HostRegexp(`{subdomain:${PORTAINER_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.portainer.rule=Host(`${PORTAINER_SUBDOMAIN:-}${TANGO_DOMAIN:-}`)"
       - "traefik.http.routers.portainer.priority=${PORTAINER_PRIORITY}"
       - "traefik.http.routers.portainer.service=portainer"
       - "traefik.http.routers.portainer-secure.entrypoints=${PORTAINER_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
-      - "traefik.http.routers.portainer-secure.rule=HostRegexp(`{subdomain:${PORTAINER_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.portainer-secure.rule=Host(`${PORTAINER_SUBDOMAIN:-}${TANGO_DOMAIN:-}`)"
       - "traefik.http.routers.portainer-secure.priority=${PORTAINER_PRIORITY}"
       - "traefik.http.routers.portainer-secure.service=portainer"
       - "traefik.http.routers.portainer-secure.tls=true"
-      - "traefik.http.routers.portainer-secure.tls.domains[0].main=${PORTAINER_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      - "traefik.http.routers.portainer-secure.tls.domains[0].main=${PORTAINER_SUBDOMAIN:-}${TANGO_DOMAIN:-}"
       # service router middlewares : portainer
       - "traefik.http.routers.portainer.middlewares=error-middleware"
       - "traefik.http.routers.portainer-secure.middlewares=error-middleware"

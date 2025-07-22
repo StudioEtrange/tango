@@ -527,6 +527,8 @@ __set_routers_info_service_all() {
 	local __router_list=
 	local __fill_info=
 
+
+	__tango_log "INFO" "tango" "Declared tango domain : ${TANGO_DOMAIN}"
 	__tango_log "DEBUG" "tango" "set_routers_info_service_all : setting routers information (port, subdomain, hostname, address, uri)"
 
 	for __service in ${TANGO_SERVICES_AVAILABLE} SUBSERVICES_DELIMITER ${TANGO_SUBSERVICES_ROUTER}; do
@@ -593,7 +595,8 @@ __set_routers_info_service_all() {
 				fi
 			fi
 
-			if [ "${TANGO_DOMAIN}" = '.*' ]; then
+			#if [ "${TANGO_DOMAIN}" = '.*' ]; then
+			if [ "${TANGO_DOMAIN}" = "" ]; then
 				__hostname="${__subdomain}" 
 			else
 				__hostname="${__subdomain}${TANGO_SUBDOMAIN_SEPARATOR}${TANGO_DOMAIN}"
@@ -602,7 +605,6 @@ __set_routers_info_service_all() {
 			
 			eval "export ${__service^^}_SUBDOMAIN=${__subdomain}"
 
-			#[ "${TANGO_DOMAIN}" = '.*' ] && __hostname="${__subdomain}" || __hostname="${__subdomain}${TANGO_SUBDOMAIN_SEPARATOR}${TANGO_DOMAIN}"
 			eval "export ${__service^^}_HOSTNAME=${__hostname}"
 			__add_declared_variables "${__service^^}_HOSTNAME"
 
@@ -932,11 +934,13 @@ __set_redirect_https_service_all() {
 					if [ ! "$secure_port" = "" ]; then
 						# catch HTTP request on entry_xxx_tcp and entry_xxx_tcp_secure entrypoint
 						yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}.entrypoints=entry_${name}_${proto},entry_${name}_${proto}_secure"
-						yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}.rule=HostRegexp(\`{host:.+}\`)"
+						#yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}.rule=HostRegexp(\`{host:.+}\`)"
+						yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}.rule=HostRegexp(\`.+\`)"
 						yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}.priority=\${ROUTER_PRIORITY_HTTP_TO_HTTPS_VALUE}"
 						# catch HTTPS request on entry_xxx_tcp only entrypoint (no need to catch HTTPS on entry_xxx_tcp_secure)
 						yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}_secure.entrypoints=entry_${name}_${proto}"
-						yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}_secure.rule=HostRegexp(\`{host:.+}\`)"
+						#yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}_secure.rule=HostRegexp(\`{host:.+}\`)"
+						yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}_secure.rule=HostRegexp(\`.+\`)"
 						yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}_secure.priority=\${ROUTER_PRIORITY_HTTP_TO_HTTPS_VALUE}"
 						yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.traefik.labels[+]" "traefik.http.routers.http-catchall-entry_${name}_${proto}_secure.tls=true"
 						
@@ -2290,7 +2294,7 @@ __set_error_engine() {
 
 
 	
-	# a wild card domain is by default attached to https error router (error-secure.tls.domains[0].main=*.${TANGO_DOMAIN:-.*}")
+	# a wild card domain is by default attached to https error router (error-secure.tls.domains[0].main=*.${TANGO_DOMAIN:-}")
 	# the code below add a certificate generation for this wild card domain
 	# But if we use HTTP challenge we cannot generate a wild card domain, it must be in DNS challenge only
 	# NOTE that all dns provider do not support wild card domain, so dnschallenge shall fail
@@ -2475,6 +2479,9 @@ __get_network_area_name_from_entrypoint() {
 
 	echo ${result}
 }
+
+
+
 
 # a service (aka a docker compose service) may exist but may not have a default traefik associated router with the same name
 # i.e a service may have only associated subservice with router for them but no router for the service name itself
@@ -2872,7 +2879,7 @@ __set_priority_router() {
 	eval "export ${__var}=${__priority}"
 	__add_declared_variables "${__var}"
 
-	__tango_log "DEBUG" "tango" "set priority : ${__priority} to traefik router : ${__service}"
+	__tango_log "DEBUG" "tango" "set priority : ${__priority} to traefik service : ${__service}"
 	
 }
 
@@ -2892,12 +2899,16 @@ __set_redirect_https_service() {
 
 	local __var="${__service}_PRIORITY"
 	__var=${!__var}
+	__tango_log "DEBUG" "tango" "set_redirect_https_service : change rule priority of ${__service} from ${__var}"
 	__var="$(($__var - $__lower_http_router_priority_value))"
-	__set_priority_router "${__service}" "${__var}" 
+	__tango_log "DEBUG" "tango" "set_redirect_https_service : change rule priority of ${__service} to ${__var}"
+	__set_priority_router "${__service}" "${__var}"
+
 	# DEPRECATED : technique was to add a middleware redirect rule for each service
 	# add only once ',' separator to compose file only if there is other middlewars declarated 
 	# ex : "traefik.http.routers.sabnzbd.middlewares=${SABNZBD_REDIRECT_HTTPS}sabnzbd-stripprefix"
 	# sed -i 's/\(.*\)\${'$__service'_REDIRECT_HTTPS}\([^,].\+\)\"$/\1\${'$__service'_REDIRECT_HTTPS},\2\"/g' "${GENERATED_DOCKER_COMPOSE_FILE}"
+
 }
 
 # add a volume to a service
@@ -3551,7 +3562,7 @@ __check_lets_encrypt_settings() {
  	case ${LETS_ENCRYPT} in
     	enable|debug ) 
 			[ "${LETS_ENCRYPT_MAIL}" = "" ] && __tango_log "$__log" "tango" "You have to specify a mail as identity into LETS_ENCRYPT_MAIL variable when using let's encrypt." && __exit=1
-			[ "${TANGO_DOMAIN}" = '.*' ] && __tango_log "$__log" "tango" "You cannot use a generic domain (.*) setted by TANGO_DOMAIN when using let's encrypt. Set TANGO_DOMAIN variables or --domain comand line option with other value." && __exit=1
+			#[ "${TANGO_DOMAIN}" = '.*' ] && __tango_log "$__log" "tango" "You cannot use a generic domain (.*) setted by TANGO_DOMAIN when using let's encrypt. Set TANGO_DOMAIN variables or --domain comand line option with other value." && __exit=1
 			[ "${TANGO_DOMAIN}" = "" ] && __tango_log "$__log" "tango" "You have to set a domain with TANGO_DOMAIN variable or --domain comand line option when using let's encrypt." && __exit=1
 
 			case ${ACME_CHALLENGE} in

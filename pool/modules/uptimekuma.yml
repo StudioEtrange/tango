@@ -33,15 +33,15 @@ services:
       # middlewares definition : uptimekuma
       # service router : uptimekuma
       - "traefik.http.routers.uptimekuma.entrypoints=${UPTIMEKUMA_ENTRYPOINTS:-entry_main_http}"
-      - "traefik.http.routers.uptimekuma.rule=HostRegexp(`{subdomain:${UPTIMEKUMA_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.uptimekuma.rule=Host(`${UPTIMEKUMA_SUBDOMAIN:-}${TANGO_DOMAIN:-}`)"
       - "traefik.http.routers.uptimekuma.priority=${UPTIMEKUMA_PRIORITY}"
       - "traefik.http.routers.uptimekuma.service=uptimekuma"
       - "traefik.http.routers.uptimekuma-secure.entrypoints=${UPTIMEKUMA_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
-      - "traefik.http.routers.uptimekuma-secure.rule=HostRegexp(`{subdomain:${UPTIMEKUMA_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.uptimekuma-secure.rule=Host(`${UPTIMEKUMA_SUBDOMAIN:-}${TANGO_DOMAIN:-}`)"
       - "traefik.http.routers.uptimekuma-secure.priority=${UPTIMEKUMA_PRIORITY}"
       - "traefik.http.routers.uptimekuma-secure.service=uptimekuma"
       - "traefik.http.routers.uptimekuma-secure.tls=true"
-      - "traefik.http.routers.uptimekuma-secure.tls.domains[0].main=${UPTIMEKUMA_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      - "traefik.http.routers.uptimekuma-secure.tls.domains[0].main=${UPTIMEKUMA_SUBDOMAIN:-}${TANGO_DOMAIN:-}"
       # service router middlewares : uptimekuma
       - "traefik.http.routers.uptimekuma.middlewares=error-middleware"
       - "traefik.http.routers.uptimekuma-secure.middlewares=error-middleware"

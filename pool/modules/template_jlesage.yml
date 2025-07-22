@@ -35,15 +35,15 @@ services:
       # middlewares definition : romvault
       # service router : romvault
       - "traefik.http.routers.romvault.entrypoints=${ROMVAULT_ENTRYPOINTS:-entry_main_http}"
-      - "traefik.http.routers.romvault.rule=HostRegexp(`{subdomain:${ROMVAULT_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.romvault.rule=Host(`${ROMVAULT_SUBDOMAIN:-}${TANGO_DOMAIN:-}`)"
       - "traefik.http.routers.romvault.priority=${ROMVAULT_PRIORITY}"
       - "traefik.http.routers.romvault.service=romvault"
       - "traefik.http.routers.romvault-secure.entrypoints=${ROMVAULT_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
-      - "traefik.http.routers.romvault-secure.rule=HostRegexp(`{subdomain:${ROMVAULT_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.romvault-secure.rule=Host(`${ROMVAULT_SUBDOMAIN:-}${TANGO_DOMAIN:-}`)"
       - "traefik.http.routers.romvault-secure.priority=${ROMVAULT_PRIORITY}"
       - "traefik.http.routers.romvault-secure.service=romvault"
       - "traefik.http.routers.romvault-secure.tls=true"
-      - "traefik.http.routers.romvault-secure.tls.domains[0].main=${ROMVAULT_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      - "traefik.http.routers.romvault-secure.tls.domains[0].main=${ROMVAULT_SUBDOMAIN:-}${TANGO_DOMAIN:-}"
       # service router middlewares : romvault
       - "traefik.http.routers.romvault.middlewares=error-middleware"
       - "traefik.http.routers.romvault-secure.middlewares=error-middleware"

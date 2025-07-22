@@ -15,15 +15,15 @@ services:
       # middlewares definition : cloud9
       # service router : cloud9
       - "traefik.http.routers.cloud9.entrypoints=${CLOUD9_ENTRYPOINTS:-entry_main_http}"
-      - "traefik.http.routers.cloud9.rule=HostRegexp(`{subdomain:${CLOUD9_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.cloud9.rule=Host(`${CLOUD9_SUBDOMAIN:-}${TANGO_DOMAIN:-}`)"
       - "traefik.http.routers.cloud9.priority=${CLOUD9_PRIORITY}"
       - "traefik.http.routers.cloud9.service=cloud9"
       - "traefik.http.routers.cloud9-secure.entrypoints=${CLOUD9_ENTRYPOINTS_SECURE:-entry_main_http_secure}"
-      - "traefik.http.routers.cloud9-secure.rule=HostRegexp(`{subdomain:${CLOUD9_SUBDOMAIN:-}}{domain:${TANGO_DOMAIN:-.*}}`)"
+      - "traefik.http.routers.cloud9-secure.rule=Host(`${CLOUD9_SUBDOMAIN:-}${TANGO_DOMAIN:-}`)"
       - "traefik.http.routers.cloud9-secure.priority=${CLOUD9_PRIORITY}"
       - "traefik.http.routers.cloud9-secure.service=cloud9"
       - "traefik.http.routers.cloud9-secure.tls=true"
-      - "traefik.http.routers.cloud9-secure.tls.domains[0].main=${CLOUD9_SUBDOMAIN:-}${TANGO_DOMAIN:-.*}"
+      - "traefik.http.routers.cloud9-secure.tls.domains[0].main=${CLOUD9_SUBDOMAIN:-}${TANGO_DOMAIN:-}"
       # service router middlewares : cloud9
       - "traefik.http.routers.cloud9.middlewares=error-middleware"
       - "traefik.http.routers.cloud9-secure.middlewares=error-middleware"

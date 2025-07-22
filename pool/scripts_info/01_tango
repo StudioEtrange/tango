@@ -93,18 +93,16 @@ for service in ${TANGO_SERVICES_AVAILABLE}; do
 
 
             __var="${r^^}_HOSTNAME"
-            __hostname="${!__var}"
-            echo "  + hostname : ${__hostname}"
+            __host="${!__var}"
+            echo "  + host : ${__host}"
 
-            if [ ! "${__hostname}" = "" ]; then
+            if [ ! "${__host}" = "" ]; then
                 # NOTE crt.sh do not need domain to be reacheable from internet : it is a search engine for certificate
-                echo "  + certificate status : https://crt.sh/?q=${__hostname}"
-                if [ "$DEBUG" = "1" ]; then
-                    if [ "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
-                        echo "  L-- diagnostic dns, cert, content : https://check-your-website.server-daten.de/?q=${__hostname}"
-                        echo "  L-- ssl analysis : https://www.ssllabs.com/ssltest/analyze.html?d=${__hostname}"
-                    fi
-                fi
+                echo "  + certificate status : https://crt.sh/?q=${__host}"
+                #if [ "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
+                    echo "  L-- diagnostic dns, cert, content : https://check-your-website.server-daten.de/?q=${__host}"
+                    echo "  L-- ssl analysis : https://www.ssllabs.com/ssltest/analyze.html?d=${__host}"
+                #fi
             fi
 
             __urls=

@@ -731,12 +731,19 @@ case ${ACTION} in
 					fi
 				done
 				if [ "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
-					if [ ! "${TANGO_DOMAIN_FEATURE}" = "auto-lan-nip" ]; then
-						__port_list="$($STELLA_API trim ${__port_list})"
-						if [ ! "${__port_list}" = "" ]; then
-							__tango_log "INFO" "tango" "If you are on a local network with a router, do not forget to forward ports ${__port_list// / and } entering into your router to your tango host IP ${TANGO_HOST_DEFAULT_IP}"
-							[ "${TANGO_FREEPORT}" = "1" ] && __tango_log "INFO" "tango" "When using freeport option this is a common mistake as port change at each services launch."
-						fi
+					__port_list="$($STELLA_API trim ${__port_list})"
+					if [ ! "${__port_list}" = "" ]; then
+						case ${TANGO_DOMAIN_FEATURE} in
+							auto-sslip-lan|auto-nip-lan)
+								# if we are using auto-nip or auto-sslip, we do not need to forward ports
+								__tango_log "INFO" "tango" "You are using ${TANGO_DOMAIN_FEATURE} domain name feature, so you do not need to forward ports on your router."
+							;;
+							*)
+								# if we are not using auto-nip or auto-sslip, we need to forward ports
+								__tango_log "INFO" "tango" "If you are on a local network with a router, do not forget to forward ports ${__port_list// / and } entering into your router to your tango host IP ${TANGO_HOST_DEFAULT_IP}"
+								[ "${TANGO_FREEPORT}" = "1" ] && __tango_log "INFO" "tango" "When using freeport option this is a common mistake as port change at each services launch."
+							;;
+						esac
 					fi
 				fi
 			;;

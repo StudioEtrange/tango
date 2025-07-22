@@ -21,7 +21,7 @@
 
 * This solution use the free nip.io or sslip.io service
     * `<anything>[.-]<IP Address>.nip.io` will be resolved as `<IP Address>`
-    * `firefox-20-20-30-40-nip.io` will be resolved as `20.20.30.40`
+    * `firefox-20-20-30-40.nip.io` will be resolved as `20.20.30.40`
 
 * When you set domain values with sepcial values, tango will internaly set your domain
     *  `auto-nip` : `<YOUR_PUBLIC_IP_ADRESS>.nip.io`
@@ -43,10 +43,12 @@
 
 * Edit /etc/hosts file mannually and add an entry for every services with your `<YOUR_CURRENT_LOCAL_IP_ADRESS>`
     ```
-    192.168.0.50 firefox.domain.org 
+    192.168.0.50 firefox.domain.org
     ```
 
-* set `TANGO_DOMAIN` or `--domain` command line option with `domain.org` value, and access to the service only using a web browser from your localhost
+* set `TANGO_DOMAIN` or `--domain` command line option with `domain.org` value, and access to the service only using a web browser from your localhost (ie: http://firefox.domain.org)
+
+* NOTE : /etc/hosts do not support wildcard notation like `192.168.0.50 *.domain.org`
 
 ----
 ## Solution #3 : edition your local network domain name server
