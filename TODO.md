@@ -168,7 +168,7 @@
 
 * [ ] implementation of __set_priority_router_all force TANGO_SUBSERVICES_ROUTER to have same family subrouter following each other in the list - REVIEW the implementation
 
-* [X] add by default traefik service ? its is added because traefik is a depency of all compose service
+* [X] add by default traefik service ? its is added because traefik is a dependency of all compose service
     * [-] each time we relaunch a single service, traefik is recreated --- is this a problem ? --- use --no-recreate ?
     
 * [ ] modules env file before/after app env file ?
@@ -197,8 +197,6 @@
 * [ ] Add possibility to reverse proxy to an http link instead of a service 
     * https://gist.github.com/StudioEtrange/c6bb41732063b0151adf5ef592768348
 
-* [ ] Catch Error 502 while getting external IP in tango_set_context.sh
-    ```TANGO_EXTERNAL_IP="$(__tango_curl -s ipinfo.io/ip)"```
 
 * [X] error service : exclude non HTTP router in entrypoints list `TRAEFIK_ENTRYPOINTS_LIST` which is used in compose file here : `"traefik.http.routers.error.entrypoints=${TRAEFIK_ENTRYPOINTS_LIST}"`
 

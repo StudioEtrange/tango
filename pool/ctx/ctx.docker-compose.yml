@@ -1,0 +1,5 @@
+# This file will be concatenated with tango docker-compose.yml
+# Use it to hardcode some docker compose definition
+#volumes:
+
+#services:

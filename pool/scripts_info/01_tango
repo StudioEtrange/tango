@@ -237,10 +237,11 @@ echo "* IP & Domain"
 echo L-- Declared domain : "$TANGO_DOMAIN"
 echo -n "L-- Should be reached from internet : "
 [ "${NETWORK_INTERNET_EXPOSED}" = "1" ] && echo YES || echo NO
-echo L-- External IP from internet : $TANGO_EXTERNAL_IP
+echo L-- External IPv4 from internet : $TANGO_EXTERNAL_IPV4
+echo L-- External IPv6 from internet : $TANGO_EXTERNAL_IPV6
 echo L-- Host name : $TANGO_HOSTNAME
-echo L-- Host default local IP : $TANGO_HOST_DEFAULT_IP
-echo L-- Host local IPs : $TANGO_HOST_IP
+echo L-- Host default local IPv4 : $TANGO_HOST_DEFAULT_IPV4
+echo L-- Host default local IPv6 : $TANGO_HOST_DEFAULT_IPV6
 echo L-- Random free ports mode :  $([ "${TANGO_FREEPORT}" = "1" ] && echo "ON [$GENERATED_ENV_FILE_FREEPORT]" || echo "OFF")
 echo "* NETWORK AREA declaration : ${NETWORK_SERVICES_AREA_LIST}"
 for area in ${NETWORK_SERVICES_AREA_LIST}; do
@@ -256,8 +257,8 @@ for area in ${NETWORK_SERVICES_AREA_LIST}; do
     v7="NETWORK_SERVICES_AREA_${name^^}_INTERNAL_PORT"
     v8="NETWORK_SERVICES_AREA_${name^^}_INTERNAL_SECURE_PORT"
     echo L-- services : ${!v1}
-    echo L-- entrypoint [entry_${name}_${proto}] - protocol : ${!v6}  - port : ${!v2} [internal port : ${!v7}] - reachable from internet : $([ "${!v4}" = "1" ] && echo YES || echo dont know)
-    [ ! "$secure_port" = "" ] && echo L-- associated secure entrypoint [entry_${name}_${proto}_secure] - port : ${!v3} [internal port : ${!v8}] - reachable from internet : $([ "${!v5}" = "1" ] && echo YES || echo dont know)
+    echo L-- entrypoint [entry_${name}_${proto}] - protocol : ${!v6}  - port : ${!v2} [internal port : ${!v7}] - reachable from internet : $([ "${!v4}" = "1" ] && echo YES || echo do not know)
+    [ ! "$secure_port" = "" ] && echo L-- associated secure entrypoint [entry_${name}_${proto}_secure] - port : ${!v3} [internal port : ${!v8}] - reachable from internet : $([ "${!v5}" = "1" ] && echo YES || echo do not know)
 done
 
 

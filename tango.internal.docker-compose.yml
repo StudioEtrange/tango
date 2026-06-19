@@ -261,7 +261,9 @@ services:
       - "--providers.docker.network=${TANGO_CTX_NETWORK_NAME}"
       # If set to false, containers that do not have a traefik.enable=true label are ignored
       - "--providers.docker.exposedByDefault=false"
+      # Enable auto loading of newly created rules by watching a directory
       - "--providers.file.directory=/traefikconfig"
+      - "--providers.file.watch=true"
       - "--certificatesresolvers.tango=true"
       - "--certificatesresolvers.tango.acme.email=${LETS_ENCRYPT_MAIL}"
       - "--certificatesresolvers.tango.acme.storage=/letsencrypt/acme.json"

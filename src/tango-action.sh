@@ -106,7 +106,7 @@ case ${ACTION} in
 	;;
 
 	gen )
-		__tango_log "INFO" "tango" "Compose & env files and files & folders are generated"
+		__tango_log "INFO" "tango" "generate compose & env files and files & folders are "
 		echo "---------==---- INFO  ----==---------"
 		echo "* Tango current context name : ${TANGO_CTX_NAME}"
 		echo "L-- standalone context : $([ "${TANGO_NOT_IN_ANY_CTX}" = "1" ] && echo NO || echo YES)"
@@ -294,20 +294,56 @@ case ${ACTION} in
 
 	vendor )
 		if [ "${TARGET}" = "" ]; then
-			__tango_log "ERROR" "tango" "Specify a target path"
+			__tango_log "ERROR" "tango" "Specify a target path to vendorize tango"
 		else
 			__tango_log "INFO" "tango" "Vendorize ${TARGET}"
 			__tango_log "INFO" "tango" "Copy tango into ${TARGET}/tango"
+			
+			mkdir -p "${TARGET}"
 			$STELLA_API transfer_app "${TARGET}"
 
 			cp -f "$TANGO_ROOT/pool/tango-link.sh" "${TARGET}/tango-link.sh"
 			chmod +x "${TARGET}/tango-link.sh"
 
-			cp -f "$TANGO_ROOT/pool/sample-app.sh" "${TARGET}/sample-app.sh"
-			chmod +x "${TARGET}/sample-app.sh"
 
 			__tango_log "INFO" "tango" "Link stella framework"
 			$STELLA_API init_app "$(basename "${TARGET}")" "${TARGET}"
+
+			echo ". \$_STELLA_LINK_CURRENT_FILE_DIR/tango-link.sh set-tango-root" >"${TARGET}/.stella-id"
+			echo "export STELLA_ROOT=\$TANGO_ROOT/pool/stella" >>"${TARGET}/.stella-id"
+			echo "STELLA_DEP_FLAVOUR=VENDOR" >>"${TARGET}/.stella-id"
+			echo "STELLA_DEP_VERSION=" >>"${TARGET}/.stella-id"
+			
+		fi
+	;;
+
+
+	ctx )
+		if [ "${TARGET}" = "" ]; then
+			__tango_log "ERROR" "tango" "Specify a context/app path to create a tango context"
+		else
+			mkdir -p "${TARGET}"
+			ctx="$(basename "${TARGET}")"
+
+			__tango_log "INFO" "tango" "Create a tango context $ctx into ${TARGET}"
+			cp -f "$TANGO_ROOT/pool/tango-link.sh" "${TARGET}/tango-link.sh"
+			chmod +x "${TARGET}/tango-link.sh"
+
+			mkdir -p "${TARGET}"/pool/modules
+			mkdir -p "${TARGET}"/pool/plugins
+			
+			cp -f "$TANGO_ROOT/pool/ctx/ctx.sh" "${TARGET}/${ctx}"
+			chmod +x "${TARGET}/${ctx}"
+
+			cp -f "$TANGO_ROOT/pool/ctx/ctx.docker-compose.yml" "${TARGET}/${ctx}.docker-compose.yml"
+
+			cp -f "$TANGO_ROOT/pool/ctx/ctx.env" "${TARGET}/${ctx}.env"
+			if [ ! "${DOMAIN}" = "" ]; then
+				$STELLA_API add_key "${TARGET}/${ctx}.env" "" "TANGO_DOMAIN" "$DOMAIN"
+			fi
+
+			__tango_log "INFO" "tango" "Link stella framework"
+			$STELLA_API init_app "$(basename "${TARGET}")" "${TARGET}" "$TANGO_WORK_ROOT" "$STELLA_APP_CACHE_DIR"
 
 			echo ". \$_STELLA_LINK_CURRENT_FILE_DIR/tango-link.sh set-tango-root" >"${TARGET}/.stella-id"
 			echo "export STELLA_ROOT=\$TANGO_ROOT/pool/stella" >>"${TARGET}/.stella-id"

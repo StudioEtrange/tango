@@ -43,9 +43,12 @@ if [ "$sourced" = "1" ]; then
                 export STELLA_APP_ROOT="${_TANGO_LINK_CURRENT_FILE_DIR}"
                 . "${TANGO_ROOT}/stella-link.sh" include
                 ;;
-            *)
+            "") 
+                # both set-tango-root and include-stella
                 export STELLA_APP_ROOT="${_TANGO_LINK_CURRENT_FILE_DIR}"
                 . "${TANGO_ROOT}/stella-link.sh" include
+                ;;
+            *)
                 ;;
         esac
     done

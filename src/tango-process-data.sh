@@ -452,9 +452,9 @@ case ${ACTION} in
 
 		# letsencrypt and ACME management -----
 		# change lets encrypt behaviour
-		if [ "${DEBUG}" = "1" ]; then
-			[ "${LETS_ENCRYPT}" = "enable" ] && LETS_ENCRYPT="debug"
-		fi
+		#if [ "${DEBUG}" = "1" ]; then
+		#	[ "${LETS_ENCRYPT}" = "enable" ] && LETS_ENCRYPT="debug"
+		#fi
 
 		# create and set variable value without ACME_ at the beginning of the name
 		# to match variable name list from https://doc.traefik.io/traefik/https/acme/
@@ -551,20 +551,29 @@ case ${ACTION} in
 		# NETWORK ---------
 
 
-		export TANGO_HOST_IP="${STELLA_HOST_IP}"
-		__add_declared_variables "TANGO_HOST_IP"
-		export TANGO_HOST_DEFAULT_IP="${STELLA_HOST_DEFAULT_IP}"
-		__add_declared_variables "TANGO_HOST_DEFAULT_IP"
+		export TANGO_HOST_DEFAULT_IPV4="$STELLA_HOST_DEFAULT_IP_IPV4"
+		__add_declared_variables "TANGO_HOST_DEFAULT_IPV4"
+		export TANGO_HOST_DEFAULT_IPV6="$STELLA_HOST_DEFAULT_IP_IPV6"
+		__add_declared_variables "TANGO_HOST_DEFAULT_IPV6"
+
 		TANGO_HOSTNAME="$(hostname)"
 		__add_declared_variables "TANGO_HOSTNAME"
+		
+		
 		if [ "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
-			TANGO_EXTERNAL_IP="$(__tango_curl --connect-timeout 2 -skL ipinfo.io/ip)"
-			__tango_log "INFO" "tango" "Declared being exposed on internet, external IP detected : $TANGO_EXTERNAL_IP"
+			__tango_log "INFO" "tango" "$TANGO_CTX_NAME is declared being exposed on internet."
+			# NOTE ; get_ip_external use dig and curl, do we need a dockererized version of it ?
+			TANGO_EXTERNAL_IPV4="$($STELLA_API get_ip_external "ipv4")"
+			__tango_log "INFO" "tango" "external IPV4 detected : $TANGO_EXTERNAL_IPV4"
+			TANGO_EXTERNAL_IPV6="$($STELLA_API get_stable_ip_from_default_interface "ipv6")"
+			__tango_log "INFO" "tango" "external IPV6 detected : $TANGO_EXTERNAL_IPV6"
 		else
 			__tango_log "DEBUG" "tango" "Not declared as exposed on internet."
-			TANGO_EXTERNAL_IP=
+			TANGO_EXTERNAL_IPV4=
+			TANGO_EXTERNAL_IPV6=
 		fi
-		__add_declared_variables "TANGO_EXTERNAL_IP"
+		__add_declared_variables "TANGO_EXTERNAL_IPV4"
+		__add_declared_variables "TANGO_EXTERNAL_IPV6"
 
 
 		# override domain value
@@ -572,86 +581,87 @@ case ${ACTION} in
 		__add_declared_variables "TANGO_DOMAIN_FEATURE"
 		if [ "${TANGO_DOMAIN}" = "auto-nip" ]; then
 			if [ ! "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
-				__tango_log "ERROR" "tango" "Your current tango context is declared not beeing exposed to internet. You can not use auto-nip domain name feature. To declare your current tango context exposed to internet change variable value NETWORK_INTERNET_EXPOSED to 1"
+				__tango_log "ERROR" "tango" "Your current tango context is declared not beeing exposed to internet. You can not use auto-nip domain name feature. To declare your current tango context exposed to internet set variable value NETWORK_INTERNET_EXPOSED to 1"
 				exit 1
 			fi
 		fi
 		if [ "${TANGO_DOMAIN}" = "auto-sslip" ]; then
 			if [ ! "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
-				__tango_log "ERROR" "tango" "Your current tango context is declared not beeing exposed to internet. You can not use auto-sslip domain name feature. To declare your current tango context exposed to internet change variable value NETWORK_INTERNET_EXPOSED to 1"
+				__tango_log "ERROR" "tango" "Your current tango context is declared not beeing exposed to internet. You can not use auto-sslip domain name feature. To declare your current tango context exposed to internet set variable value NETWORK_INTERNET_EXPOSED to 1"
 				exit 1
 			fi
 		fi
 
 		case $TANGO_DOMAIN in
 
-			auto-sslip-lan)
-				__tango_log "INFO" "tango" "auto-sslip-lan feature for domain name enabled."
-				TANGO_DOMAIN_FEATURE="auto-sslip-lan"
-				TANGO_DOMAIN="${TANGO_HOST_DEFAULT_IP//./-}.sslip.io"
-				__tango_log "INFO" "tango" "Domain is auto set to $TANGO_DOMAIN"
-				TANGO_SUBDOMAIN_SEPARATOR="-"
-				_s="$($STELLA_API get_ip_from_hostname ${TANGO_DOMAIN})"
-				case ${_s} in
-					${TANGO_HOST_DEFAULT_IP})
-						__tango_log "INFO" "tango" "$TANGO_DOMAIN is solved as your local IP address ${TANGO_HOST_DEFAULT_IP}"
-						;;
-					"")
-						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN do not return any result. Maybe your DNS configuration is protected against DNS rebind. Try to use auto-sslip mode feature OR get your own domain name !"
-						;;
-					*)
-						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN return ${_s} which is different from your local IP address ${TANGO_HOST_DEFAULT_IP}."
-						;;
-				esac
-			;;
-
 			auto-sslip)
 				__tango_log "INFO" "tango" "auto-sslip feature for domain name enabled."
 				TANGO_DOMAIN_FEATURE="auto-sslip"
-				if [ "${TANGO_EXTERNAL_IP}" = "" ]; then
-					__tango_log "ERROR" "tango" "Can not auto determine your external internet ip. Try to use auto-sslip-lan domain name feature OR get your own domain name !."
+				if [ "${TANGO_EXTERNAL_IPV4}" = "" ]; then
+					__tango_log "ERROR" "tango" "Can not auto determine your external internet IPv4. Try to use auto-sslip-lan domain name feature OR get your own domain name !"
 					exit 1
 				else
-					TANGO_DOMAIN="${TANGO_EXTERNAL_IP//./-}.sslip.io"
+					TANGO_DOMAIN="${TANGO_EXTERNAL_IPV4//./-}.sslip.io"
 				fi
 				__tango_log "INFO" "tango" "Domain is auto set to $TANGO_DOMAIN"
 				TANGO_SUBDOMAIN_SEPARATOR="-"
-				_s="$($STELLA_API get_ip_from_hostname ${TANGO_DOMAIN})"
+				_s="$($STELLA_API get_ip_from_host ${TANGO_DOMAIN})"
 				case ${_s} in
-					${TANGO_EXTERNAL_IP})
-						__tango_log "INFO" "tango" "$TANGO_DOMAIN is solved as your external IP address ${TANGO_EXTERNAL_IP}"
+					${TANGO_EXTERNAL_IPV4})
+						__tango_log "INFO" "tango" "$TANGO_DOMAIN is solved as your external IPv4 address ${TANGO_EXTERNAL_IPV4}"
 						;;
 					"")
 						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN do not return any result. Maybe your DNS configuration is protected against DNS rebind. Try to use auto-sslip-lan mode OR get your own domain name !"
 						;;
 					*)
-						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN return ${_s} which is different from your external IP address ${TANGO_EXTERNAL_IP}."
+						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN return ${_s} which is different from your external IP address ${TANGO_EXTERNAL_IPV4}."
 						;;
 				esac
 				
 			;;
 
+			auto-sslip-lan)
+				__tango_log "INFO" "tango" "auto-sslip-lan feature for domain name enabled."
+				TANGO_DOMAIN_FEATURE="auto-sslip-lan"
+				TANGO_DOMAIN="${TANGO_HOST_DEFAULT_IPV4//./-}.sslip.io"
+				__tango_log "INFO" "tango" "Domain is auto set to $TANGO_DOMAIN"
+				TANGO_SUBDOMAIN_SEPARATOR="-"
+				_s="$($STELLA_API get_ip_from_host ${TANGO_DOMAIN})"
+				case ${_s} in
+					${TANGO_HOST_DEFAULT_IPV4})
+						__tango_log "INFO" "tango" "$TANGO_DOMAIN is solved as your local lan IPv4 address ${TANGO_HOST_DEFAULT_IPV4}"
+						;;
+					"")
+						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN do not return any result. Maybe your DNS configuration is protected against DNS rebind. Try to use auto-sslip mode feature OR get your own domain name !"
+						;;
+					*)
+						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN return ${_s} which is different from your local IPv4 address ${TANGO_HOST_DEFAULT_IPV4}."
+						;;
+				esac
+			;;
+
+
 			auto-nip)
 				__tango_log "INFO" "tango" "auto-nip feature for domain name enabled."
 				TANGO_DOMAIN_FEATURE="auto-nip"
-				if [ "${TANGO_EXTERNAL_IP}" = "" ]; then
-					__tango_log "ERROR" "tango" "Can not auto determine your external internet ip. Try to use auto-nip-lan domain name feature OR get your own domain name !."
+				if [ "${TANGO_EXTERNAL_IPV4}" = "" ]; then
+					__tango_log "ERROR" "tango" "Can not auto determine your external internet IP v4. Try to use auto-nip-lan domain name feature OR get your own domain name !"
 					exit 1
 				else
-					TANGO_DOMAIN="${TANGO_EXTERNAL_IP//./-}.nip.io"
+					TANGO_DOMAIN="${TANGO_EXTERNAL_IPV4//./-}.nip.io"
 				fi
 				__tango_log "INFO" "tango" "Domain is auto set to $TANGO_DOMAIN"
 				TANGO_SUBDOMAIN_SEPARATOR="-"
-				_s="$($STELLA_API get_ip_from_hostname ${TANGO_DOMAIN})"
+				_s="$($STELLA_API get_ip_from_host ${TANGO_DOMAIN})"
 				case ${_s} in
-					${TANGO_EXTERNAL_IP})
-						__tango_log "INFO" "tango" "$TANGO_DOMAIN is solved as your external IP address ${TANGO_EXTERNAL_IP}"
+					${TANGO_EXTERNAL_IPV4})
+						__tango_log "INFO" "tango" "$TANGO_DOMAIN is solved as your external IPv4 address ${TANGO_EXTERNAL_IPV4}"
 						;;
 					"")
 						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN do not return any result. Maybe your DNS configuration is protected against DNS rebind. Try to use auto-nip-lan mode OR get your own domain name !"
 						;;
 					*)
-						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN return ${_s} which is different from your external IP address ${TANGO_EXTERNAL_IP}."
+						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN return ${_s} which is different from your external IPv4 address ${TANGO_EXTERNAL_IPV4}."
 						;;
 				esac
 				
@@ -660,24 +670,23 @@ case ${ACTION} in
 			auto-nip-lan)
 				__tango_log "INFO" "tango" "auto-nip-lan feature for domain name enabled."
 				TANGO_DOMAIN_FEATURE="auto-nip-lan"
-				TANGO_DOMAIN="${TANGO_HOST_DEFAULT_IP//./-}.nip.io"
+				TANGO_DOMAIN="${TANGO_HOST_DEFAULT_IPV4//./-}.nip.io"
 				__tango_log "INFO" "tango" "Domain is auto set to $TANGO_DOMAIN"
 				TANGO_SUBDOMAIN_SEPARATOR="-"
-				_s="$($STELLA_API get_ip_from_hostname ${TANGO_DOMAIN})"
+				_s="$($STELLA_API get_ip_from_host ${TANGO_DOMAIN})"
 				case ${_s} in
-					${TANGO_HOST_DEFAULT_IP})
-						__tango_log "INFO" "tango" "$TANGO_DOMAIN is solved as your local IP address ${TANGO_HOST_DEFAULT_IP}"
+					${TANGO_HOST_DEFAULT_IPV4})
+						__tango_log "INFO" "tango" "$TANGO_DOMAIN is solved as your local lan IP address ${TANGO_HOST_DEFAULT_IPV4}"
 						;;
 					"")
 						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN do not return any result. Maybe your DNS configuration is protected against DNS rebind. Try to use auto-nip mode feature OR get your own domain name !"
 						;;
 					*)
-						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN return ${_s} which is different from your local IP address ${TANGO_HOST_DEFAULT_IP}."
+						__tango_log "WARN" "tango" "DNS request on $TANGO_DOMAIN return ${_s} which is different from your local IP address ${TANGO_HOST_DEFAULT_IPV4}."
 						;;
 				esac
 			;;
 		esac
-
 
 		NETWORK_SERVICES_AREA_LIST="$($STELLA_API list_filter_duplicate "${NETWORK_SERVICES_AREA_LIST}")"
 		__area_main_done=
@@ -712,7 +721,16 @@ case ${ACTION} in
 					if [ -n "${!v0}" ]; then
 						__tango_log "INFO" "tango" "${name} area network port for protocol $proto is : ${!v0}"
 						__port_list="${__port_list} ${!v0}"
-						[ "${NETWORK_INTERNET_EXPOSED}" = "1" ] && [ ! "${TANGO_EXTERNAL_IP}" = "" ] && [ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${!v0}")" = "TRUE" ] && eval NETWORK_PORT_${name^^}_REACHABLE=1						
+						# TODO : we cannot check port open from LAN when using ipv4, we can do this only when using ipv6
+						#if [ "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
+							# if [ ! "${TANGO_EXTERNAL_IPV4}" = "" ]; then
+							# 	__tango_log "DEBUG" "tango" "check for port ${!v0} is reachable on external ipv4 ${TANGO_EXTERNAL_IPV4}"
+							# 	[ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IPV4}" "${!v0}")" = "TRUE" ] && eval NETWORK_PORT_${name^^}_REACHABLE=1						
+							# else
+							# 	__tango_log "DEBUG" "tango" "check for port ${!v0} is reachable on external ipv6 ${TANGO_EXTERNAL_IPV6}"
+							# 	[ ! "${TANGO_EXTERNAL_IPV6}" = "" ] && [ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IPV6}" "${!v0}")" = "TRUE" ] && eval NETWORK_PORT_${name^^}_REACHABLE=1	
+							# fi
+						#fi
 					else
 						__tango_log "WARN" "tango" "${name} area network do not have a port defined. Set it with option --port ${name}@port[@secured_port] OR variable : ${v0}"
 					fi
@@ -723,7 +741,16 @@ case ${ACTION} in
 						if [ -n "${!v0s}" ]; then
 							__tango_log "INFO" "tango" "${name} area network secured port for protocol $proto is : ${!v0s}"
 							__port_list="${__port_list} ${!v0s}"
-							[ "${NETWORK_INTERNET_EXPOSED}" = "1" ] && [ ! "${TANGO_EXTERNAL_IP}" = "" ] && [ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IP}" "${!v0s}")" = "TRUE" ] && eval NETWORK_PORT_${name^^}_SECURE_REACHABLE=1
+							# TODO : we cannot check port open from LAN when using ipv4, we can do this only when using ipv6
+							#if [ "${NETWORK_INTERNET_EXPOSED}" = "1" ]; then
+								# if [ ! "${TANGO_EXTERNAL_IPV4}" = "" ]; then
+								# 	__tango_log "DEBUG" "tango" "check for secured port ${!v0s} is reachable on external ipv4 ${TANGO_EXTERNAL_IPV4}"
+								# 	[ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IPV4}" "${!v0s}")" = "TRUE" ] && eval NETWORK_PORT_${name^^}_SECURE_REACHABLE=1						
+								# else
+								# 	__tango_log "DEBUG" "tango" "check for secured port ${!v0s} is reachable on external ipv6 ${TANGO_EXTERNAL_IPV6}"
+								# 	[ ! "${TANGO_EXTERNAL_IPV6}" = "" ] && [ "$(__check_tcp_port_open "${TANGO_EXTERNAL_IPV6}" "${!v0s}")" = "TRUE" ] && eval NETWORK_PORT_${name^^}_SECURE_REACHABLE=1	
+								# fi
+							#fi
 						else
 							__tango_log "WARN" "tango" "${name} area network do not have a secured port defined. Set it with with option --port ${name}@port@secured_port OR variable : ${v0s}"
 						fi
@@ -740,7 +767,7 @@ case ${ACTION} in
 							;;
 							*)
 								# if we are not using auto-nip or auto-sslip, we need to forward ports
-								__tango_log "INFO" "tango" "If you are on a local network with a router, do not forget to forward ports ${__port_list// / and } entering into your router to your tango host IP ${TANGO_HOST_DEFAULT_IP}"
+								__tango_log "INFO" "tango" "If you are on a local network with a router, do not forget to forward or open ports ${__port_list// / and } into your router to your tango host IP ${TANGO_HOST_DEFAULT_IPV4} or ${TANGO_HOST_DEFAULT_IPV6} if your router support ipv6."
 								[ "${TANGO_FREEPORT}" = "1" ] && __tango_log "INFO" "tango" "When using freeport option this is a common mistake as port change at each services launch."
 							;;
 						esac

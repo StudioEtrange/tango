@@ -442,7 +442,7 @@ __set_traefik_log() {
 # https://doc.traefik.io/traefik/https/acme/
 __set_letsencrypt_service_all() {
 	local __cloudflare_ip
-	
+
 	case ${LETS_ENCRYPT} in
 		enable|debug )
 			for serv in ${LETS_ENCRYPT_SERVICES}; do
@@ -2501,10 +2501,10 @@ __check_traefik_router_have_secured_version() {
 }
 
 
+# nvidia container toolkit : https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/docker-specialized.html
 __add_gpu() {
 	local __service="$1"
 	local __opt="$2"
-
 	local __docker_version
 	
 	__opt_intel_quicksync=0
@@ -2531,7 +2531,7 @@ __add_gpu() {
 		__docker_version_minor=$(echo "$__docker_version"| cut -d'.' -f 2)
 		__docker_version_build=$(echo "$__docker_version"| cut -d'.' -f 3)
 
-		# NOTE we keep old and new method (A and B) because some image like plexinc/pms-docker needs envrionement variable even when using devices method (B)
+		# NOTE we keep old and new method (A and B) because some container image like plexinc/pms-docker needs envrionement variable even when using devices method (B)
 		[ "${__docker_version_major}" -gt 19 ] && USE_NVIDIA_CONTAINER_TOOLKIT="1"
 		if [ "${__docker_version_major}" -eq 19 ]; then
 			[ "${__docker_version_minor}" -gt 0 ] && USE_NVIDIA_CONTAINER_TOOLKIT="1"
@@ -2540,13 +2540,16 @@ __add_gpu() {
 			fi
 		fi
 
-		if [ $USE_NVIDIA_CONTAINER_TOOLKIT = "1" ]; then
+		if [ "$USE_NVIDIA_CONTAINER_TOOLKIT" = "1" ]; then
 			# docker >= 19.03 -- method B : nvidia-container-toolkit
 			# docker run --rm --gpus all,capabilities=utility nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
 			yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.deploy.resources.reservations.devices[+].driver" "nvidia"
 			yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.deploy.resources.reservations.devices[0].count" "all"
 			yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.deploy.resources.reservations.devices[0].capabilities[+]" "compute"
 			yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.deploy.resources.reservations.devices[0].capabilities[+]" "utility"
+			yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.deploy.resources.reservations.devices[0].capabilities[+]" "video"
+			# pour le encoding decoding du H265 'graphics' est nécessaire https://github.com/linuxserver/docker-plex/commit/4dd0b7f2d290c87c6679312f51c959ed46dfc1dd
+			yq w -i --style=single -- "${GENERATED_DOCKER_COMPOSE_FILE}" "services.${__service}.deploy.resources.reservations.devices[0].capabilities[+]" "graphics"
 		fi
 	fi
 }

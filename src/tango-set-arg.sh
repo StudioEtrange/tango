@@ -4,7 +4,7 @@
 usage() {
 	echo "USAGE :"
 	echo "----------------"
-	echo "o-- tango management :"
+	echo "o-- management :"
 	echo "L     install : deploy/update Tango dependencies."
 	echo "L     up [service [-b]] [--module module] [--plugin plugin] [--freeport|--port port]: launch all available services or one service"
 	echo "L     down [service] [--module module] [--all]: down all services or one service. Except shared internal service when in shared mode (--all force stop shared service)."
@@ -28,6 +28,7 @@ usage() {
 	echo "L		letsencrypt rm : delete generated letsencrypt cert [WARN : delete certs will regenerate request to letsencrypt. Too much requests and you may be banned for a time]"
 	echo "L		letsencrypt logs : follow letsencrypt actions"
 	echo "L		letsencrypt test : test certificate generation using dns-challenge"
+	echo "L		ctx <path> [--domain=<domain>] : create a tango context/app into the defined path"
 	echo "L		vendor <path> : copy tango into another path (inside a tango folder : <path>/tango), mainly to vendorize tango into another folder."
 }
 
@@ -38,7 +39,7 @@ usage() {
 
 # COMMAND LINE
 PARAMETERS="
-ACTION=										'action' 			a				'update info gen shell exec up down status install logs restart services modules plugins cert vendor letsencrypt' '1'
+ACTION=										'action' 			a				'update info gen shell exec up down status install logs restart services modules plugins cert ctx vendor letsencrypt' '1'
 TARGET=										'target' 			s				''	'0'
 ARGUMENT=									'argument' 			s				''	'0'
 "

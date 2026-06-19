@@ -16,7 +16,7 @@ Tango is a command line tool written in bash.
 * Generate and run a fully configured docker-compose file.
 * Pick services from a list of preconfigured available modules (calibre, cloud9, codeserver,...) to be composed.
 * Entirely configurable through environment variables and files.
-* Use Traefik2 as a reverse proxy to set up network route to access the services.
+* Use Traefik 3 as a reverse proxy to set up network route to access the services.
 * Take care automaticly of HTTPS certificate generation using Let's encrypt.
 
 * Advanced special features :
@@ -126,7 +126,7 @@ In most cases, you will have to use only tango management commands below.
 
 * A service is a containerized application (i.e sabnzbd, calibreweb, cloud9, codeserver,...), accessible through HTTP, configured and managed by tango. At core level, a service is a yml definition of a docker-compose file.
 * A module is a ready-to-use service with a markdown description, a yml predefined compose file and a set of configurable variables in an environment file (see [modules catalogue](/pool/modules/))
-* Tango leverage services exposition mechanisms using traefik2. Tango automaticly set up all traefik2 rules and routes to provide access to services.
+* Tango leverage services exposition mechanisms using traefik. Tango automaticly set up all traefik rules and routes to provide access to services.
 
 * *see details in [variables documentation](/doc/services.md)*
 
